@@ -276,61 +276,6 @@ export default function PDFToExcelConverter({sendDataToParent}) {
         await extractTextFromPDF(file);
     };
 
-    const downloadExcel = () => {
-        if (tableData.length === 0) {
-            setError('No data to download');
-            return;
-        }
-
-        console.log('Downloading CSV with data:', tableData);
-
-        // Create list from CSV data
-        const dataList = tableData.slice(1).map((row, index) => {
-            const headers = tableData[0];
-            const obj = {};
-            headers.forEach((header, i) => {
-                obj[header] = row[i] || '';
-            });
-            return obj;
-        });
-
-        console.log('=== CSV DATA AS LIST ===');
-        console.log('Total Items:', dataList.length);
-        console.log('List:', dataList);
-        console.log('=== JSON FORMAT ===');
-        console.log(JSON.stringify(dataList, null, 2));
-
-        // Create CSV content (Excel can open CSV files)
-        const csvContent = tableData.map(row =>
-            row.map(cell => {
-                // Escape cells with commas or quotes
-                const cellStr = String(cell || '');
-                if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-                    return `"${cellStr.replace(/"/g, '""')}"`;
-                }
-                return cellStr;
-            }).join(',')
-        ).join('\r\n');
-
-        console.log('=== CSV CONTENT ===');
-        console.log(csvContent);
-
-        // Create blob and download
-        const BOM = '\uFEFF';
-        const blob = new Blob([BOM + csvContent], {type: 'text/csv;charset=utf-8;'});
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', pdfFile ? pdfFile.name.replace('.pdf', '.csv') : 'invoice_data.csv');
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        console.log('Download triggered');
-    };
-
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-8">
             <div className="max-w-4xl mx-auto">
@@ -354,8 +299,6 @@ export default function PDFToExcelConverter({sendDataToParent}) {
                             <p className="text-red-700">{error}</p>
                         </div>
                     )}
-
-                    {/* Upload Section */}
                     <div className="space-y-6">
                         <label className="block cursor-pointer">
                             <div
@@ -391,92 +334,6 @@ export default function PDFToExcelConverter({sendDataToParent}) {
                             />
                         </label>
 
-                        {/* Loading State */}
-                        {loading && (
-                            <div className="text-center py-8">
-                                <div
-                                    className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mb-4"></div>
-                                <p className="text-lg text-gray-600 font-medium">
-                                    Converting PDF to Excel...
-                                </p>
-                                <p className="text-sm text-gray-500 mt-2">
-                                    This may take a moment
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Success State */}
-                        {converted && !loading && (
-                            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <CheckCircle className="w-12 h-12 text-green-600"/>
-                                        <div>
-                                            <h3 className="text-xl font-bold text-gray-800">
-                                                Conversion Complete!
-                                            </h3>
-                                            <p className="text-gray-600">
-                                                {tableData.length - 1} rows extracted from PDF
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={downloadExcel}
-                                        className="flex items-center gap-3 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold"
-                                    >
-                                        <Download className="w-5 h-5"/>
-                                        Download CSV
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Preview Table */}
-                        {converted && !loading && tableData.length > 0 && (
-                            <div className="mt-6">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                                    Preview (First 10 rows)
-                                </h3>
-                                <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-96">
-                                    <table className="min-w-full border-collapse bg-white text-sm">
-                                        <thead className="bg-green-600 text-white sticky top-0">
-                                        <tr>
-                                            {tableData[0]?.map((header, i) => (
-                                                <th
-                                                    key={i}
-                                                    className="border border-green-500 px-3 py-2 text-left font-semibold whitespace-nowrap"
-                                                >
-                                                    {header}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {tableData.slice(1, 11).map((row, i) => (
-                                            <tr
-                                                key={i}
-                                                className={`hover:bg-green-50 ${i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
-                                            >
-                                                {row.map((cell, j) => (
-                                                    <td
-                                                        key={j}
-                                                        className="border border-gray-300 px-3 py-2 text-gray-700"
-                                                    >
-                                                        {cell}
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {tableData.length > 11 && (
-                                    <p className="text-center text-gray-500 mt-3 text-sm">
-                                        ... and {tableData.length - 11} more rows
-                                    </p>
-                                )}
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
