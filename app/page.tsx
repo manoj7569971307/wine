@@ -10,6 +10,11 @@ function removeCommasAndDecimals(value) {
     cleanedValue = cleanedValue.split('.')[0];
     return cleanedValue;
 }
+function removeCommas(value) {
+    let cleanedValue = value.replace(/,/g, '');
+    return parseFloat(cleanedValue);
+}
+
 
 function getFirstIndexValue(childDataRow: string[]): string {
     if (!childDataRow[5] || !childDataRow[5].includes('/')) return '0';
@@ -51,7 +56,6 @@ export default function Home() {
                 }
 
                 // Calculate issue price with proper error handling
-                const rawPrice = removeCommasAndDecimals(String(childData[j][8]));
                 const quantity = Number(childData[j][6]);
                 const quantitySize = String(childData[j][5] || '');
                 const [firstIndex, secondIndex] = quantitySize.includes('/')
@@ -63,10 +67,12 @@ export default function Home() {
                     continue;
                 }
                 let issuePrice;
+                let rawPrice = removeCommasAndDecimals(String(childData[j][8]));
                 if(Number(childData[j][7]) === 0){
                     issuePrice = Number(rawPrice) / quantity;
                 }else {
-                    issuePrice = (Number(rawPrice)/((quantity * Number(firstIndex)) + Number(childData[j][7]))) * Number(firstIndex);
+                    issuePrice = Math.ceil((Number(rawPrice)/((quantity * Number(firstIndex)) + Number(childData[j][7]))) * Number(firstIndex));
+                    rawPrice = removeCommas(String(childData[j][8]));
                 }
 
                 if (isNaN(issuePrice)) {
@@ -109,7 +115,7 @@ export default function Home() {
                                 description: sampleWinesData[i]['Product Name'],
                                 unit: childData[j][3] || '',
                                 group: childData[j][4] || '',
-                                quantity: firstIndex ? Number(firstIndex) * quantity : quantity,
+                                quantity: firstIndex ? (Number(firstIndex) * quantity) + Number(childData[j][7]) : quantity,
                                 size: secondIndex || '',
                                 someField2: childData[j][7] || '',
                                 totalPrice: childData[j][8] || '',
