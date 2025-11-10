@@ -4,9 +4,10 @@ import {useEffect, useState} from 'react';
 import { Upload, Download, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
 
 
-export default function PDFToExcelConverter({sendDataToParent}) {
+export default function PDFToExcelConverter({sendDataToParent, handleIDOC}) {
     const [pdfFile, setPdfFile] = useState(null);
     const [tableData, setTableData] = useState([]);
+    const [idocNumber, setIdocNumber] = useState('');
     const [loading, setLoading] = useState(false);
     const [converted, setConverted] = useState(false);
     const [error, setError] = useState('');
@@ -14,6 +15,9 @@ export default function PDFToExcelConverter({sendDataToParent}) {
     useEffect(() => {
         sendDataToParent(tableData)
     }, [tableData]);
+    useEffect(() => {
+        handleIDOC(idocNumber)
+    }, [idocNumber]);
 
 
     const extractTextFromPDF = async (file) => {
@@ -92,6 +96,21 @@ export default function PDFToExcelConverter({sendDataToParent}) {
 
             console.log(`Grouped into ${rows.length} rows`);
             console.log('First 10 rows:', rows.slice(0, 10));
+            // 🔹 Extract the iDOC number (format: ICDC + digits)
+            try {
+                const fullText = allTextItems.map(item => item.text).join(' ');
+                const idocMatch = fullText.match(/\bICDC\d{15,20}\b/i);
+
+                if (idocMatch) {
+                    console.log('✅ Extracted iDOC Number:', idocMatch[0]);
+                    setIdocNumber(idocMatch[0])
+                } else {
+                    console.log('⚠️ No iDOC number found in PDF text');
+                }
+            } catch (e) {
+                console.log('Error extracting iDOC number:', e);
+            }
+
 
             // Parse the extracted text into table format
             const parsedData = parseInvoiceText(rows);

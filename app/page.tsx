@@ -28,13 +28,27 @@ function getSecondIndexValue(childDataRow: string[]): string {
 
 export default function Home() {
     const [childData, setChildData] = useState([]);
+    const [idocData, setIdocData] = useState([])
     const [filterData, setFilterData] = useState([]);
 
     // Callback function to receive data from the child
     const handleDataFromChild = (data) => {
         setChildData(data);
     };
+    const handleIDOC = (data) => {
+        if (!data || data.trim() === "") return; // ignore empty strings
+        setIdocData((prev) => {
+            if (prev.includes(data)) {
+                console.error(`IDOC ${data} already exists!`);
+                return prev; // do not add duplicates
+            }
+            return [...prev, data]; // add new IDOC
+        });
+    };
 
+    useEffect(() => {
+        console.log("✅ Current IDOCs:", idocData);
+    }, [idocData]);
     // Function to filter wine data - FIXED VERSION (No Duplicates)
     const filterWineData = () => {
         let filtered = [];
@@ -159,7 +173,13 @@ export default function Home() {
             console.table(unmatched);
         }
 
-        setFilterData(filtered);
+        // Assuming filtered is an array of objects with a 'description' property
+        const sortedFiltered = filtered.sort((a, b) => {
+            if (!a.description) return 1; // handle missing descriptions
+            if (!b.description) return -1;
+            return a.description.localeCompare(b.description);
+        });
+        setFilterData(sortedFiltered);
     };
 
     // Effect hook to filter data when childData changes
@@ -191,7 +211,7 @@ export default function Home() {
                 <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
                     <h2 className="text-xl font-semibold text-blue-600 mb-4">Sample Data</h2>
                     <p className="text-gray-600">Brand Number: {sampleWinesData[0]?.['Brand Number']}</p>
-                    <PDFToExcelConverter sendDataToParent={handleDataFromChild} />
+                    <PDFToExcelConverter sendDataToParent={handleDataFromChild} handleIDOC={handleIDOC} />
                 </div>
 
                 {filterData.length > 0 && (
