@@ -12,10 +12,12 @@ function removeCommasAndDecimals(value) {
 }
 
 function getFirstIndexValue(childDataRow: string[]): string {
+    if (!childDataRow[5] || !childDataRow[5].includes('/')) return '0';
     return childDataRow[5].split('/')[0].trim();
 }
 
 function getSecondIndexValue(childDataRow: string[]): string {
+    if (!childDataRow[5] || !childDataRow[5].includes('/')) return '';
     return childDataRow[5].split('/')[1].trim();
 }
 
@@ -28,32 +30,127 @@ export default function Home() {
         setChildData(data);
     };
 
-    // Function to filter wine data
+    // Function to filter wine data - FIXED VERSION (No Duplicates)
     const filterWineData = () => {
         let filtered = [];
+        let unmatched = [];
 
-        for (let i = 0; i < sampleWinesData.length; i++) {
-            for (let j = 0; j < childData.length; j++) {
-                const issuePrice = Number(removeCommasAndDecimals(childData[j][8])) / Number(childData[j][6]);
+        // Debug logging
+        console.log('Starting filter with:', {
+            sampleWinesCount: sampleWinesData.length,
+            childDataCount: childData.length - 1 // Excluding header
+        });
 
-                if (sampleWinesData[i]['Brand Number'] === childData[j][1] &&
-                    sampleWinesData[i]['Issue Price'] === issuePrice) {
-                    filtered.push({
-                        brandNumber: sampleWinesData[i]['Brand Number'],
-                        code: childData[j][1],
-                        Mrp: sampleWinesData[i]['MRP'],
-                        description: sampleWinesData[i]['Product Name'],
-                        unit: childData[j][3],
-                        group: childData[j][4],
-                        quantity: Number(getFirstIndexValue(childData[j])) * childData[j][6],
-                        size: getSecondIndexValue(childData[j]),
-                        someField2: childData[j][7],
-                        totalPrice: sampleWinesData[i]['Product Name'],
-                        extraField1: childData[j][9],
-                        extraField2: childData[j][10],
+        // Process each row from childData (invoice data)
+        for (let j = 1; j < childData.length; j++) {
+            try {
+                // Add safety checks for childData
+                if (!childData[j] || !childData[j][8] || !childData[j][6] || !childData[j][1]) {
+                    console.warn(`Missing critical data at row ${j}:`, childData[j]);
+                    continue;
+                }
+
+                // Calculate issue price with proper error handling
+                const rawPrice = removeCommasAndDecimals(String(childData[j][8]));
+                const quantity = Number(childData[j][6]);
+                const quantitySize = String(childData[j][5] || '');
+                const [firstIndex, secondIndex] = quantitySize.includes('/')
+                    ? quantitySize.split('/').map(s => s?.trim() || '')
+                    : ['0', ''];
+
+                if (quantity === 0 || isNaN(quantity)) {
+                    console.warn(`Invalid quantity at row ${j}:`, childData[j][6]);
+                    continue;
+                }
+                let issuePrice;
+                if(Number(childData[j][7]) === 0){
+                    issuePrice = Number(rawPrice) / quantity;
+                }else {
+                    issuePrice = (Number(rawPrice)/((quantity * Number(firstIndex)) + Number(childData[j][7]))) * Number(firstIndex);
+                }
+
+                if (isNaN(issuePrice)) {
+                    console.warn(`Invalid issue price calculation at row ${j}`);
+                    continue;
+                }
+
+                // Convert brand number to string for comparison
+                const brandNumberFromChild = String(childData[j][1]).trim();
+
+                console.log(`Row ${j}: Brand="${brandNumberFromChild}", IssuePrice=${issuePrice.toFixed(2)}, Qty=${quantity}`);
+
+                // Find the matching wine in sampleWinesData
+                let matchFound = false;
+                let potentialMatches = [];
+
+                for (let i = 0; i < sampleWinesData.length; i++) {
+                    const brandNumberFromSample = String(sampleWinesData[i]['Brand Number']).trim();
+                    const sampleIssuePrice = Number(sampleWinesData[i]['Issue Price']);
+
+                    // Check brand number match first
+                    if (brandNumberFromChild === brandNumberFromSample) {
+                        const priceDiff = Math.abs(issuePrice - sampleIssuePrice);
+                        potentialMatches.push({
+                            index: i,
+                            mrp: sampleWinesData[i]['MRP'],
+                            issuePrice: sampleIssuePrice,
+                            priceDiff: priceDiff
+                        });
+
+                        // Match on brand number AND issue price (with tolerance)
+                        if (priceDiff < 1) {
+                            console.log(`✓ Match found for row ${j}: Brand=${brandNumberFromChild}, MRP=${sampleWinesData[i]['MRP']}, IssuePrice=${sampleIssuePrice}`);
+
+                            // Check if index 5 exists and has proper format
+
+                            filtered.push({
+                                brandNumber: sampleWinesData[i]['Brand Number'],
+                                Mrp: sampleWinesData[i]['MRP'],
+                                description: sampleWinesData[i]['Product Name'],
+                                unit: childData[j][3] || '',
+                                group: childData[j][4] || '',
+                                quantity: firstIndex ? Number(firstIndex) * quantity : quantity,
+                                size: secondIndex || '',
+                                someField2: childData[j][7] || '',
+                                totalPrice: childData[j][8] || '',
+                                issuePrice: issuePrice.toFixed(2),
+                                extraField1: childData[j][9] || '',
+                                extraField2: childData[j][10] || '',
+                                invoiceRow: j, // Track which invoice row this came from
+                            });
+
+                            matchFound = true;
+                            break; // Stop after first match to avoid duplicates
+                        }
+                    }
+                }
+
+                if (!matchFound) {
+                    console.warn(`✗ No match for row ${j}:`, {
+                        brand: brandNumberFromChild,
+                        issuePrice: issuePrice.toFixed(2),
+                        potentialMatches: potentialMatches.length > 0 ? potentialMatches : 'No brand matches found',
+                        rawData: childData[j]
+                    });
+
+                    unmatched.push({
+                        invoiceRow: j,
+                        brandNumber: brandNumberFromChild,
+                        issuePrice: issuePrice.toFixed(2),
+                        quantity: quantity,
+                        totalPrice: childData[j][8],
+                        potentialMatches: potentialMatches
                     });
                 }
+            } catch (error) {
+                console.error(`Error processing row ${j}:`, error, childData[j]);
             }
+        }
+
+        console.log(`✓ Matched: ${filtered.length} items`);
+        console.log(`✗ Unmatched: ${unmatched.length} items`);
+        if (unmatched.length > 0) {
+            console.table(unmatched);
         }
 
         setFilterData(filtered);
@@ -68,7 +165,11 @@ export default function Home() {
 
     // Log filtered data (for debugging)
     useEffect(() => {
-        console.log('Filtered Data:', filterData, childData);
+        console.log('Filtered Data:', filterData);
+        if (childData.length > 0) {
+            console.log('Sample brand numbers:', sampleWinesData.slice(0, 5).map(w => w['Brand Number']));
+            console.log('Child brand numbers:', childData.slice(1, 6).map(row => row[1]));
+        }
     }, [filterData]);
 
     return (
@@ -94,10 +195,6 @@ export default function Home() {
                                 <h3 className="text-xl font-semibold text-blue-700 mb-4">Brand Number: {item.brandNumber}</h3>
                                 <div className="space-y-3 text-black">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-700 font-medium">Code:</span>
-                                        <span>{item.code}</span>
-                                    </div>
-                                    <div className="flex justify-between">
                                         <span className="text-gray-700 font-medium">MRP:</span>
                                         <span>{item.Mrp}</span>
                                     </div>
@@ -121,9 +218,24 @@ export default function Home() {
                                         <span className="text-gray-700 font-medium">Size:</span>
                                         <span>{item.size}</span>
                                     </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-700 font-medium">Total Price:</span>
+                                        <span>{item.totalPrice}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-700 font-medium">Issue Price:</span>
+                                        <span>{item.issuePrice}</span>
+                                    </div>
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {childData.length > 0 && filterData.length === 0 && (
+                    <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded">
+                        <p className="font-bold">No matches found</p>
+                        <p>Check the console for debugging information about brand numbers and prices.</p>
                     </div>
                 )}
             </main>
