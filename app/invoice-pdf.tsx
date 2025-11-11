@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useState} from 'react';
-import { Upload, Download, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, CheckCircle, AlertCircle, X } from 'lucide-react';
 
 
 export default function PDFToExcelConverter({sendDataToParent}) {
@@ -10,7 +10,13 @@ export default function PDFToExcelConverter({sendDataToParent}) {
     const [loading, setLoading] = useState(false);
     const [converted, setConverted] = useState(false);
     const [error, setError] = useState('');
-    console.log('manoj', tableData)
+    const [idocNumber, setIdocNumber] = useState('');
+    const [processedIdocs, setProcessedIdocs] = useState(new Set());
+    const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+    const [duplicateIdoc, setDuplicateIdoc] = useState('');
+
+    console.log('manoj', tableData);
+
     useEffect(() => {
         sendDataToParent(tableData)
     }, [tableData]);
@@ -92,20 +98,44 @@ export default function PDFToExcelConverter({sendDataToParent}) {
 
             console.log(`Grouped into ${rows.length} rows`);
             console.log('First 10 rows:', rows.slice(0, 10));
+
             // 🔹 Extract the iDOC number (format: ICDC + digits)
+            let extractedIdoc = '';
             try {
                 const fullText = allTextItems.map(item => item.text).join(' ');
                 const idocMatch = fullText.match(/\bICDC\d{15,20}\b/i);
 
                 if (idocMatch) {
-                    console.log('✅ Extracted iDOC Number:', idocMatch[0]);
+                    extractedIdoc = idocMatch[0];
+                    console.log('✅ Extracted iDOC Number:', extractedIdoc);
+
+                    // Check if this iDOC has already been processed
+                    if (processedIdocs.has(extractedIdoc)) {
+                        console.log('⚠️ Duplicate iDOC detected:', extractedIdoc);
+                        setDuplicateIdoc(extractedIdoc);
+                        setShowDuplicateModal(true);
+                        setLoading(false);
+                        setPdfFile(null);
+                        return; // Stop processing
+                    }
+
+                    setIdocNumber(extractedIdoc);
+                    // Add to processed set
+                    setProcessedIdocs(prev => new Set([...prev, extractedIdoc]));
                 } else {
                     console.log('⚠️ No iDOC number found in PDF text');
+                    setError('No iDOC number found in this PDF');
+                    setLoading(false);
+                    setPdfFile(null);
+                    return;
                 }
             } catch (e) {
                 console.log('Error extracting iDOC number:', e);
+                setError('Error extracting iDOC number from PDF');
+                setLoading(false);
+                setPdfFile(null);
+                return;
             }
-
 
             // Parse the extracted text into table format
             const parsedData = parseInvoiceText(rows);
@@ -290,6 +320,11 @@ export default function PDFToExcelConverter({sendDataToParent}) {
         await extractTextFromPDF(file);
     };
 
+    const closeDuplicateModal = () => {
+        setShowDuplicateModal(false);
+        setDuplicateIdoc('');
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-8">
             <div className="max-w-4xl mx-auto">
@@ -313,6 +348,15 @@ export default function PDFToExcelConverter({sendDataToParent}) {
                             <p className="text-red-700">{error}</p>
                         </div>
                     )}
+
+                    {/* Current iDOC Display */}
+                    {idocNumber && (
+                        <div className="mb-6 bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                            <p className="text-sm text-blue-600 font-semibold">Current iDOC: {idocNumber}</p>
+                            <p className="text-xs text-blue-500 mt-1">Total processed: {processedIdocs.size}</p>
+                        </div>
+                    )}
+
                     <div className="space-y-6">
                         <label className="block cursor-pointer">
                             <div
@@ -347,10 +391,70 @@ export default function PDFToExcelConverter({sendDataToParent}) {
                                 onChange={handleFileUpload}
                             />
                         </label>
-
                     </div>
                 </div>
             </div>
+
+            {/* Duplicate iDOC Modal */}
+            {showDuplicateModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in">
+                        <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-red-100 rounded-full">
+                                    <AlertCircle className="w-8 h-8 text-red-600"/>
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-800">Duplicate PDF Detected</h2>
+                                </div>
+                            </div>
+                            <button
+                                onClick={closeDuplicateModal}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <X className="w-6 h-6"/>
+                            </button>
+                        </div>
+
+                        <div className="mb-6">
+                            <p className="text-gray-700 mb-4">
+                                This PDF has already been processed. The iDOC number already exists:
+                            </p>
+                            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                                <p className="font-mono text-lg font-bold text-red-700 text-center">
+                                    {duplicateIdoc}
+                                </p>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-4">
+                                Please upload a different PDF with a unique iDOC number.
+                            </p>
+                        </div>
+
+                        <button
+                            onClick={closeDuplicateModal}
+                            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                        >
+                            OK, Got It
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <style jsx>{`
+                @keyframes scale-in {
+                    from {
+                        transform: scale(0.9);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: scale(1);
+                        opacity: 1;
+                    }
+                }
+                .animate-scale-in {
+                    animation: scale-in 0.2s ease-out;
+                }
+            `}</style>
         </div>
     );
 }
