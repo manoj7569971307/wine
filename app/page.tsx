@@ -91,7 +91,7 @@ export default function Home() {
                                 filtered.push({
                                     particulars: sampleWinesData[i]['Product Name'],
                                     category: childData[j][3] || '',
-                                    rate: issuePrice.toFixed(0),
+                                    rate: sampleWinesData[i]['MRP'],
                                     receiptDate: new Date().toISOString().split('T')[0],
                                     openingStock: 0,
                                     receipts: calculatedQuantity,
