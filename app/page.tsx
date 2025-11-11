@@ -46,6 +46,7 @@ export default function Home() {
                 const [firstIndex, secondIndex] = quantitySize.includes('/')
                     ? quantitySize.split('/').map(s => s?.trim() || '')
                     : ['0', ''];
+                console.log('manoj', secondIndex)
 
                 if (quantity === 0 || isNaN(quantity)) {
                     console.warn(`Invalid quantity at row ${j}:`, childData[j][6]);
@@ -96,6 +97,7 @@ export default function Home() {
                                     receipts: calculatedQuantity,
                                     sales: 0,
                                     closingStock: 0,
+                                    size: secondIndex,
                                     amount: '₹0',
                                     brandNumber: sampleWinesData[i]['Brand Number'],
                                     issuePrice: issuePrice.toFixed(2),
@@ -146,7 +148,7 @@ export default function Home() {
                                 <thead>
                                 <tr className="bg-purple-50 border-b-2 border-purple-200">
                                     <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">Particulars</th>
-                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Category</th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Size</th>
                                     <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
                                     <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Receipt Date</th>
                                     <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Opening Stock</th>
@@ -162,7 +164,7 @@ export default function Home() {
                                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-800">{item.particulars}</td>
                                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                 <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
-                                                    {item.category}
+                                                    {item.size}
                                                 </span>
                                         </td>
                                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">₹{item.rate}</td>

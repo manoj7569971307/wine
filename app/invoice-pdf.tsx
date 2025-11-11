@@ -326,22 +326,9 @@ export default function PDFToExcelConverter({sendDataToParent}) {
     };
 
     return (
-        <div className="bg-gradient-to-br from-green-50 to-blue-100 p-4 sm:p-6 md:p-8">
+        <div className="bg-gradient-to-br from-green-50 to-blue-100 sm:p-6 md:p-8">
             <div className="max-w-4xl mx-auto">
                 <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8">
-                    {/*<div className="text-center mb-6 sm:mb-8">*/}
-                    {/*    <div className="inline-block p-3 sm:p-4 bg-green-100 rounded-full mb-3 sm:mb-4">*/}
-                    {/*        <FileSpreadsheet className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-green-600"/>*/}
-                    {/*    </div>*/}
-                    {/*    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2">*/}
-                    {/*        PDF to Excel Converter*/}
-                    {/*    </h1>*/}
-                    {/*    <p className="text-sm sm:text-base text-gray-600 px-4">*/}
-                    {/*        Upload a PDF invoice and download it as CSV (Excel compatible)*/}
-                    {/*    </p>*/}
-                    {/*</div>*/}
-
-                    {/* Error Message */}
                     {error && (
                         <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-center gap-3">
                             <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0"/>
@@ -360,29 +347,8 @@ export default function PDFToExcelConverter({sendDataToParent}) {
                     <div className="space-y-6">
                         <label className="block cursor-pointer">
                             <div
-                                className="border-3 border-dashed border-gray-300 rounded-xl p-12 hover:border-green-500 hover:bg-green-50 transition-all">
-                                <div className="flex flex-col items-center">
-                                    <Upload className="w-16 h-16 text-gray-400 mb-4"/>
-                                    {pdfFile ? (
-                                        <div className="text-center">
-                                            <p className="text-lg font-semibold text-green-600 mb-2">
-                                                ✓ {pdfFile.name}
-                                            </p>
-                                            <p className="text-sm text-gray-500">
-                                                Click to upload a different file
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center">
-                                            <p className="text-lg font-semibold text-gray-700 mb-2">
-                                                Click to upload PDF
-                                            </p>
-                                            <p className="text-sm text-gray-500">
-                                                Select your invoice PDF file
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
+                                className="border-3 border-dashed text-black border-gray-300 rounded-xl p-3 hover:border-green-500 hover:bg-green-50 transition-all">
+                                Enter PDF
                             </div>
                             <input
                                 type="file"
