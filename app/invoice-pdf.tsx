@@ -326,20 +326,20 @@ export default function PDFToExcelConverter({sendDataToParent}) {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-8">
+        <div className="bg-gradient-to-br from-green-50 to-blue-100 p-4 sm:p-6 md:p-8">
             <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-2xl shadow-2xl p-8">
-                    <div className="text-center mb-8">
-                        <div className="inline-block p-4 bg-green-100 rounded-full mb-4">
-                            <FileSpreadsheet className="w-12 h-12 text-green-600"/>
-                        </div>
-                        <h1 className="text-4xl font-bold text-gray-800 mb-2">
-                            PDF to Excel Converter
-                        </h1>
-                        <p className="text-gray-600">
-                            Upload a PDF invoice and download it as CSV (Excel compatible)
-                        </p>
-                    </div>
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8">
+                    {/*<div className="text-center mb-6 sm:mb-8">*/}
+                    {/*    <div className="inline-block p-3 sm:p-4 bg-green-100 rounded-full mb-3 sm:mb-4">*/}
+                    {/*        <FileSpreadsheet className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-green-600"/>*/}
+                    {/*    </div>*/}
+                    {/*    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2">*/}
+                    {/*        PDF to Excel Converter*/}
+                    {/*    </h1>*/}
+                    {/*    <p className="text-sm sm:text-base text-gray-600 px-4">*/}
+                    {/*        Upload a PDF invoice and download it as CSV (Excel compatible)*/}
+                    {/*    </p>*/}
+                    {/*</div>*/}
 
                     {/* Error Message */}
                     {error && (
