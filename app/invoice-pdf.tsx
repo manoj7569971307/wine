@@ -362,8 +362,8 @@ export default function PDFToExcelConverter({sendDataToParent}) {
                     <div className="space-y-6">
                         <label className="block cursor-pointer">
                             <div
-                                className="border-3 border-dashed text-black border-gray-300 rounded-xl p-3 hover:border-green-500 hover:bg-green-50 transition-all">
-                                Enter PDF
+                                className="border-3 border-dashed text-white bg-amber-500 border-gray-300 rounded-xl p-3 hover:border-green-500 hover:bg-green-50 transition-all">
+                                Upload Invoice PDF
                             </div>
                             <input
                                 type="file"
