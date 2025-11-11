@@ -14,44 +14,30 @@ function removeCommas(value) {
     let cleanedValue = value.replace(/,/g, '');
     return parseFloat(cleanedValue);
 }
-
-
-function getFirstIndexValue(childDataRow: string[]): string {
-    if (!childDataRow[5] || !childDataRow[5].includes('/')) return '0';
-    return childDataRow[5].split('/')[0].trim();
-}
-
-function getSecondIndexValue(childDataRow: string[]): string {
-    if (!childDataRow[5] || !childDataRow[5].includes('/')) return '';
-    return childDataRow[5].split('/')[1].trim();
-}
+//
+//
+// function getFirstIndexValue(childDataRow: string[]): string {
+//     if (!childDataRow[5] || !childDataRow[5].includes('/')) return '0';
+//     return childDataRow[5].split('/')[0].trim();
+// }
+//
+// function getSecondIndexValue(childDataRow: string[]): string {
+//     if (!childDataRow[5] || !childDataRow[5].includes('/')) return '';
+//     return childDataRow[5].split('/')[1].trim();
+// }
 
 export default function Home() {
     const [childData, setChildData] = useState([]);
-    const [idocData, setIdocData] = useState([])
     const [filterData, setFilterData] = useState([]);
 
     // Callback function to receive data from the child
     const handleDataFromChild = (data) => {
         setChildData(data);
     };
-    const handleIDOC = (data) => {
-        if (!data || data.trim() === "") return; // ignore empty strings
-        setIdocData((prev) => {
-            if (prev.includes(data)) {
-                console.error(`IDOC ${data} already exists!`);
-                return prev; // do not add duplicates
-            }
-            return [...prev, data]; // add new IDOC
-        });
-    };
 
-    useEffect(() => {
-        console.log("✅ Current IDOCs:", idocData);
-    }, [idocData]);
     // Function to filter wine data - FIXED VERSION (No Duplicates)
     const filterWineData = () => {
-        let filtered = [];
+        let filtered = [...filterData]; // Start with existing filtered data
         let unmatched = [];
 
         // Debug logging
@@ -121,46 +107,41 @@ export default function Home() {
                         if (priceDiff < 1) {
                             console.log(`✓ Match found for row ${j}: Brand=${brandNumberFromChild}, MRP=${sampleWinesData[i]['MRP']}, IssuePrice=${sampleIssuePrice}`);
 
-                            // Check if index 5 exists and has proper format
+                            const calculatedQuantity = firstIndex ? (Number(firstIndex) * quantity) + Number(childData[j][7]) : quantity;
 
-                            filtered.push({
-                                brandNumber: sampleWinesData[i]['Brand Number'],
-                                Mrp: sampleWinesData[i]['MRP'],
-                                description: sampleWinesData[i]['Product Name'],
-                                unit: childData[j][3] || '',
-                                group: childData[j][4] || '',
-                                quantity: firstIndex ? (Number(firstIndex) * quantity) + Number(childData[j][7]) : quantity,
-                                size: secondIndex || '',
-                                someField2: childData[j][7] || '',
-                                totalPrice: childData[j][8] || '',
-                                issuePrice: issuePrice.toFixed(2),
-                                extraField1: childData[j][9] || '',
-                                extraField2: childData[j][10] || '',
-                                invoiceRow: j, // Track which invoice row this came from
-                            });
+                            // Check if this item already exists in filtered data
+                            const existingItemIndex = filtered.findIndex(
+                                item => item.brandNumber === sampleWinesData[i]['Brand Number'] &&
+                                    Math.abs(Number(item.issuePrice) - issuePrice) < 1
+                            );
+
+                            if (existingItemIndex !== -1) {
+                                // Item exists, just add to quantity
+                                filtered[existingItemIndex].quantity += calculatedQuantity;
+                                console.log(`✓ Updated quantity for Brand ${brandNumberFromChild}: +${calculatedQuantity} = ${filtered[existingItemIndex].quantity}`);
+                            } else {
+                                // New item, add to filtered array
+                                filtered.push({
+                                    brandNumber: sampleWinesData[i]['Brand Number'],
+                                    Mrp: sampleWinesData[i]['MRP'],
+                                    description: sampleWinesData[i]['Product Name'],
+                                    unit: childData[j][3] || '',
+                                    group: childData[j][4] || '',
+                                    quantity: calculatedQuantity,
+                                    size: secondIndex || '',
+                                    someField2: childData[j][7] || '',
+                                    totalPrice: childData[j][8] || '',
+                                    issuePrice: issuePrice.toFixed(2),
+                                    extraField1: childData[j][9] || '',
+                                    extraField2: childData[j][10] || '',
+                                    invoiceRow: j,// Track which invoice row this came from
+                                });
+                            }
 
                             matchFound = true;
                             break; // Stop after first match to avoid duplicates
                         }
                     }
-                }
-
-                if (!matchFound) {
-                    console.warn(`✗ No match for row ${j}:`, {
-                        brand: brandNumberFromChild,
-                        issuePrice: issuePrice.toFixed(2),
-                        potentialMatches: potentialMatches.length > 0 ? potentialMatches : 'No brand matches found',
-                        rawData: childData[j]
-                    });
-
-                    unmatched.push({
-                        invoiceRow: j,
-                        brandNumber: brandNumberFromChild,
-                        issuePrice: issuePrice.toFixed(2),
-                        quantity: quantity,
-                        totalPrice: childData[j][8],
-                        potentialMatches: potentialMatches
-                    });
                 }
             } catch (error) {
                 console.error(`Error processing row ${j}:`, error, childData[j]);
@@ -211,7 +192,7 @@ export default function Home() {
                 <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
                     <h2 className="text-xl font-semibold text-blue-600 mb-4">Sample Data</h2>
                     <p className="text-gray-600">Brand Number: {sampleWinesData[0]?.['Brand Number']}</p>
-                    <PDFToExcelConverter sendDataToParent={handleDataFromChild} handleIDOC={handleIDOC} />
+                    <PDFToExcelConverter sendDataToParent={handleDataFromChild} />
                 </div>
 
                 {filterData.length > 0 && (
