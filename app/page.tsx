@@ -2,42 +2,57 @@
 
 import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter from "@/app/invoice-pdf";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-// Function to remove commas and decimals
-function removeCommasAndDecimals(value) {
-    let cleanedValue = value.replace(/,/g, '');
-    cleanedValue = cleanedValue.split('.')[0];
-    return cleanedValue;
+interface WineData {
+    'Brand Number': string | number;
+    'Product Name': string;
+    'Issue Price': number;
+    'MRP': number;
 }
-function removeCommas(value) {
-    let cleanedValue = value.replace(/,/g, '');
+
+interface FilteredItem {
+    particulars: string;
+    category: string;
+    rate: number;
+    receiptDate: string;
+    openingStock: number;
+    receipts: number;
+    sales: number;
+    closingStock: number;
+    size: string;
+    amount: string;
+    brandNumber: string | number;
+    issuePrice: string;
+}
+
+type ChildDataRow = string[];
+type ChildData = ChildDataRow[];
+
+const removeCommasAndDecimals = (value: string): string => {
+    const cleanedValue = value.replace(/,/g, '');
+    return cleanedValue.split('.')[0];
+};
+
+const removeCommas = (value: string): number => {
+    const cleanedValue = value.replace(/,/g, '');
     return parseFloat(cleanedValue);
-}
+};
 
 export default function Home() {
-    const [childData, setChildData] = useState([]);
-    const [filterData, setFilterData] = useState([]);
+    const [childData, setChildData] = useState<ChildData>([]);
+    const [filterData, setFilterData] = useState<FilteredItem[]>([]);
 
-    // Callback function to receive data from the child
-    const handleDataFromChild = (data) => {
+    const handleDataFromChild = useCallback((data: ChildData): void => {
         setChildData(data);
-    };
+    }, []);
 
-    // Function to filter wine data
-    const filterWineData = () => {
-        let filtered = [...filterData];
-        let unmatched = [];
-
-        console.log('Starting filter with:', {
-            sampleWinesCount: sampleWinesData.length,
-            childDataCount: childData.length - 1
-        });
+    const filterWineData = useCallback((): void => {
+        const filtered: FilteredItem[] = [...filterData];
 
         for (let j = 1; j < childData.length; j++) {
             try {
                 if (!childData[j] || !childData[j][8] || !childData[j][6] || !childData[j][1]) {
-                    console.warn(`Missing critical data at row ${j}:`, childData[j]);
                     continue;
                 }
 
@@ -46,42 +61,45 @@ export default function Home() {
                 const [firstIndex, secondIndex] = quantitySize.includes('/')
                     ? quantitySize.split('/').map(s => s?.trim() || '')
                     : ['0', ''];
-                console.log('manoj', secondIndex)
 
                 if (quantity === 0 || isNaN(quantity)) {
-                    console.warn(`Invalid quantity at row ${j}:`, childData[j][6]);
                     continue;
                 }
 
-                let issuePrice;
+                let issuePrice: number;
                 let rawPrice = removeCommasAndDecimals(String(childData[j][8]));
-                if(Number(childData[j][7]) === 0){
+
+                if (Number(childData[j][7]) === 0) {
                     issuePrice = Number(rawPrice) / quantity;
-                }else {
-                    issuePrice = Math.ceil((Number(rawPrice)/((quantity * Number(firstIndex)) + Number(childData[j][7]))) * Number(firstIndex));
-                    rawPrice = removeCommas(String(childData[j][8]));
+                } else {
+                    issuePrice = Math.ceil(
+                        (Number(rawPrice) / ((quantity * Number(firstIndex)) + Number(childData[j][7]))) *
+                        Number(firstIndex)
+                    );
+                    rawPrice = String(removeCommas(String(childData[j][8])));
                 }
 
                 if (isNaN(issuePrice)) {
-                    console.warn(`Invalid issue price calculation at row ${j}`);
                     continue;
                 }
 
                 const brandNumberFromChild = String(childData[j][1]).trim();
-                let matchFound = false;
 
                 for (let i = 0; i < sampleWinesData.length; i++) {
-                    const brandNumberFromSample = String(sampleWinesData[i]['Brand Number']).trim();
-                    const sampleIssuePrice = Number(sampleWinesData[i]['Issue Price']);
+                    const wine = sampleWinesData[i] as WineData;
+                    const brandNumberFromSample = String(wine['Brand Number']).trim();
+                    const sampleIssuePrice = Number(wine['Issue Price']);
 
                     if (brandNumberFromChild === brandNumberFromSample) {
                         const priceDiff = Math.abs(issuePrice - sampleIssuePrice);
 
                         if (priceDiff < 1) {
-                            const calculatedQuantity = firstIndex ? (Number(firstIndex) * quantity) + Number(childData[j][7]) : quantity;
+                            const calculatedQuantity = firstIndex
+                                ? (Number(firstIndex) * quantity) + Number(childData[j][7])
+                                : quantity;
 
                             const existingItemIndex = filtered.findIndex(
-                                item => item.brandNumber === sampleWinesData[i]['Brand Number'] &&
+                                item => item.brandNumber === wine['Brand Number'] &&
                                     Math.abs(Number(item.issuePrice) - issuePrice) < 1
                             );
 
@@ -89,9 +107,9 @@ export default function Home() {
                                 filtered[existingItemIndex].receipts += calculatedQuantity;
                             } else {
                                 filtered.push({
-                                    particulars: sampleWinesData[i]['Product Name'],
+                                    particulars: wine['Product Name'],
                                     category: childData[j][3] || '',
-                                    rate: sampleWinesData[i]['MRP'],
+                                    rate: wine['MRP'],
                                     receiptDate: new Date().toISOString().split('T')[0],
                                     openingStock: 0,
                                     receipts: calculatedQuantity,
@@ -99,18 +117,17 @@ export default function Home() {
                                     closingStock: 0,
                                     size: secondIndex,
                                     amount: '₹0',
-                                    brandNumber: sampleWinesData[i]['Brand Number'],
+                                    brandNumber: wine['Brand Number'],
                                     issuePrice: issuePrice.toFixed(2),
                                 });
                             }
-
-                            matchFound = true;
                             break;
                         }
                     }
                 }
             } catch (error) {
-                console.error(`Error processing row ${j}:`, error, childData[j]);
+                // Silent error handling - continue processing other rows
+                continue;
             }
         }
 
@@ -119,8 +136,9 @@ export default function Home() {
             if (!b.particulars) return -1;
             return a.particulars.localeCompare(b.particulars);
         });
+
         setFilterData(sortedFiltered);
-    };
+    }, [childData, filterData]);
 
     useEffect(() => {
         if (childData.length > 0) {
@@ -132,7 +150,9 @@ export default function Home() {
         <div className="min-h-screen bg-gray-50">
             <header className="bg-blue-600 p-3 sm:p-4 shadow-md">
                 <div className="container mx-auto">
-                    <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold">Wine Invoice Tracker</h1>
+                    <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold">
+                        Wine Invoice Tracker
+                    </h1>
                 </div>
             </header>
 
@@ -147,25 +167,46 @@ export default function Home() {
                             <table className="w-full min-w-[800px]">
                                 <thead>
                                 <tr className="bg-purple-50 border-b-2 border-purple-200">
-                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">Particulars</th>
-                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Size</th>
-                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Opening Stock</th>
-                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Receipts</th>
-                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock</th>
-                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Sales</th>
-                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
-                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">Amount</th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
+                                        Particulars
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Size
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Opening Stock
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Receipts
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Closing Stock
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Sales
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Rate
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">
+                                        Amount
+                                    </th>
                                 </tr>
                                 </thead>
 
                                 <tbody>
                                 {filterData.map((item, index) => (
-                                    <tr key={index} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-800">{item.particulars}</td>
+                                    <tr
+                                        key={index}
+                                        className="border-b border-gray-200 hover:bg-purple-50 transition-colors"
+                                    >
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-800">
+                                            {item.particulars}
+                                        </td>
                                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-          <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
-            {item.size}
-          </span>
+                                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
+                                                    {item.size}
+                                                </span>
                                         </td>
                                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                             <input
@@ -175,7 +216,9 @@ export default function Home() {
                                                 readOnly
                                             />
                                         </td>
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">
+                                            {item.receipts}
+                                        </td>
                                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                             <input
                                                 type="number"
@@ -185,18 +228,22 @@ export default function Home() {
                                             />
                                         </td>
                                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                            <span className="text-blue-600 font-semibold text-xs sm:text-sm">{item.sales}</span>
+                                                <span className="text-blue-600 font-semibold text-xs sm:text-sm">
+                                                    {item.sales}
+                                                </span>
                                         </td>
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">₹{item.rate}</td>
-                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-green-600">{item.amount}</td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">
+                                            ₹{item.rate}
+                                        </td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-green-600">
+                                            {item.amount}
+                                        </td>
                                     </tr>
                                 ))}
                                 </tbody>
                             </table>
-
                         </div>
 
-                        {/* Mobile scroll hint */}
                         <div className="sm:hidden p-2 text-center text-xs text-gray-500 bg-gray-50">
                             ← Scroll horizontally to see all columns →
                         </div>
@@ -206,14 +253,12 @@ export default function Home() {
                 {childData.length > 0 && filterData.length === 0 && (
                     <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 sm:p-4 rounded">
                         <p className="font-bold text-sm sm:text-base">No matches found</p>
-                        <p className="text-xs sm:text-sm">Check the console for debugging information.</p>
+                        <p className="text-xs sm:text-sm">
+                            No wine data matched the uploaded invoice.
+                        </p>
                     </div>
                 )}
             </main>
-
-            {/*<footer className="bg-blue-600 p-3 sm:p-4 mt-6 text-center text-white">*/}
-            {/*    <p className="text-xs sm:text-sm">&copy; 2025 Wine Tracker. All Rights Reserved.</p>*/}
-            {/*</footer>*/}
         </div>
     );
 }
