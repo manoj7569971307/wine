@@ -335,6 +335,21 @@ export default function PDFToExcelConverter({sendDataToParent}) {
                             <p className="text-red-700">{error}</p>
                         </div>
                     )}
+                    {/* Success Message */}
+                    {converted && (
+                        <div className="mb-6 bg-green-50 border-2 border-green-200 rounded-xl p-4 flex items-center gap-3">
+                            <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                            <div>
+                                <p className="text-green-700 font-semibold">PDF successfully processed!</p>
+                                {idocNumber && (
+                                    <p className="text-green-600 text-sm">
+                                        iDOC Number: <span className="font-mono">{idocNumber}</span>
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
 
                     {/* Current iDOC Display */}
                     {idocNumber && (
