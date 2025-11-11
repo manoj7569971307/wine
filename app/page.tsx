@@ -211,9 +211,9 @@ export default function Home() {
                 )}
             </main>
 
-            <footer className="bg-blue-600 p-3 sm:p-4 mt-6 text-center text-white">
-                <p className="text-xs sm:text-sm">&copy; 2025 Wine Tracker. All Rights Reserved.</p>
-            </footer>
+            {/*<footer className="bg-blue-600 p-3 sm:p-4 mt-6 text-center text-white">*/}
+            {/*    <p className="text-xs sm:text-sm">&copy; 2025 Wine Tracker. All Rights Reserved.</p>*/}
+            {/*</footer>*/}
         </div>
     );
 }
