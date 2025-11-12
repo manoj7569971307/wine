@@ -16,6 +16,17 @@ interface PDFToExcelConverterProps {
 
 type TableData = string[][];
 
+// Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyBf-dvyFjMttuLD43V4MBBRbuvfbwBRKsI",
+    authDomain: "wines-sheet.firebaseapp.com",
+    projectId: "wines-sheet",
+    storageBucket: "wines-sheet.firebasestorage.app",
+    messagingSenderId: "313820033015",
+    appId: "1:313820033015:web:75cc4ccf84217324bf08f2",
+    measurementId: "G-C8JCT3DNNH"
+};
+
 export default function PDFToExcelConverter({ sendDataToParent }: PDFToExcelConverterProps) {
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [tableData, setTableData] = useState<TableData>([]);
@@ -26,10 +37,85 @@ export default function PDFToExcelConverter({ sendDataToParent }: PDFToExcelConv
     const [processedIdocs, setProcessedIdocs] = useState<Set<string>>(new Set());
     const [showDuplicateModal, setShowDuplicateModal] = useState<boolean>(false);
     const [duplicateIdoc, setDuplicateIdoc] = useState<string>('');
+    const [firebaseReady, setFirebaseReady] = useState<boolean>(false);
+
+    // Load Firebase SDK
+    useEffect(() => {
+        const loadFirebase = async () => {
+            try {
+                // Load Firebase App
+                const appScript = document.createElement('script');
+                appScript.src = 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js';
+
+                await new Promise<void>((resolve, reject) => {
+                    appScript.onload = () => resolve();
+                    appScript.onerror = () => reject(new Error('Failed to load Firebase App'));
+                    document.head.appendChild(appScript);
+                });
+
+                // Load Firebase Firestore
+                const firestoreScript = document.createElement('script');
+                firestoreScript.src = 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js';
+
+                await new Promise<void>((resolve, reject) => {
+                    firestoreScript.onload = () => resolve();
+                    firestoreScript.onerror = () => reject(new Error('Failed to load Firebase Firestore'));
+                    document.head.appendChild(firestoreScript);
+                });
+
+                // Initialize Firebase
+                const firebase = (window as any).firebase;
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+
+                setFirebaseReady(true);
+            } catch (err) {
+                console.error('Error loading Firebase:', err);
+            }
+        };
+
+        loadFirebase();
+    }, []);
 
     useEffect(() => {
         sendDataToParent(tableData);
     }, [tableData, sendDataToParent]);
+
+    const checkIdocInDatabase = async (idoc: string): Promise<boolean> => {
+        try {
+            const firebase = (window as any).firebase;
+            const db = firebase.firestore();
+
+            const querySnapshot = await db.collection('processedIdocs')
+                .where('idocNumber', '==', idoc)
+                .get();
+
+            return !querySnapshot.empty;
+        } catch (err) {
+            console.error('Error checking iDOC in database:', err);
+            return false;
+        }
+    };
+
+    const saveIdocToDatabase = async (idoc: string, fileName: string) => {
+        try {
+            const firebase = (window as any).firebase;
+            const db = firebase.firestore();
+
+            await db.collection('processedIdocs').add({
+                idocNumber: idoc,
+                fileName: fileName,
+                processedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                timestamp: new Date().toISOString()
+            });
+
+            return true;
+        } catch (err) {
+            console.error('Error saving to database:', err);
+            return false;
+        }
+    };
 
     const parseInvoiceText = useCallback((rows: string[]): TableData => {
         const headers = [
@@ -228,6 +314,7 @@ export default function PDFToExcelConverter({ sendDataToParent }: PDFToExcelConv
 
             const extractedIdoc = idocMatch[0];
 
+            // Check in local memory first
             if (processedIdocs.has(extractedIdoc)) {
                 setDuplicateIdoc(extractedIdoc);
                 setShowDuplicateModal(true);
@@ -236,18 +323,35 @@ export default function PDFToExcelConverter({ sendDataToParent }: PDFToExcelConv
                 return;
             }
 
+            // Check in database if Firebase is ready
+            if (firebaseReady) {
+                const existsInDb = await checkIdocInDatabase(extractedIdoc);
+                if (existsInDb) {
+                    setDuplicateIdoc(extractedIdoc);
+                    setShowDuplicateModal(true);
+                    setLoading(false);
+                    setPdfFile(null);
+                    return;
+                }
+            }
+
             setIdocNumber(extractedIdoc);
             setProcessedIdocs(prev => new Set([...prev, extractedIdoc]));
 
             const parsedData = parseInvoiceText(rows);
             setTableData(parsedData);
             setConverted(true);
+
+            // Save to database after successful processing
+            if (firebaseReady) {
+                await saveIdocToDatabase(extractedIdoc, file.name);
+            }
         } catch (err) {
             setError('Failed to process PDF. Please try again or use a different file.');
         } finally {
             setLoading(false);
         }
-    }, [processedIdocs, parseInvoiceText]);
+    }, [processedIdocs, parseInvoiceText, firebaseReady]);
 
     const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
         const file = e.target.files?.[0];
