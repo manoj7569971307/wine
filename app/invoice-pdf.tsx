@@ -300,17 +300,14 @@ export default function PDFToExcelConverter({ sendDataToParent }: PDFToExcelConv
                         </div>
                     )}
 
-                    <div className="space-y-6">
-                        <label className="block cursor-pointer">
-                            <div className="border-3 border-dashed text-white bg-amber-500 border-gray-300 rounded-xl p-3 hover:border-green-500 hover:bg-green-50 transition-all">
-                                Upload Invoice PDF
-                            </div>
+                    <div className="space-y-4">
+                        <label className="block">
+                            <span className="text-gray-700 font-medium">Upload Invoice PDF</span>
                             <input
                                 type="file"
-                                className="hidden"
                                 accept=".pdf"
                                 onChange={handleFileUpload}
-                                disabled={loading}
+                                className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                             />
                         </label>
                     </div>
