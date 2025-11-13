@@ -66,11 +66,13 @@ export default function Home() {
     const [filterData, setFilterData] = useState<FilteredItem[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [saveAllowed, setSaveAllowed] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [saveMessage, setSaveMessage] = useState('');
 
     const handleDataFromChild = useCallback((data: ChildData): void => {
         setChildData(data);
+        setSaveAllowed(false);
         setSaveStatus('idle');
     }, []);
 
@@ -215,7 +217,7 @@ export default function Home() {
 
             setSaveStatus('success');
             setSaveMessage(`Successfully saved ${filterData.length} items`);
-
+            setSaveAllowed(false);
             setTimeout(() => {
                 setSaveStatus('idle');
             }, 3000);
@@ -383,7 +385,7 @@ export default function Home() {
 
             <main className="container mx-auto p-2 sm:p-4 md:p-6">
                 <div className="bg-white shadow-lg rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
-                    <PDFToExcelConverter sendDataToParent={handleDataFromChild} />
+                    <PDFToExcelConverter sendDataToParent={handleDataFromChild} saveAllowed={saveAllowed} />
                 </div>
 
                 {filterData.length > 0 && (
@@ -393,7 +395,10 @@ export default function Home() {
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div className="flex flex-wrap items-center gap-3">
                                     <button
-                                        onClick={saveToFirebase}
+                                        onClick={()=>{
+                                            saveToFirebase();
+                                           setSaveAllowed(true)
+                                        }}
                                         disabled={isSaving}
                                         className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
                                             isSaving

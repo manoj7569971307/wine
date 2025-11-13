@@ -12,6 +12,7 @@ interface TextItem {
 
 interface PDFToExcelConverterProps {
     sendDataToParent: (data: string[][]) => void;
+    saveAllowed: boolean;
 }
 
 type TableData = string[][];
@@ -27,7 +28,7 @@ const firebaseConfig = {
     measurementId: "G-C8JCT3DNNH"
 };
 
-export default function PDFToExcelConverter({ sendDataToParent }: PDFToExcelConverterProps) {
+export default function PDFToExcelConverter({ sendDataToParent, saveAllowed }: PDFToExcelConverterProps) {
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [tableData, setTableData] = useState<TableData>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -40,6 +41,13 @@ export default function PDFToExcelConverter({ sendDataToParent }: PDFToExcelConv
     const [firebaseReady, setFirebaseReady] = useState<boolean>(false);
 
     // Load Firebase SDK
+    useEffect(() => {
+        // Only save when parent sends true AND idoc exists AND not saved before
+        if (saveAllowed && idocNumber && firebaseReady) {
+            saveIdocToDatabase(idocNumber, pdfFile?.name || "unknown.pdf");
+        }
+    }, [saveAllowed, idocNumber, firebaseReady]);
+
     useEffect(() => {
         const loadFirebase = async () => {
             try {
@@ -343,9 +351,6 @@ export default function PDFToExcelConverter({ sendDataToParent }: PDFToExcelConv
             setConverted(true);
 
             // Save to database after successful processing
-            if (firebaseReady) {
-                await saveIdocToDatabase(extractedIdoc, file.name);
-            }
         } catch (err) {
             setError('Failed to process PDF. Please try again or use a different file.');
         } finally {
