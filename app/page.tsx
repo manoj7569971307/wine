@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw } from 'lucide-react';
+import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter from "@/app/invoice-pdf";
+import LoginForm from "@/app/login";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -54,6 +55,19 @@ export default function Home() {
     const [saveAllowed, setSaveAllowed] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [saveMessage, setSaveMessage] = useState('');
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [userRole, setUserRole] = useState('');
+    const [username, setUsername] = useState('');
+
+    // Get collection name based on user
+    const getCollectionName = () => {
+        if (userRole === 'Admin') {
+            return 'invoices_admin';
+        } else {
+            // For shop owners: shop1 -> invoices_shop1, shop2 -> invoices_shop2, etc.
+            return `invoices_${username}`;
+        }
+    };
 
     const handleDataFromChild = useCallback((data: ChildData): void => {
         setChildData(data);
@@ -138,24 +152,38 @@ export default function Home() {
     }, [childData]);
 
     const loadFromFirebase = async () => {
+        if (!username) {
+            console.log('No username set, skipping load');
+            return;
+        }
+
         setIsLoading(true);
         try {
-            const q = query(collection(db, 'invoices'), orderBy('timestamp', 'desc'), limit(1));
+            const collectionName = getCollectionName();
+            console.log('Loading from collection:', collectionName);
+
+            const q = query(
+                collection(db, collectionName),
+                orderBy('createdAt', 'desc'),
+                limit(1)
+            );
             const querySnapshot = await getDocs(q);
 
             if (!querySnapshot.empty) {
                 const data = querySnapshot.docs[0].data();
+                console.log('Loaded data:', data);
                 setFilterData(data.items || []);
                 setSaveStatus('success');
                 setSaveMessage('Data loaded successfully');
             } else {
-                setSaveStatus('error');
-                setSaveMessage('No saved data found');
+                console.log('No data found in collection');
+                setSaveStatus('idle');
+                setSaveMessage('');
             }
         } catch (error) {
             console.error('Error loading from Firebase:', error);
-            setSaveStatus('error');
-            setSaveMessage('Failed to load data');
+            setSaveStatus('idle');
+            setSaveMessage('');
         } finally {
             setIsLoading(false);
             setTimeout(() => setSaveStatus('idle'), 3000);
@@ -166,6 +194,14 @@ export default function Home() {
         if (filterData.length === 0) {
             setSaveStatus('error');
             setSaveMessage('No data to save');
+            setTimeout(() => setSaveStatus('idle'), 3000);
+            return;
+        }
+
+        if (!username) {
+            setSaveStatus('error');
+            setSaveMessage('User not logged in');
+            setTimeout(() => setSaveStatus('idle'), 3000);
             return;
         }
 
@@ -173,23 +209,33 @@ export default function Home() {
         setSaveStatus('idle');
 
         try {
-            await addDoc(collection(db, 'invoices'), {
+            const collectionName = getCollectionName();
+            console.log('Saving to collection:', collectionName);
+            console.log('Data to save:', { itemCount: filterData.length, user: username, role: userRole });
+
+            const docData = {
                 items: filterData,
                 timestamp: serverTimestamp(),
                 totalItems: filterData.length,
-                createdAt: new Date().toISOString()
-            });
+                createdAt: new Date().toISOString(),
+                user: username,
+                role: userRole
+            };
+
+            const docRef = await addDoc(collection(db, collectionName), docData);
+            console.log('Document saved with ID:', docRef.id);
 
             setSaveStatus('success');
             setSaveMessage(`Successfully saved ${filterData.length} items`);
             setSaveAllowed(false);
         } catch (error) {
             console.error('Error saving to Firebase:', error);
+            console.error('Error details:', error.message);
             setSaveStatus('error');
-            setSaveMessage('Failed to save data. Please try again.');
+            setSaveMessage(`Failed to save: ${error.message}`);
         } finally {
             setIsSaving(false);
-            setTimeout(() => setSaveStatus('idle'), 3000);
+            setTimeout(() => setSaveStatus('idle'), 5000);
         }
     };
 
@@ -213,7 +259,7 @@ export default function Home() {
 
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Wine Invoice');
-        XLSX.writeFile(workbook, `wine-invoice-${new Date().toISOString().split('T')[0]}.xlsx`);
+        XLSX.writeFile(workbook, `wine-invoice-${username}-${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const downloadPDF = () => {
@@ -227,11 +273,12 @@ export default function Home() {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Wine Invoice - ${date}</title>
+                <title>Wine Invoice - ${username} - ${date}</title>
                 <style>
                     body { font-family: Arial, sans-serif; padding: 20px; }
                     h1 { color: #2563eb; text-align: center; margin-bottom: 10px; }
                     .date { text-align: center; color: #666; margin-bottom: 20px; }
+                    .user-info { text-align: center; color: #666; margin-bottom: 20px; font-weight: bold; }
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
                     th { background-color: #f3e8ff; padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold; }
                     td { padding: 10px; border: 1px solid #ddd; }
@@ -243,6 +290,7 @@ export default function Home() {
             </head>
             <body>
                 <h1>Wine Invoice Tracker</h1>
+                <div class="user-info">${userRole}: ${username}</div>
                 <div class="date">Generated on: ${date}</div>
                 <table>
                     <thead>
@@ -284,21 +332,55 @@ export default function Home() {
         printWindow.document.close();
     };
 
+    const handleLoginSuccess = (role: string, user: string) => {
+        console.log('Login success - Role:', role, 'User:', user);
+        setIsLoggedIn(true);
+        setUserRole(role);
+        setUsername(user);
+    };
+
+    const handleLogout = () => {
+        setIsLoggedIn(false);
+        setUserRole('');
+        setUsername('');
+        setFilterData([]);
+        setChildData([]);
+        setSaveStatus('idle');
+    };
+
     useEffect(() => {
-        loadFromFirebase();
-    }, []);
+        if (isLoggedIn && username) {
+            loadFromFirebase();
+        }
+    }, [isLoggedIn, username]);
 
     useEffect(() => {
         if (childData.length > 0) filterWineData();
     }, [childData, filterWineData]);
 
+    if (!isLoggedIn) {
+        return <LoginForm onLoginSuccess={handleLoginSuccess} />;
+    }
+
     return (
         <div className="min-h-screen bg-gray-50">
             <header className="bg-blue-600 p-3 sm:p-4 shadow-md">
-                <div className="container mx-auto">
-                    <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold">
-                        Wine Invoice Tracker
-                    </h1>
+                <div className="container mx-auto flex justify-between items-center">
+                    <div>
+                        <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold">
+                            Wine Invoice Tracker
+                        </h1>
+                        <p className="text-blue-100 text-sm mt-1">
+                            {userRole}: {username}
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-all"
+                    >
+                        <LogOut className="w-4 h-4" />
+                        Logout
+                    </button>
                 </div>
             </header>
 
@@ -400,9 +482,9 @@ export default function Home() {
                                         <tr key={index} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-800">{item.particulars}</td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                    <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
-                                                        {item.size}
-                                                    </span>
+                                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
+                                                    {item.size}
+                                                </span>
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                 <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" readOnly />
