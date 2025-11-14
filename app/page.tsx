@@ -71,7 +71,7 @@ export default function Home() {
     const [field5, setField5] = useState('');
     const [field6, setField6] = useState('');
     const [field7, setField7] = useState('');
-    const [paymentData, setPaymentData] = useState([{ phonepe: '', cash: '', amount: '', comments: '' }]);
+    const [paymentData, setPaymentData] = useState([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -296,7 +296,7 @@ export default function Home() {
                 setField5(data.field5 || '');
                 setField6(data.field6 || '');
                 setField7(data.field7 || '');
-                setPaymentData(data.paymentData || [{ phonepe: '', cash: '', amount: '', comments: '' }]);
+                setPaymentData(data.paymentData || [{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
                 setSaveStatus('success');
                 setSaveMessage('Data loaded successfully');
             } else {
@@ -603,11 +603,11 @@ export default function Home() {
         paymentData.forEach((payment, index) => {
             data.push({
                 'Particulars': `Payment ${index + 1}`,
-                'Size': `PhonePe: ${payment.phonepe}`,
-                'Opening Stock': `Cash: ${payment.cash}`,
-                'Receipts': `Amount: ${payment.amount}`,
-                'Tran In': `Comments: ${payment.comments}`,
-                'Tran Out': '',
+                'Size': `Date: ${payment.date}`,
+                'Opening Stock': `PhonePe: ${payment.phonepe}`,
+                'Receipts': `Cash: ${payment.cash}`,
+                'Tran In': `Amount: ${payment.amount}`,
+                'Tran Out': `Comments: ${payment.comments}`,
                 'Closing Stock': '',
                 'Sales': '',
                 'Rate': '',
@@ -750,6 +750,7 @@ export default function Home() {
                     <table style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr style="background-color: #f3e8ff;">
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Date</th>
                                 <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">PhonePe</th>
                                 <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Cash</th>
                                 <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Amount</th>
@@ -759,6 +760,7 @@ export default function Home() {
                         <tbody>
                             ${paymentData.map(payment => `
                                 <tr>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount}</td>
@@ -1137,7 +1139,7 @@ export default function Home() {
                                                     type="text"
                                                     value={field1Value}
                                                     readOnly
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-900"
                                                 />
                                             </td>
                                         </tr>
@@ -1148,7 +1150,7 @@ export default function Home() {
                                                     type="text"
                                                     value={field2}
                                                     readOnly
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-900"
                                                 />
                                             </td>
                                         </tr>
@@ -1159,7 +1161,7 @@ export default function Home() {
                                                     type="text"
                                                     value={field3Value}
                                                     readOnly
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-900"
                                                 />
                                             </td>
                                         </tr>
@@ -1170,7 +1172,7 @@ export default function Home() {
                                                     type="text"
                                                     value={field4}
                                                     onChange={(e) => setField4(e.target.value)}
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900"
                                                 />
                                             </td>
                                         </tr>
@@ -1181,7 +1183,7 @@ export default function Home() {
                                                     type="text"
                                                     value={field5Value}
                                                     readOnly
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-900"
                                                 />
                                             </td>
                                         </tr>
@@ -1192,7 +1194,7 @@ export default function Home() {
                                                     type="text"
                                                     value={field6}
                                                     onChange={(e) => setField6(e.target.value)}
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900"
                                                 />
                                             </td>
                                         </tr>
@@ -1203,7 +1205,7 @@ export default function Home() {
                                                     type="text"
                                                     value={field7Value}
                                                     readOnly
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-900"
                                                 />
                                             </td>
                                         </tr>
@@ -1219,6 +1221,7 @@ export default function Home() {
                                 <table className="w-full border-collapse border border-gray-300">
                                     <thead>
                                         <tr className="bg-purple-50">
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Date</th>
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">PhonePe</th>
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Cash</th>
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Amount</th>
@@ -1231,6 +1234,18 @@ export default function Home() {
                                             <tr key={index} className="hover:bg-gray-50">
                                                 <td className="px-4 py-3 border border-gray-300">
                                                     <input
+                                                        type="date"
+                                                        value={row.date}
+                                                        onChange={(e) => {
+                                                            const newData = [...paymentData];
+                                                            newData[index].date = e.target.value;
+                                                            setPaymentData(newData);
+                                                        }}
+                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 border border-gray-300">
+                                                    <input
                                                         type="text"
                                                         value={row.phonepe}
                                                         onChange={(e) => {
@@ -1238,7 +1253,7 @@ export default function Home() {
                                                             newData[index].phonepe = e.target.value;
                                                             setPaymentData(newData);
                                                         }}
-                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900"
                                                         placeholder="PhonePe amount"
                                                     />
                                                 </td>
@@ -1251,7 +1266,7 @@ export default function Home() {
                                                             newData[index].cash = e.target.value;
                                                             setPaymentData(newData);
                                                         }}
-                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900"
                                                         placeholder="Cash amount"
                                                     />
                                                 </td>
@@ -1264,7 +1279,7 @@ export default function Home() {
                                                             newData[index].amount = e.target.value;
                                                             setPaymentData(newData);
                                                         }}
-                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900"
                                                         placeholder="Total amount"
                                                     />
                                                 </td>
@@ -1277,7 +1292,7 @@ export default function Home() {
                                                             newData[index].comments = e.target.value;
                                                             setPaymentData(newData);
                                                         }}
-                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900"
                                                         placeholder="Comments"
                                                     />
                                                 </td>
@@ -1299,7 +1314,7 @@ export default function Home() {
                                     </tbody>
                                 </table>
                                 <button
-                                    onClick={() => setPaymentData([...paymentData, { phonepe: '', cash: '', amount: '', comments: '' }])}
+                                    onClick={() => setPaymentData([...paymentData, { phonepe: '', cash: '', amount: '', comments: '', date: '' }])}
                                     className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
                                 >
                                     Add Row
@@ -1447,6 +1462,78 @@ export default function Home() {
                                     </table>
                                 </div>
                             </div>
+                            
+                            {/* Additional Information in History */}
+                            {(selectedHistory.field1 || selectedHistory.field2 || selectedHistory.field3 || selectedHistory.field4 || selectedHistory.field5 || selectedHistory.field6) && (
+                                <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
+                                    <div className="overflow-hidden">
+                                        <table className="w-full border-collapse border border-gray-300">
+                                            <tbody>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Total Sale</td>
+                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field1 || '0'}</td>
+                                                </tr>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Opening Balance</td>
+                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field2 || '0'}</td>
+                                                </tr>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Total</td>
+                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field3 || '0'}</td>
+                                                </tr>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Jama</td>
+                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field4 || '0'}</td>
+                                                </tr>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Total</td>
+                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field5 || '0'}</td>
+                                                </tr>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Expenses</td>
+                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field6 || '0'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Closing Balance</td>
+                                                    <td className="py-2 px-3 text-sm">{((parseFloat(selectedHistory.field1 || '0') + parseFloat(selectedHistory.field2 || '0') + parseFloat(selectedHistory.field4 || '0')) - parseFloat(selectedHistory.field6 || '0')).toString()}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Payment Information in History */}
+                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && (
+                                <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Information</h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full border-collapse border border-gray-300">
+                                            <thead>
+                                                <tr className="bg-purple-50">
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Date</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">PhonePe</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Cash</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Amount</th>
+                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Comments</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {selectedHistory.paymentData.map((payment: any, index: number) => (
+                                                    <tr key={index} className="hover:bg-gray-50">
+                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.date}</td>
+                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.phonepe}</td>
+                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.cash}</td>
+                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.amount}</td>
+                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.comments}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
