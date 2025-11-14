@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
@@ -58,14 +58,46 @@ export default function Home() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userRole, setUserRole] = useState('');
     const [username, setUsername] = useState('');
+    const [showHistory, setShowHistory] = useState(false);
+    const [historyData, setHistoryData] = useState<any[]>([]);
+
+    // Handle closing stock change
+    const handleClosingStockChange = (index: number, value: string) => {
+        const newValue = parseInt(value) || 0;
+
+        setFilterData(prevData => {
+            const newData = [...prevData];
+            const item = newData[index];
+
+            // Update closing stock
+            item.closingStock = newValue;
+
+            // Calculate: opening stock + receipts = closing stock + sales
+            // So: sales = opening stock + receipts - closing stock
+            item.sales = item.openingStock + item.receipts - item.closingStock;
+
+            // Calculate amount: sales * rate
+            item.amount = `₹${(item.sales * item.rate).toFixed(2)}`;
+
+            return newData;
+        });
+    };
 
     // Get collection name based on user
     const getCollectionName = () => {
         if (userRole === 'Admin') {
             return 'invoices_admin';
         } else {
-            // For shop owners: shop1 -> invoices_shop1, shop2 -> invoices_shop2, etc.
             return `invoices_${username}`;
+        }
+    };
+
+    // Get history collection name
+    const getHistoryCollectionName = () => {
+        if (userRole === 'Admin') {
+            return 'history_admin';
+        } else {
+            return `history_${username}`;
         }
     };
 
@@ -210,23 +242,50 @@ export default function Home() {
 
         try {
             const collectionName = getCollectionName();
+            const historyCollectionName = getHistoryCollectionName();
+            const saveDate = new Date().toISOString();
+
             console.log('Saving to collection:', collectionName);
             console.log('Data to save:', { itemCount: filterData.length, user: username, role: userRole });
 
-            const docData = {
+            // Save to history collection
+            await addDoc(collection(db, historyCollectionName), {
                 items: filterData,
                 timestamp: serverTimestamp(),
                 totalItems: filterData.length,
-                createdAt: new Date().toISOString(),
+                savedAt: saveDate,
+                user: username,
+                role: userRole
+            });
+
+            // Update opening stock with closing stock values and reset closing stock
+            const updatedData = filterData.map(item => ({
+                ...item,
+                openingStock: item.closingStock, // Transfer closing to opening
+                closingStock: 0, // Reset closing stock
+                sales: 0, // Reset sales
+                amount: '₹0', // Reset amount
+            }));
+
+            // Save updated data to main collection (latest state)
+            const docData = {
+                items: updatedData,
+                timestamp: serverTimestamp(),
+                totalItems: updatedData.length,
+                createdAt: saveDate,
                 user: username,
                 role: userRole
             };
 
-            const docRef = await addDoc(collection(db, collectionName), docData);
-            console.log('Document saved with ID:', docRef.id);
+            await addDoc(collection(db, collectionName), docData);
+
+            // Update local state with new opening stocks
+            setFilterData(updatedData);
+
+            console.log('Document saved successfully');
 
             setSaveStatus('success');
-            setSaveMessage(`Successfully saved ${filterData.length} items`);
+            setSaveMessage(`Successfully saved ${filterData.length} items to history`);
             setSaveAllowed(false);
         } catch (error) {
             console.error('Error saving to Firebase:', error);
@@ -339,6 +398,59 @@ export default function Home() {
         setUsername(user);
     };
 
+    const loadHistory = async () => {
+        if (!username) return;
+
+        setIsLoading(true);
+        try {
+            const historyCollectionName = getHistoryCollectionName();
+            console.log('Loading history from:', historyCollectionName);
+
+            const q = query(
+                collection(db, historyCollectionName),
+                orderBy('savedAt', 'desc')
+            );
+            const querySnapshot = await getDocs(q);
+
+            const history = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            setHistoryData(history);
+            setShowHistory(true);
+        } catch (error) {
+            console.error('Error loading history:', error);
+            setSaveStatus('error');
+            setSaveMessage('Failed to load history');
+        } finally {
+            setIsLoading(false);
+            setTimeout(() => setSaveStatus('idle'), 3000);
+        }
+    };
+
+    const downloadHistoryExcel = (historyItem: any) => {
+        if (!historyItem.items || historyItem.items.length === 0) return;
+
+        const worksheet = XLSX.utils.json_to_sheet(
+            historyItem.items.map((item: FilteredItem) => ({
+                'Particulars': item.particulars,
+                'Size': item.size,
+                'Opening Stock': item.openingStock,
+                'Receipts': item.receipts,
+                'Closing Stock': item.closingStock,
+                'Sales': item.sales,
+                'Rate': item.rate,
+                'Amount': item.amount,
+            }))
+        );
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'History');
+        const date = new Date(historyItem.savedAt).toLocaleDateString().replace(/\//g, '-');
+        XLSX.writeFile(workbook, `history-${username}-${date}.xlsx`);
+    };
+
     const handleLogout = () => {
         setIsLoggedIn(false);
         setUserRole('');
@@ -423,6 +535,21 @@ export default function Home() {
                                         {isLoading ? 'Loading...' : 'Load'}
                                     </button>
 
+                                    {userRole === 'Shop Owner' && (
+                                        <button
+                                            onClick={loadHistory}
+                                            disabled={isLoading}
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                                                isLoading
+                                                    ? 'bg-gray-400 cursor-not-allowed'
+                                                    : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg'
+                                            }`}
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            History
+                                        </button>
+                                    )}
+
                                     <div className="h-6 w-px bg-gray-300"></div>
 
                                     <button
@@ -487,11 +614,19 @@ export default function Home() {
                                                 </span>
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" readOnly />
+                                                <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" readOnly />
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <input type="number" value={item.closingStock} className="w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" readOnly />
+                                                <input
+                                                    type="number"
+                                                    value={item.closingStock}
+                                                    onChange={(e) => handleClosingStockChange(index, e.target.value)}
+                                                    disabled={userRole === 'Admin'}
+                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${
+                                                        userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                                    }`}
+                                                />
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                 <span className="text-blue-600 font-semibold text-xs sm:text-sm">{item.sales}</span>
@@ -524,6 +659,89 @@ export default function Home() {
                     </div>
                 )}
             </main>
+
+            {/* History Modal */}
+            {showHistory && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="bg-purple-600 text-white p-4 flex justify-between items-center">
+                            <h2 className="text-xl font-bold">Saved History</h2>
+                            <button
+                                onClick={() => setShowHistory(false)}
+                                className="text-white hover:bg-purple-700 rounded-full p-2"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {historyData.length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">No history found</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    {historyData.map((record, idx) => (
+                                        <div key={record.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <div>
+                                                    <h3 className="font-semibold text-lg">
+                                                        {new Date(record.savedAt).toLocaleDateString()} - {new Date(record.savedAt).toLocaleTimeString()}
+                                                    </h3>
+                                                    <p className="text-sm text-gray-600">
+                                                        {record.totalItems} items saved
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => downloadHistoryExcel(record)}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                                                >
+                                                    <FileSpreadsheet className="w-4 h-4" />
+                                                    Download
+                                                </button>
+                                            </div>
+
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-gray-50">
+                                                    <tr>
+                                                        <th className="px-3 py-2 text-left">Particulars</th>
+                                                        <th className="px-3 py-2 text-center">Size</th>
+                                                        <th className="px-3 py-2 text-center">Opening</th>
+                                                        <th className="px-3 py-2 text-center">Receipts</th>
+                                                        <th className="px-3 py-2 text-center">Closing</th>
+                                                        <th className="px-3 py-2 text-center">Sales</th>
+                                                        <th className="px-3 py-2 text-center">Rate</th>
+                                                        <th className="px-3 py-2 text-right">Amount</th>
+                                                    </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                    {record.items.slice(0, 5).map((item: FilteredItem, itemIdx: number) => (
+                                                        <tr key={itemIdx} className="border-t">
+                                                            <td className="px-3 py-2">{item.particulars}</td>
+                                                            <td className="px-3 py-2 text-center">{item.size}</td>
+                                                            <td className="px-3 py-2 text-center">{item.openingStock}</td>
+                                                            <td className="px-3 py-2 text-center">{item.receipts}</td>
+                                                            <td className="px-3 py-2 text-center">{item.closingStock}</td>
+                                                            <td className="px-3 py-2 text-center">{item.sales}</td>
+                                                            <td className="px-3 py-2 text-center">₹{item.rate}</td>
+                                                            <td className="px-3 py-2 text-right">{item.amount}</td>
+                                                        </tr>
+                                                    ))}
+                                                    </tbody>
+                                                </table>
+                                                {record.items.length > 5 && (
+                                                    <p className="text-center text-gray-500 text-sm mt-2">
+                                                        ... and {record.items.length - 5} more items
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
