@@ -116,7 +116,7 @@ export default function LoginForm({ onLoginSuccess }) {
                                     placeholder="Enter your username"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-gray-900"
                                 />
                             </div>
                         </div>
@@ -133,7 +133,7 @@ export default function LoginForm({ onLoginSuccess }) {
                                     placeholder="Enter your password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-gray-900"
                                 />
                             </div>
                         </div>
