@@ -66,6 +66,10 @@ export default function Home() {
     const [invoiceName, setInvoiceName] = useState('');
     const [field1, setField1] = useState('');
     const [field2, setField2] = useState('');
+    const [field3, setField3] = useState('');
+    const [field4, setField4] = useState('');
+    const [field5, setField5] = useState('');
+    const [field6, setField6] = useState('');
 
     // Handle closing stock change
     const handleClosingStockChange = (index: number, value: string) => {
@@ -274,6 +278,10 @@ export default function Home() {
                 setFilterData(data.items || []);
                 setField1(data.field1 || '');
                 setField2(data.field2 || '');
+                setField3(data.field3 || '');
+                setField4(data.field4 || '');
+                setField5(data.field5 || '');
+                setField6(data.field6 || '');
                 setSaveStatus('success');
                 setSaveMessage('Data loaded successfully');
             } else {
@@ -331,7 +339,11 @@ export default function Home() {
                 invoiceName: invoiceName || `Invoice ${new Date().toLocaleDateString()}`,
                 hasClosingStock: hasClosingStock,
                 field1: field1,
-                field2: field2
+                field2: field2,
+                field3: field3,
+                field4: field4,
+                field5: field5,
+                field6: field6
             });
 
             // If closing stock is entered, update opening stock
@@ -361,7 +373,11 @@ export default function Home() {
                 user: username,
                 role: userRole,
                 field1: field1,
-                field2: field2
+                field2: field2,
+                field3: field3,
+                field4: field4,
+                field5: field5,
+                field6: field6
             };
 
             await addDoc(collection(db, collectionName), docData);
@@ -437,6 +453,97 @@ export default function Home() {
             'Issue Price': '',
         });
         
+        data.push({});
+        data.push({
+            'Particulars': 'Field 1',
+            'Size': field1,
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': '',
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+        
+        data.push({
+            'Particulars': 'Field 2',
+            'Size': field2,
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': '',
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+        
+        data.push({
+            'Particulars': 'Field 3',
+            'Size': field3,
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': '',
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+        
+        data.push({
+            'Particulars': 'Field 4',
+            'Size': field4,
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': '',
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+        
+        data.push({
+            'Particulars': 'Field 5',
+            'Size': field5,
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': '',
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+        
+        data.push({
+            'Particulars': 'Field 6',
+            'Size': field6,
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': '',
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+        
         const worksheet = XLSX.utils.json_to_sheet(data);
 
         const workbook = XLSX.utils.book_new();
@@ -494,12 +601,12 @@ export default function Home() {
                             <tr>
                                 <td>${item.particulars}</td>
                                 <td class="text-center">${item.size}</td>
-                                <td class="text-center">${item.openingStock}</td>
-                                <td class="text-center">${item.receipts}</td>
-                                <td class="text-center">${item.tranIn}</td>
-                                <td class="text-center">${item.tranOut}</td>
-                                <td class="text-center">${item.closingStock}</td>
-                                <td class="text-center">${item.sales}</td>
+                                <td class="text-center">${item.openingStock || 0}</td>
+                                <td class="text-center">${item.receipts || 0}</td>
+                                <td class="text-center">${item.tranIn || 0}</td>
+                                <td class="text-center">${item.tranOut || 0}</td>
+                                <td class="text-center">${item.closingStock || 0}</td>
+                                <td class="text-center">${item.sales || 0}</td>
                                 <td class="text-center">₹${item.rate}</td>
                                 <td class="text-right">${item.amount}</td>
                             </tr>
@@ -527,6 +634,36 @@ export default function Home() {
                         </tr>
                     </tbody>
                 </table>
+                
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 1</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field1}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 2</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field2}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 3</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field3}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 4</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field4}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 5</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field5}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 6</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field6}</td>
+                        </tr>
+                    </table>
+                </div>
                 <script>
                     window.onload = () => {
                         window.print();
@@ -877,7 +1014,7 @@ export default function Home() {
                         {/* Additional Fields */}
                         <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                             <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Field 1</label>
                                     <input
@@ -896,6 +1033,46 @@ export default function Home() {
                                         onChange={(e) => setField2(e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="Enter field 2 value"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 3</label>
+                                    <input
+                                        type="text"
+                                        value={field3}
+                                        onChange={(e) => setField3(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Enter field 3 value"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 4</label>
+                                    <input
+                                        type="text"
+                                        value={field4}
+                                        onChange={(e) => setField4(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Enter field 4 value"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 5</label>
+                                    <input
+                                        type="text"
+                                        value={field5}
+                                        onChange={(e) => setField5(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Enter field 5 value"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 6</label>
+                                    <input
+                                        type="text"
+                                        value={field6}
+                                        onChange={(e) => setField6(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Enter field 6 value"
                                     />
                                 </div>
                             </div>
