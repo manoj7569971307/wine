@@ -110,7 +110,7 @@ export default function Home() {
     }, []);
 
     const filterWineData = useCallback((): void => {
-        const filtered: FilteredItem[] = [];
+        const filtered: FilteredItem[] = [...filterData];
 
         for (let j = 1; j < childData.length; j++) {
             const row = childData[j];
@@ -304,9 +304,9 @@ export default function Home() {
             setInvoiceName(''); // Reset invoice name
         } catch (error) {
             console.error('Error saving to Firebase:', error);
-            console.error('Error details:', error.message);
+            console.error('Error details:', error);
             setSaveStatus('error');
-            setSaveMessage(`Failed to save: ${error.message}`);
+            setSaveMessage(`Failed to save: ${error}`);
         } finally {
             setIsSaving(false);
             setTimeout(() => setSaveStatus('idle'), 5000);
@@ -647,7 +647,7 @@ export default function Home() {
                                                 </span>
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" readOnly />
+                                                <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
@@ -656,7 +656,7 @@ export default function Home() {
                                                     value={item.closingStock}
                                                     onChange={(e) => handleClosingStockChange(index, e.target.value)}
                                                     disabled={userRole === 'Admin'}
-                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${
                                                         userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
                                                     }`}
                                                 />
