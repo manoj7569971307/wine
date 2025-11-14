@@ -31,6 +31,8 @@ interface FilteredItem {
     receiptDate: string;
     openingStock: number;
     receipts: number;
+    tranIn: number;
+    tranOut: number;
     sales: number;
     closingStock: number;
     size: string;
@@ -62,6 +64,8 @@ export default function Home() {
     const [historyData, setHistoryData] = useState<any[]>([]);
     const [selectedHistory, setSelectedHistory] = useState<any>(null);
     const [invoiceName, setInvoiceName] = useState('');
+    const [field1, setField1] = useState('');
+    const [field2, setField2] = useState('');
 
     // Handle closing stock change
     const handleClosingStockChange = (index: number, value: string) => {
@@ -74,12 +78,71 @@ export default function Home() {
             // Update closing stock
             item.closingStock = newValue;
 
-            // Calculate: opening stock + receipts = closing stock + sales
-            // So: sales = opening stock + receipts - closing stock
-            item.sales = item.openingStock + item.receipts - item.closingStock;
+            // Ensure all values are numbers
+            const openingStock = Number(item.openingStock) || 0;
+            const receipts = Number(item.receipts) || 0;
+            const tranIn = Number(item.tranIn) || 0;
+            const tranOut = Number(item.tranOut) || 0;
+            const rate = Number(item.rate) || 0;
+
+            // Calculate: opening stock + receipts + tran in = closing stock + sales + tran out
+            // So: sales = opening stock + receipts + tran in - closing stock - tran out
+            item.sales = openingStock + receipts + tranIn - newValue - tranOut;
 
             // Calculate amount: sales * rate
-            item.amount = `₹${(item.sales * item.rate).toFixed(2)}`;
+            item.amount = `₹${(item.sales * rate).toFixed(2)}`;
+
+            return newData;
+        });
+    };
+
+    // Handle tran in change
+    const handleTranInChange = (index: number, value: string) => {
+        const newValue = parseInt(value) || 0;
+
+        setFilterData(prevData => {
+            const newData = [...prevData];
+            const item = newData[index];
+
+            // Update tran in
+            item.tranIn = newValue;
+
+            // Ensure all values are numbers
+            const openingStock = Number(item.openingStock) || 0;
+            const receipts = Number(item.receipts) || 0;
+            const tranOut = Number(item.tranOut) || 0;
+            const closingStock = Number(item.closingStock) || 0;
+            const rate = Number(item.rate) || 0;
+
+            // Recalculate sales
+            item.sales = openingStock + receipts + newValue - closingStock - tranOut;
+            item.amount = `₹${(item.sales * rate).toFixed(2)}`;
+
+            return newData;
+        });
+    };
+
+    // Handle tran out change
+    const handleTranOutChange = (index: number, value: string) => {
+        const newValue = parseInt(value) || 0;
+
+        setFilterData(prevData => {
+            const newData = [...prevData];
+            const item = newData[index];
+
+            // Update tran out
+            item.tranOut = newValue;
+
+            // Ensure all values are numbers
+            const openingStock = Number(item.openingStock) || 0;
+            const receipts = Number(item.receipts) || 0;
+            const tranIn = Number(item.tranIn) || 0;
+            const closingStock = Number(item.closingStock) || 0;
+            const rate = Number(item.rate) || 0;
+
+            // Recalculate sales
+            item.sales = openingStock + receipts + tranIn - closingStock - newValue;
+            item.amount = `₹${(item.sales * rate).toFixed(2)}`;
 
             return newData;
         });
@@ -167,6 +230,8 @@ export default function Home() {
                             receiptDate: new Date().toISOString().split('T')[0],
                             openingStock: 0,
                             receipts: calculatedQuantity,
+                            tranIn: 0,
+                            tranOut: 0,
                             sales: 0,
                             closingStock: 0,
                             size: secondIndex,
@@ -207,6 +272,8 @@ export default function Home() {
                 const data = querySnapshot.docs[0].data();
                 console.log('Loaded data:', data);
                 setFilterData(data.items || []);
+                setField1(data.field1 || '');
+                setField2(data.field2 || '');
                 setSaveStatus('success');
                 setSaveMessage('Data loaded successfully');
             } else {
@@ -262,7 +329,9 @@ export default function Home() {
                 user: username,
                 role: userRole,
                 invoiceName: invoiceName || `Invoice ${new Date().toLocaleDateString()}`,
-                hasClosingStock: hasClosingStock
+                hasClosingStock: hasClosingStock,
+                field1: field1,
+                field2: field2
             });
 
             // If closing stock is entered, update opening stock
@@ -272,6 +341,8 @@ export default function Home() {
                     ...item,
                     openingStock: item.closingStock > 0 ? item.closingStock : item.openingStock,
                     receipts: item.closingStock > 0 ? 0 : item.receipts,
+                    tranIn: 0,
+                    tranOut: 0,
                     closingStock: 0,
                     sales: 0,
                     amount: '₹0',
@@ -288,7 +359,9 @@ export default function Home() {
                 totalItems: updatedData.length,
                 createdAt: saveDate,
                 user: username,
-                role: userRole
+                role: userRole,
+                field1: field1,
+                field2: field2
             };
 
             await addDoc(collection(db, collectionName), docData);
@@ -316,20 +389,55 @@ export default function Home() {
     const downloadExcel = () => {
         if (filterData.length === 0) return;
 
-        const worksheet = XLSX.utils.json_to_sheet(
-            filterData.map(item => ({
-                'Particulars': item.particulars,
-                'Size': item.size,
-                'Opening Stock': item.openingStock,
-                'Receipts': item.receipts,
-                'Closing Stock': item.closingStock,
-                'Sales': item.sales,
-                'Rate': item.rate,
-                'Amount': item.amount,
-                'Brand Number': item.brandNumber,
-                'Issue Price': item.issuePrice,
-            }))
-        );
+        const data = filterData.map(item => ({
+            'Particulars': item.particulars,
+            'Size': item.size,
+            'Opening Stock': item.openingStock,
+            'Receipts': item.receipts,
+            'Tran In': item.tranIn,
+            'Tran Out': item.tranOut,
+            'Closing Stock': item.closingStock,
+            'Sales': item.sales,
+            'Rate': item.rate,
+            'Amount': item.amount,
+            'Brand Number': item.brandNumber,
+            'Issue Price': item.issuePrice,
+        }));
+        
+        data.push({
+            'Particulars': 'TOTAL',
+            'Size': '-',
+            'Opening Stock': filterData.reduce((sum, item) => sum + item.openingStock, 0),
+            'Receipts': filterData.reduce((sum, item) => sum + item.receipts, 0),
+            'Tran In': filterData.reduce((sum, item) => sum + item.tranIn, 0),
+            'Tran Out': filterData.reduce((sum, item) => sum + item.tranOut, 0),
+            'Closing Stock': filterData.reduce((sum, item) => sum + item.closingStock, 0),
+            'Sales': filterData.reduce((sum, item) => sum + item.sales, 0),
+            'Rate': '-',
+            'Amount': `₹${filterData.reduce((sum, item) => {
+                const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
+                return sum + amount;
+            }, 0).toLocaleString()}`,
+            'Brand Number': '-',
+            'Issue Price': '-',
+        });
+        
+        data.push({
+            'Particulars': 'CLOSING STOCK TOTAL AMOUNT',
+            'Size': '',
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': `₹${filterData.reduce((sum, item) => sum + (item.closingStock * item.rate), 0).toLocaleString()}`,
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+        
+        const worksheet = XLSX.utils.json_to_sheet(data);
 
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Wine Invoice');
@@ -373,6 +481,8 @@ export default function Home() {
                             <th class="text-center">Size</th>
                             <th class="text-center">Opening Stock</th>
                             <th class="text-center">Receipts</th>
+                            <th class="text-center">Tran In</th>
+                            <th class="text-center">Tran Out</th>
                             <th class="text-center">Closing Stock</th>
                             <th class="text-center">Sales</th>
                             <th class="text-center">Rate</th>
@@ -386,12 +496,35 @@ export default function Home() {
                                 <td class="text-center">${item.size}</td>
                                 <td class="text-center">${item.openingStock}</td>
                                 <td class="text-center">${item.receipts}</td>
+                                <td class="text-center">${item.tranIn}</td>
+                                <td class="text-center">${item.tranOut}</td>
                                 <td class="text-center">${item.closingStock}</td>
                                 <td class="text-center">${item.sales}</td>
                                 <td class="text-center">₹${item.rate}</td>
                                 <td class="text-right">${item.amount}</td>
                             </tr>
                         `).join('')}
+                        <tr style="background-color: #f3f4f6; border-top: 2px solid #d1d5db; font-weight: bold;">
+                            <td>TOTAL</td>
+                            <td class="text-center">-</td>
+                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.openingStock, 0)}</td>
+                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.receipts, 0)}</td>
+                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.tranIn, 0)}</td>
+                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.tranOut, 0)}</td>
+                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.closingStock, 0)}</td>
+                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.sales, 0)}</td>
+                            <td class="text-center">-</td>
+                            <td class="text-right">₹${filterData.reduce((sum, item) => {
+                                const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
+                                return sum + amount;
+                            }, 0).toLocaleString()}</td>
+                        </tr>
+                        <tr style="background-color: #eff6ff; font-weight: bold;">
+                            <td colspan="9">CLOSING STOCK TOTAL AMOUNT</td>
+                            <td class="text-right">₹${filterData.reduce((sum, item) => {
+                                return sum + (item.closingStock * item.rate);
+                            }, 0).toLocaleString()}</td>
+                        </tr>
                     </tbody>
                 </table>
                 <script>
@@ -453,6 +586,8 @@ export default function Home() {
                 'Size': item.size,
                 'Opening Stock': item.openingStock,
                 'Receipts': item.receipts,
+                'Tran In': item.tranIn,
+                'Tran Out': item.tranOut,
                 'Closing Stock': item.closingStock,
                 'Sales': item.sales,
                 'Rate': item.rate,
@@ -631,6 +766,8 @@ export default function Home() {
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Size</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Opening Stock</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Receipts</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran In</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran Out</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Sales</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
@@ -653,6 +790,28 @@ export default function Home() {
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                 <input
                                                     type="number"
+                                                    value={item.tranIn}
+                                                    onChange={(e) => handleTranInChange(index, e.target.value)}
+                                                    disabled={userRole === 'Admin'}
+                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${
+                                                        userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                                    }`}
+                                                />
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                <input
+                                                    type="number"
+                                                    value={item.tranOut}
+                                                    onChange={(e) => handleTranOutChange(index, e.target.value)}
+                                                    disabled={userRole === 'Admin'}
+                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${
+                                                        userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                                    }`}
+                                                />
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                <input
+                                                    type="number"
                                                     value={item.closingStock}
                                                     onChange={(e) => handleClosingStockChange(index, e.target.value)}
                                                     disabled={userRole === 'Admin'}
@@ -669,10 +828,76 @@ export default function Home() {
                                         </tr>
                                     ))}
                                     </tbody>
+                                    <tfoot className="bg-gray-100 border-t-2 border-gray-300">
+                                        <tr className="font-bold">
+                                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-800">TOTAL</td>
+                                            <td className="px-2 sm:px-4 py-3 text-center">-</td>
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                                {filterData.reduce((sum, item) => sum + item.openingStock, 0)}
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-blue-600">
+                                                {filterData.reduce((sum, item) => sum + item.receipts, 0)}
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                                {filterData.reduce((sum, item) => sum + item.tranIn, 0)}
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                                {filterData.reduce((sum, item) => sum + item.tranOut, 0)}
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                                {filterData.reduce((sum, item) => sum + item.closingStock, 0)}
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                                {filterData.reduce((sum, item) => sum + item.sales, 0)}
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-3 text-center">-</td>
+                                            <td className="px-2 sm:px-4 py-3 text-right text-sm text-green-600">
+                                                ₹{filterData.reduce((sum, item) => {
+                                                    const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
+                                                    return sum + amount;
+                                                }, 0).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                        <tr className="font-bold bg-blue-50">
+                                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-800" colSpan={9}>CLOSING STOCK TOTAL AMOUNT</td>
+                                            <td className="px-2 sm:px-4 py-3 text-right text-sm text-purple-600">
+                                                ₹{filterData.reduce((sum, item) => {
+                                                    return sum + (item.closingStock * item.rate);
+                                                }, 0).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                             <div className="sm:hidden p-2 text-center text-xs text-gray-500 bg-gray-50">
                                 ← Scroll horizontally to see all columns →
+                            </div>
+                        </div>
+                        
+                        {/* Additional Fields */}
+                        <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 1</label>
+                                    <input
+                                        type="text"
+                                        value={field1}
+                                        onChange={(e) => setField1(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Enter field 1 value"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 2</label>
+                                    <input
+                                        type="text"
+                                        value={field2}
+                                        onChange={(e) => setField2(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Enter field 2 value"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </>
@@ -785,6 +1010,8 @@ export default function Home() {
                                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Size</th>
                                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Opening Stock</th>
                                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Receipts</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Tran In</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Tran Out</th>
                                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
                                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Sales</th>
                                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Rate</th>
@@ -802,6 +1029,8 @@ export default function Home() {
                                                 </td>
                                                 <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-red-600">{item.tranOut}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
                                                 <td className="px-4 py-3 text-center text-sm text-gray-800">₹{item.rate}</td>
