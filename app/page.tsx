@@ -60,6 +60,8 @@ export default function Home() {
     const [username, setUsername] = useState('');
     const [showHistory, setShowHistory] = useState(false);
     const [historyData, setHistoryData] = useState<any[]>([]);
+    const [selectedHistory, setSelectedHistory] = useState<any>(null);
+    const [invoiceName, setInvoiceName] = useState('');
 
     // Handle closing stock change
     const handleClosingStockChange = (index: number, value: string) => {
@@ -237,6 +239,9 @@ export default function Home() {
             return;
         }
 
+        // Check if closing stock is entered
+        const hasClosingStock = filterData.some(item => item.closingStock > 0);
+
         setIsSaving(true);
         setSaveStatus('idle');
 
@@ -248,24 +253,33 @@ export default function Home() {
             console.log('Saving to collection:', collectionName);
             console.log('Data to save:', { itemCount: filterData.length, user: username, role: userRole });
 
-            // Save to history collection
+            // Always save to history collection with invoice name or closing stock status
             await addDoc(collection(db, historyCollectionName), {
                 items: filterData,
                 timestamp: serverTimestamp(),
                 totalItems: filterData.length,
                 savedAt: saveDate,
                 user: username,
-                role: userRole
+                role: userRole,
+                invoiceName: invoiceName || `Invoice ${new Date().toLocaleDateString()}`,
+                hasClosingStock: hasClosingStock
             });
 
-            // Update opening stock with closing stock values and reset closing stock
-            const updatedData = filterData.map(item => ({
-                ...item,
-                openingStock: item.closingStock, // Transfer closing to opening
-                closingStock: 0, // Reset closing stock
-                sales: 0, // Reset sales
-                amount: '₹0', // Reset amount
-            }));
+            // If closing stock is entered, update opening stock
+            let updatedData;
+            if (hasClosingStock) {
+                updatedData = filterData.map(item => ({
+                    ...item,
+                    openingStock: item.closingStock > 0 ? item.closingStock : item.openingStock,
+                    receipts: item.closingStock > 0 ? 0 : item.receipts,
+                    closingStock: 0,
+                    sales: 0,
+                    amount: '₹0',
+                }));
+            } else {
+                // Keep data as is if no closing stock
+                updatedData = filterData;
+            }
 
             // Save updated data to main collection (latest state)
             const docData = {
@@ -279,14 +293,15 @@ export default function Home() {
 
             await addDoc(collection(db, collectionName), docData);
 
-            // Update local state with new opening stocks
+            // Update local state with new data
             setFilterData(updatedData);
 
             console.log('Document saved successfully');
 
             setSaveStatus('success');
-            setSaveMessage(`Successfully saved ${filterData.length} items to history`);
+            setSaveMessage(`Successfully saved ${filterData.length} items`);
             setSaveAllowed(false);
+            setInvoiceName(''); // Reset invoice name
         } catch (error) {
             console.error('Error saving to Firebase:', error);
             console.error('Error details:', error.message);
@@ -451,6 +466,14 @@ export default function Home() {
         XLSX.writeFile(workbook, `history-${username}-${date}.xlsx`);
     };
 
+    const viewHistorySheet = (record: any) => {
+        setSelectedHistory(record);
+    };
+
+    const closeHistorySheet = () => {
+        setSelectedHistory(null);
+    };
+
     const handleLogout = () => {
         setIsLoggedIn(false);
         setUserRole('');
@@ -506,6 +529,16 @@ export default function Home() {
                         <div className="mb-4 bg-white shadow-lg rounded-lg p-4">
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div className="flex flex-wrap items-center gap-3">
+                                    {userRole === 'Shop Owner' && (
+                                        <input
+                                            type="text"
+                                            placeholder="Invoice Name (optional)"
+                                            value={invoiceName}
+                                            onChange={(e) => setInvoiceName(e.target.value)}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    )}
+
                                     <button
                                         onClick={() => {
                                             saveToFirebase();
@@ -614,7 +647,7 @@ export default function Home() {
                                                 </span>
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" readOnly />
+                                                <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" readOnly />
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
@@ -623,7 +656,7 @@ export default function Home() {
                                                     value={item.closingStock}
                                                     onChange={(e) => handleClosingStockChange(index, e.target.value)}
                                                     disabled={userRole === 'Admin'}
-                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${
+                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                                                         userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
                                                     }`}
                                                 />
@@ -663,12 +696,12 @@ export default function Home() {
             {/* History Modal */}
             {showHistory && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                    <div className="bg-white rounded-lg shadow-2xl max-w-md w-full max-h-[70vh] overflow-hidden flex flex-col">
                         <div className="bg-purple-600 text-white p-4 flex justify-between items-center">
                             <h2 className="text-xl font-bold">Saved History</h2>
                             <button
                                 onClick={() => setShowHistory(false)}
-                                className="text-white hover:bg-purple-700 rounded-full p-2"
+                                className="text-white hover:bg-purple-700 rounded-full p-2 transition"
                             >
                                 ✕
                             </button>
@@ -678,66 +711,107 @@ export default function Home() {
                             {historyData.length === 0 ? (
                                 <p className="text-center text-gray-500 py-8">No history found</p>
                             ) : (
-                                <div className="space-y-4">
-                                    {historyData.map((record, idx) => (
-                                        <div key={record.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
-                                            <div className="flex justify-between items-center mb-3">
-                                                <div>
-                                                    <h3 className="font-semibold text-lg">
-                                                        {new Date(record.savedAt).toLocaleDateString()} - {new Date(record.savedAt).toLocaleTimeString()}
-                                                    </h3>
-                                                    <p className="text-sm text-gray-600">
-                                                        {record.totalItems} items saved
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={() => downloadHistoryExcel(record)}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
-                                                >
-                                                    <FileSpreadsheet className="w-4 h-4" />
-                                                    Download
-                                                </button>
-                                            </div>
-
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-sm">
-                                                    <thead className="bg-gray-50">
-                                                    <tr>
-                                                        <th className="px-3 py-2 text-left">Particulars</th>
-                                                        <th className="px-3 py-2 text-center">Size</th>
-                                                        <th className="px-3 py-2 text-center">Opening</th>
-                                                        <th className="px-3 py-2 text-center">Receipts</th>
-                                                        <th className="px-3 py-2 text-center">Closing</th>
-                                                        <th className="px-3 py-2 text-center">Sales</th>
-                                                        <th className="px-3 py-2 text-center">Rate</th>
-                                                        <th className="px-3 py-2 text-right">Amount</th>
-                                                    </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                    {record.items.slice(0, 5).map((item: FilteredItem, itemIdx: number) => (
-                                                        <tr key={itemIdx} className="border-t">
-                                                            <td className="px-3 py-2">{item.particulars}</td>
-                                                            <td className="px-3 py-2 text-center">{item.size}</td>
-                                                            <td className="px-3 py-2 text-center">{item.openingStock}</td>
-                                                            <td className="px-3 py-2 text-center">{item.receipts}</td>
-                                                            <td className="px-3 py-2 text-center">{item.closingStock}</td>
-                                                            <td className="px-3 py-2 text-center">{item.sales}</td>
-                                                            <td className="px-3 py-2 text-center">₹{item.rate}</td>
-                                                            <td className="px-3 py-2 text-right">{item.amount}</td>
-                                                        </tr>
-                                                    ))}
-                                                    </tbody>
-                                                </table>
-                                                {record.items.length > 5 && (
-                                                    <p className="text-center text-gray-500 text-sm mt-2">
-                                                        ... and {record.items.length - 5} more items
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
+                                <div className="space-y-2">
+                                    {historyData.map((record) => (
+                                        <button
+                                            key={record.id}
+                                            onClick={() => viewHistorySheet(record)}
+                                            className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition"
+                                        >
+                                            <p className="font-semibold text-blue-600 hover:text-blue-700">
+                                                {record.invoiceName || new Date(record.savedAt).toLocaleDateString('en-US', {
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </p>
+                                            {record.hasClosingStock && (
+                                                <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+                                                    Closing Stock Entered
+                                                </span>
+                                            )}
+                                        </button>
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* View History Sheet Modal */}
+            {selectedHistory && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold">
+                                    {new Date(selectedHistory.savedAt).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    })}
+                                </h2>
+                                <p className="text-sm text-blue-100 mt-1">
+                                    {new Date(selectedHistory.savedAt).toLocaleTimeString()}
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => downloadHistoryExcel(selectedHistory)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                                >
+                                    <FileSpreadsheet className="w-4 h-4" />
+                                    Download
+                                </button>
+                                <button
+                                    onClick={closeHistorySheet}
+                                    className="text-white hover:bg-blue-700 rounded-full p-2 transition"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto flex-1">
+                            <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[800px]">
+                                        <thead>
+                                        <tr className="bg-purple-50 border-b-2 border-purple-200">
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Size</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Opening Stock</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Receipts</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Sales</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Rate</th>
+                                            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        {selectedHistory.items.map((item: FilteredItem, index: number) => (
+                                            <tr key={index} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
+                                                <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
+                                                <td className="px-4 py-3 text-center">
+                                                        <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
+                                                            {item.size}
+                                                        </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
+                                                <td className="px-4 py-3 text-center text-sm text-gray-800">₹{item.rate}</td>
+                                                <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
+                                            </tr>
+                                        ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
