@@ -72,6 +72,7 @@ export default function Home() {
     const [field6, setField6] = useState('');
     const [field7, setField7] = useState('');
     const [paymentData, setPaymentData] = useState([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
+    const [selectedMonth, setSelectedMonth] = useState('');
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -826,15 +827,7 @@ export default function Home() {
         const worksheet = XLSX.utils.json_to_sheet(
             historyItem.items.map((item: FilteredItem) => ({
                 'Particulars': item.particulars,
-                'Size': item.size,
-                'Opening Stock': item.openingStock,
-                'Receipts': item.receipts,
-                'Tran In': item.tranIn,
-                'Tran Out': item.tranOut,
                 'Closing Stock': item.closingStock,
-                'Sales': item.sales,
-                'Rate': item.rate,
-                'Amount': item.amount,
             }))
         );
 
@@ -842,6 +835,63 @@ export default function Home() {
         XLSX.utils.book_append_sheet(workbook, worksheet, 'History');
         const date = new Date(historyItem.savedAt).toLocaleDateString().replace(/\//g, '-');
         XLSX.writeFile(workbook, `history-${username}-${date}.xlsx`);
+    };
+
+    const downloadHistoryPDF = (historyItem: any) => {
+        if (!historyItem.items || historyItem.items.length === 0) return;
+
+        const printWindow = window.open('', '', 'height=800,width=1000');
+        if (!printWindow) return;
+
+        const date = new Date(historyItem.savedAt).toLocaleDateString();
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>History - ${username} - ${date}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    h1 { color: #2563eb; text-align: center; margin-bottom: 10px; }
+                    .date { text-align: center; color: #666; margin-bottom: 20px; }
+                    .user-info { text-align: center; color: #666; margin-bottom: 20px; font-weight: bold; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { background-color: #f3e8ff; padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold; }
+                    td { padding: 10px; border: 1px solid #ddd; }
+                    tr:nth-child(even) { background-color: #f9f9f9; }
+                    .text-center { text-align: center; }
+                    @media print { body { padding: 10px; } }
+                </style>
+            </head>
+            <body>
+                <h1>Closing Stock History</h1>
+                <div class="user-info">${userRole}: ${username}</div>
+                <div class="date">Generated on: ${date}</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Particulars</th>
+                            <th class="text-center">Closing Stock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${historyItem.items.map((item: FilteredItem) => `
+                            <tr>
+                                <td>${item.particulars}</td>
+                                <td class="text-center">${item.closingStock || 0}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <script>
+                    window.onload = () => {
+                        window.print();
+                        window.onafterprint = () => window.close();
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     };
 
     const viewHistorySheet = (record: any) => {
@@ -1354,11 +1404,28 @@ export default function Home() {
                         </div>
 
                         <div className="p-6 overflow-y-auto flex-1">
-                            {historyData.length === 0 ? (
-                                <p className="text-center text-gray-500 py-8">No history found</p>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Month</label>
+                                <input
+                                    type="month"
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                />
+                            </div>
+                            {historyData.filter(record => record.hasClosingStock).length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">No closing stock history found</p>
                             ) : (
                                 <div className="space-y-2">
-                                    {historyData.map((record) => (
+                                    {historyData
+                                        .filter(record => record.hasClosingStock)
+                                        .filter(record => {
+                                            if (!selectedMonth) return true;
+                                            const recordDate = new Date(record.savedAt);
+                                            const recordMonth = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+                                            return recordMonth === selectedMonth;
+                                        })
+                                        .map((record) => (
                                         <button
                                             key={record.id}
                                             onClick={() => viewHistorySheet(record)}
@@ -1380,6 +1447,16 @@ export default function Home() {
                                             )}
                                         </button>
                                     ))}
+                                    {historyData
+                                        .filter(record => record.hasClosingStock)
+                                        .filter(record => {
+                                            if (!selectedMonth) return true;
+                                            const recordDate = new Date(record.savedAt);
+                                            const recordMonth = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+                                            return recordMonth === selectedMonth;
+                                        }).length === 0 && selectedMonth && (
+                                        <p className="text-center text-gray-500 py-8">No closing stock records found for selected month</p>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1410,7 +1487,14 @@ export default function Home() {
                                     className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
                                 >
                                     <FileSpreadsheet className="w-4 h-4" />
-                                    Download
+                                    Excel
+                                </button>
+                                <button
+                                    onClick={() => downloadHistoryPDF(selectedHistory)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition"
+                                >
+                                    <FileText className="w-4 h-4" />
+                                    PDF
                                 </button>
                                 <button
                                     onClick={closeHistorySheet}
@@ -1424,38 +1508,18 @@ export default function Home() {
                         <div className="p-6 overflow-y-auto flex-1">
                             <div className="bg-white shadow-lg rounded-lg overflow-hidden">
                                 <div className="overflow-x-auto">
-                                    <table className="w-full min-w-[800px]">
+                                    <table className="w-full">
                                         <thead>
                                         <tr className="bg-purple-50 border-b-2 border-purple-200">
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Size</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Opening Stock</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Receipts</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Tran In</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Tran Out</th>
                                             <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Sales</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Rate</th>
-                                            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
                                         </tr>
                                         </thead>
                                         <tbody>
                                         {selectedHistory.items.map((item: FilteredItem, index: number) => (
                                             <tr key={index} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
                                                 <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
-                                                <td className="px-4 py-3 text-center">
-                                                        <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
-                                                            {item.size}
-                                                        </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-red-600">{item.tranOut}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
-                                                <td className="px-4 py-3 text-center text-sm text-gray-800">₹{item.rate}</td>
-                                                <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
                                             </tr>
                                         ))}
                                         </tbody>
