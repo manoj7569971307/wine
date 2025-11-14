@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { User, Store, Lock, Mail } from 'lucide-react';
 
-export default function LoginForm({ onLoginSuccess }) {
+interface LoginProps {
+    onLoginSuccess: (roleName: string, username: string) => void;
+}
+
+export default function Login({ onLoginSuccess }: LoginProps) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [selectedRole, setSelectedRole] = useState('');
@@ -14,7 +18,7 @@ export default function LoginForm({ onLoginSuccess }) {
         { id: 'shopowner', name: 'Shop Owner', icon: Store, color: 'from-blue-500 to-blue-700' },
     ];
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: any) => {
         e.preventDefault();
         if (!selectedRole) {
             setError('Please select a role');
@@ -55,8 +59,8 @@ export default function LoginForm({ onLoginSuccess }) {
 
         // Call the parent's login success handler
         if (onLoginSuccess) {
-            const roleName = roles.find(r => r.id === selectedRole)?.name;
-            onLoginSuccess(roleName, username); // Pass both role and username
+            const roleName = roles.find(r => r.id === selectedRole)?.name ?? "";
+            onLoginSuccess(roleName, username);
         }
 
         console.log('Login successful:', { username, role: selectedRole });
