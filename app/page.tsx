@@ -73,6 +73,12 @@ export default function Home() {
     const [field7, setField7] = useState('');
     const [paymentData, setPaymentData] = useState([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
     const [selectedMonth, setSelectedMonth] = useState('');
+    const [showShopSelection, setShowShopSelection] = useState(false);
+    const [availableShops, setAvailableShops] = useState<string[]>([]);
+    const [selectedShop, setSelectedShop] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [consolidatedData, setConsolidatedData] = useState<any>(null);
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -169,7 +175,7 @@ export default function Home() {
     // Get collection name based on user
     const getCollectionName = () => {
         if (userRole === 'Admin') {
-            return 'invoices_admin';
+            return selectedShop === 'admin' ? 'invoices_admin' : `invoices_${selectedShop}`;
         } else {
             return `invoices_${username}`;
         }
@@ -178,7 +184,7 @@ export default function Home() {
     // Get history collection name
     const getHistoryCollectionName = () => {
         if (userRole === 'Admin') {
-            return 'history_admin';
+            return selectedShop === 'admin' ? 'history_admin' : `history_${selectedShop}`;
         } else {
             return `history_${username}`;
         }
@@ -788,6 +794,31 @@ export default function Home() {
         setIsLoggedIn(true);
         setUserRole(role);
         setUsername(user);
+        if (role === 'Admin') {
+            loadAvailableShops();
+            setShowShopSelection(true);
+        }
+    };
+
+    const loadAvailableShops = async () => {
+        try {
+            const collections = await getDocs(query(collection(db, 'invoices_admin')));
+            const shops = new Set<string>();
+            
+            // Get all collection names that start with 'invoices_'
+            const allCollections = ['shop1', 'shop2', 'shop3']; // You can expand this list
+            setAvailableShops(allCollections);
+        } catch (error) {
+            console.error('Error loading shops:', error);
+            // Fallback to predefined shops
+            setAvailableShops(['shop1', 'shop2', 'shop3']);
+        }
+    };
+
+    const selectShop = (shopName: string) => {
+        setSelectedShop(shopName);
+        setUsername(shopName);
+        setShowShopSelection(false);
     };
 
     const loadHistory = async () => {
@@ -824,17 +855,58 @@ export default function Home() {
     const downloadHistoryExcel = (historyItem: any) => {
         if (!historyItem.items || historyItem.items.length === 0) return;
 
-        const worksheet = XLSX.utils.json_to_sheet(
+        const data = consolidatedData ? 
+            historyItem.items.map((item: FilteredItem) => ({
+                'Particulars': item.particulars,
+                'Size': item.size,
+                'Opening Stock': item.openingStock,
+                'Receipts': item.receipts,
+                'Tran In': item.tranIn,
+                'Tran Out': item.tranOut,
+                'Closing Stock': item.closingStock,
+                'Sales': item.sales,
+                'Rate': item.rate,
+                'Amount': item.amount,
+            })) :
             historyItem.items.map((item: FilteredItem) => ({
                 'Particulars': item.particulars,
                 'Closing Stock': item.closingStock,
-            }))
-        );
+            }));
 
+        if (consolidatedData) {
+            data.push({});
+            data.push({ 'Particulars': 'ADDITIONAL INFORMATION' });
+            data.push({ 'Particulars': 'Total Sale', 'Size': historyItem.field1 || '0' });
+            data.push({ 'Particulars': 'Opening Balance', 'Size': historyItem.field2 || '0' });
+            data.push({ 'Particulars': 'Total', 'Size': historyItem.field3 || '0' });
+            data.push({ 'Particulars': 'Jama', 'Size': historyItem.field4 || '0' });
+            data.push({ 'Particulars': 'Total', 'Size': historyItem.field5 || '0' });
+            data.push({ 'Particulars': 'Expenses', 'Size': historyItem.field6 || '0' });
+            data.push({ 'Particulars': 'Closing Balance', 'Size': historyItem.field7 || '0' });
+            
+            if (historyItem.paymentData && historyItem.paymentData.length > 0) {
+                data.push({});
+                data.push({ 'Particulars': 'PAYMENT INFORMATION' });
+                historyItem.paymentData.forEach((payment: any, index: number) => {
+                    data.push({
+                        'Particulars': `Payment ${index + 1}`,
+                        'Size': payment.date + (payment.recordDate ? ` (${payment.recordDate})` : ''),
+                        'Opening Stock': payment.phonepe,
+                        'Receipts': payment.cash,
+                        'Tran In': payment.amount,
+                        'Tran Out': payment.comments
+                    });
+                });
+            }
+        }
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'History');
-        const date = new Date(historyItem.savedAt).toLocaleDateString().replace(/\//g, '-');
-        XLSX.writeFile(workbook, `history-${username}-${date}.xlsx`);
+        const filename = consolidatedData ? 
+            `consolidated-${username}-${consolidatedData.startDate}-to-${consolidatedData.endDate}.xlsx` :
+            `history-${username}-${new Date(historyItem.savedAt).toLocaleDateString().replace(/\//g, '-')}.xlsx`;
+        XLSX.writeFile(workbook, filename);
     };
 
     const downloadHistoryPDF = (historyItem: any) => {
@@ -843,12 +915,18 @@ export default function Home() {
         const printWindow = window.open('', '', 'height=800,width=1000');
         if (!printWindow) return;
 
-        const date = new Date(historyItem.savedAt).toLocaleDateString();
+        const title = consolidatedData ? 
+            `Consolidated Report: ${consolidatedData.startDate} to ${consolidatedData.endDate}` :
+            `History - ${new Date(historyItem.savedAt).toLocaleDateString()}`;
+        const subtitle = consolidatedData ? 
+            `${consolidatedData.recordCount} sheets consolidated` :
+            new Date(historyItem.savedAt).toLocaleTimeString();
+
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>History - ${username} - ${date}</title>
+                <title>${title}</title>
                 <style>
                     body { font-family: Arial, sans-serif; padding: 20px; }
                     h1 { color: #2563eb; text-align: center; margin-bottom: 10px; }
@@ -863,25 +941,113 @@ export default function Home() {
                 </style>
             </head>
             <body>
-                <h1>Closing Stock History</h1>
+                <h1>${consolidatedData ? 'Consolidated Closing Stock Report' : 'Closing Stock History'}</h1>
                 <div class="user-info">${userRole}: ${username}</div>
-                <div class="date">Generated on: ${date}</div>
+                <div class="date">${subtitle}</div>
                 <table>
                     <thead>
                         <tr>
                             <th>Particulars</th>
-                            <th class="text-center">Closing Stock</th>
+                            ${consolidatedData ? `
+                                <th class="text-center">Size</th>
+                                <th class="text-center">Opening Stock</th>
+                                <th class="text-center">Receipts</th>
+                                <th class="text-center">Tran In</th>
+                                <th class="text-center">Tran Out</th>
+                                <th class="text-center">Closing Stock</th>
+                                <th class="text-center">Sales</th>
+                                <th class="text-center">Rate</th>
+                                <th class="text-center">Amount</th>
+                            ` : `
+                                <th class="text-center">Closing Stock</th>
+                            `}
                         </tr>
                     </thead>
                     <tbody>
                         ${historyItem.items.map((item: FilteredItem) => `
                             <tr>
                                 <td>${item.particulars}</td>
-                                <td class="text-center">${item.closingStock || 0}</td>
+                                ${consolidatedData ? `
+                                    <td class="text-center">${item.size}</td>
+                                    <td class="text-center">${item.openingStock || 0}</td>
+                                    <td class="text-center">${item.receipts || 0}</td>
+                                    <td class="text-center">${item.tranIn || 0}</td>
+                                    <td class="text-center">${item.tranOut || 0}</td>
+                                    <td class="text-center">${item.closingStock || 0}</td>
+                                    <td class="text-center">${item.sales || 0}</td>
+                                    <td class="text-center">₹${item.rate}</td>
+                                    <td class="text-center">${item.amount}</td>
+                                ` : `
+                                    <td class="text-center">${item.closingStock || 0}</td>
+                                `}
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
+                
+                ${consolidatedData && (historyItem.field1 || historyItem.field2 || historyItem.field3 || historyItem.field4 || historyItem.field5 || historyItem.field6) ? `
+                    <div style="margin-top: 30px;">
+                        <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total Sale</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field1 || '0'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Opening Balance</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field2 || '0'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field3 || '0'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Jama</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field4 || '0'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field5 || '0'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Expenses</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field6 || '0'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Closing Balance</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field7 || '0'}</td>
+                            </tr>
+                        </table>
+                    </div>
+                ` : ''}
+                
+                ${consolidatedData && historyItem.paymentData && historyItem.paymentData.length > 0 ? `
+                    <div style="margin-top: 30px;">
+                        <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background-color: #f3e8ff;">
+                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Date</th>
+                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">PhonePe</th>
+                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Cash</th>
+                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Amount</th>
+                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Comments</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${historyItem.paymentData.map((payment: any) => `
+                                    <tr>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}${payment.recordDate ? ` (${payment.recordDate})` : ''}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : ''}
                 <script>
                     window.onload = () => {
                         window.print();
@@ -900,6 +1066,126 @@ export default function Home() {
 
     const closeHistorySheet = () => {
         setSelectedHistory(null);
+        setConsolidatedData(null);
+    };
+
+    const consolidateSheets = () => {
+        if (!startDate || !endDate) return;
+
+        const filteredRecords = historyData
+            .filter(record => record.hasClosingStock)
+            .filter(record => {
+                const recordDate = new Date(record.savedAt).toISOString().split('T')[0];
+                return recordDate >= startDate && recordDate <= endDate;
+            })
+            .sort((a, b) => new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime());
+
+        if (filteredRecords.length === 0) return;
+
+        const firstRecord = filteredRecords[0];
+        const lastRecord = filteredRecords[filteredRecords.length - 1];
+
+        // Create consolidated items
+        const itemsMap = new Map();
+
+        // Initialize with all unique items
+        filteredRecords.forEach(record => {
+            record.items.forEach((item: FilteredItem) => {
+                if (!itemsMap.has(item.particulars)) {
+                    itemsMap.set(item.particulars, {
+                        particulars: item.particulars,
+                        size: item.size,
+                        openingStock: 0,
+                        receipts: 0,
+                        tranIn: 0,
+                        tranOut: 0,
+                        sales: 0,
+                        closingStock: 0,
+                        rate: item.rate,
+                        amount: '₹0',
+                        brandNumber: item.brandNumber,
+                        issuePrice: item.issuePrice,
+                        category: item.category,
+                        receiptDate: item.receiptDate
+                    });
+                }
+            });
+        });
+
+        // Set opening stock from first record and closing stock from last record
+        firstRecord.items.forEach((item: FilteredItem) => {
+            if (itemsMap.has(item.particulars)) {
+                itemsMap.get(item.particulars).openingStock = item.openingStock;
+            }
+        });
+
+        lastRecord.items.forEach((item: FilteredItem) => {
+            if (itemsMap.has(item.particulars)) {
+                itemsMap.get(item.particulars).closingStock = item.closingStock;
+            }
+        });
+
+        // Sum all other values from all records
+        filteredRecords.forEach(record => {
+            record.items.forEach((item: FilteredItem) => {
+                if (itemsMap.has(item.particulars)) {
+                    const consolidatedItem = itemsMap.get(item.particulars);
+                    consolidatedItem.receipts += item.receipts || 0;
+                    consolidatedItem.tranIn += item.tranIn || 0;
+                    consolidatedItem.tranOut += item.tranOut || 0;
+                    consolidatedItem.sales += item.sales || 0;
+                }
+            });
+        });
+
+        // Calculate amounts
+        itemsMap.forEach(item => {
+            item.amount = `₹${(item.sales * item.rate).toFixed(2)}`;
+        });
+
+        const consolidatedItems = Array.from(itemsMap.values());
+
+        // Consolidate additional fields
+        const consolidatedFields = {
+            field1: filteredRecords.reduce((sum, record) => sum + parseFloat(record.field1 || '0'), 0).toString(),
+            field2: firstRecord.field2 || '0', // Opening balance from first record
+            field4: filteredRecords.reduce((sum, record) => sum + parseFloat(record.field4 || '0'), 0).toString(), // Sum Jama
+            field6: filteredRecords.reduce((sum, record) => sum + parseFloat(record.field6 || '0'), 0).toString(), // Sum Expenses
+        };
+        
+        // Calculate derived fields
+        consolidatedFields.field3 = (parseFloat(consolidatedFields.field1) + parseFloat(consolidatedFields.field2)).toString();
+        consolidatedFields.field5 = (parseFloat(consolidatedFields.field3) + parseFloat(consolidatedFields.field4)).toString();
+        const field7 = (parseFloat(consolidatedFields.field5) - parseFloat(consolidatedFields.field6)).toString();
+
+        // Consolidate payment data
+        const consolidatedPayments: any[] = [];
+        filteredRecords.forEach(record => {
+            if (record.paymentData && record.paymentData.length > 0) {
+                record.paymentData.forEach((payment: any) => {
+                    if (payment.date || payment.phonepe || payment.cash || payment.amount || payment.comments) {
+                        consolidatedPayments.push({
+                            ...payment,
+                            recordDate: new Date(record.savedAt).toLocaleDateString()
+                        });
+                    }
+                });
+            }
+        });
+
+        const consolidatedData = {
+            items: consolidatedItems,
+            startDate,
+            endDate,
+            recordCount: filteredRecords.length,
+            savedAt: `${startDate} to ${endDate}`,
+            ...consolidatedFields,
+            field7,
+            paymentData: consolidatedPayments
+        };
+
+        setConsolidatedData(consolidatedData);
+        setSelectedHistory(consolidatedData);
     };
 
     const handleLogout = () => {
@@ -925,6 +1211,40 @@ export default function Home() {
         return <LoginForm onLoginSuccess={handleLoginSuccess} />;
     }
 
+    if (userRole === 'Admin' && showShopSelection) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
+                    <div className="text-center mb-6">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Select Shop</h2>
+                        <p className="text-gray-600">Choose which shop's data you want to view</p>
+                    </div>
+                    <div className="space-y-3">
+                        {availableShops.map((shop) => (
+                            <button
+                                key={shop}
+                                onClick={() => selectShop(shop)}
+                                className="w-full px-4 py-3 text-left border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all"
+                            >
+                                <p className="font-semibold text-blue-600 capitalize">{shop}</p>
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => {
+                            setShowShopSelection(false);
+                            setSelectedShop('admin');
+                            setUsername('admin');
+                        }}
+                        className="w-full mt-4 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all"
+                    >
+                        View Admin Data
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-gray-50">
             <header className="bg-blue-600 p-3 sm:p-4 shadow-md">
@@ -934,16 +1254,26 @@ export default function Home() {
                             Wine Invoice Tracker
                         </h1>
                         <p className="text-blue-100 text-sm mt-1">
-                            {userRole}: {username}
+                            {userRole}: {username} {userRole === 'Admin' && selectedShop && selectedShop !== 'admin' && `(Viewing: ${selectedShop})`}
                         </p>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-all"
-                    >
-                        <LogOut className="w-4 h-4" />
-                        Logout
-                    </button>
+                    <div className="flex gap-2">
+                        {userRole === 'Admin' && (
+                            <button
+                                onClick={() => setShowShopSelection(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-all"
+                            >
+                                Switch Shop
+                            </button>
+                        )}
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-all"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Logout
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -996,7 +1326,7 @@ export default function Home() {
                                         {isLoading ? 'Loading...' : 'Load'}
                                     </button>
 
-                                    {userRole === 'Shop Owner' && (
+                                    {(userRole === 'Shop Owner' || (userRole === 'Admin' && selectedShop && selectedShop !== 'admin')) && (
                                         <button
                                             onClick={loadHistory}
                                             disabled={isLoading}
@@ -1404,14 +1734,44 @@ export default function Home() {
                         </div>
 
                         <div className="p-6 overflow-y-auto flex-1">
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Month</label>
-                                <input
-                                    type="month"
-                                    value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                                />
+                            <div className="mb-4 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Month</label>
+                                    <input
+                                        type="month"
+                                        value={selectedMonth}
+                                        onChange={(e) => setSelectedMonth(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                    />
+                                </div>
+                                {userRole === 'Admin' && (
+                                    <div className="border-t pt-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Consolidate Date Range</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="date"
+                                                value={startDate}
+                                                onChange={(e) => setStartDate(e.target.value)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                placeholder="Start Date"
+                                            />
+                                            <input
+                                                type="date"
+                                                value={endDate}
+                                                onChange={(e) => setEndDate(e.target.value)}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                placeholder="End Date"
+                                            />
+                                            <button
+                                                onClick={consolidateSheets}
+                                                disabled={!startDate || !endDate}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                                            >
+                                                Consolidate
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             {historyData.filter(record => record.hasClosingStock).length === 0 ? (
                                 <p className="text-center text-gray-500 py-8">No closing stock history found</p>
@@ -1471,14 +1831,20 @@ export default function Home() {
                         <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
                             <div>
                                 <h2 className="text-xl font-bold">
-                                    {new Date(selectedHistory.savedAt).toLocaleDateString('en-US', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric'
-                                    })}
+                                    {consolidatedData ? 
+                                        `Consolidated: ${consolidatedData.startDate} to ${consolidatedData.endDate}` :
+                                        new Date(selectedHistory.savedAt).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
+                                        })
+                                    }
                                 </h2>
                                 <p className="text-sm text-blue-100 mt-1">
-                                    {new Date(selectedHistory.savedAt).toLocaleTimeString()}
+                                    {consolidatedData ? 
+                                        `${consolidatedData.recordCount} sheets consolidated` :
+                                        new Date(selectedHistory.savedAt).toLocaleTimeString()
+                                    }
                                 </p>
                             </div>
                             <div className="flex gap-2">
@@ -1512,14 +1878,46 @@ export default function Home() {
                                         <thead>
                                         <tr className="bg-purple-50 border-b-2 border-purple-200">
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
+                                            {consolidatedData ? (
+                                                <>
+                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Size</th>
+                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Opening Stock</th>
+                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Receipts</th>
+                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Tran In</th>
+                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Tran Out</th>
+                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
+                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Sales</th>
+                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Rate</th>
+                                                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
+                                                </>
+                                            ) : (
+                                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
+                                            )}
                                         </tr>
                                         </thead>
                                         <tbody>
                                         {selectedHistory.items.map((item: FilteredItem, index: number) => (
                                             <tr key={index} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
                                                 <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
+                                                {consolidatedData ? (
+                                                    <>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
+                                                                {item.size}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
+                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
+                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-red-600">{item.tranOut}</td>
+                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
+                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
+                                                        <td className="px-4 py-3 text-center text-sm text-gray-800">₹{item.rate}</td>
+                                                        <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
+                                                    </>
+                                                ) : (
+                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
+                                                )}
                                             </tr>
                                         ))}
                                         </tbody>
@@ -1528,7 +1926,7 @@ export default function Home() {
                             </div>
                             
                             {/* Additional Information in History */}
-                            {(selectedHistory.field1 || selectedHistory.field2 || selectedHistory.field3 || selectedHistory.field4 || selectedHistory.field5 || selectedHistory.field6) && (
+                            {(selectedHistory.field1 || selectedHistory.field2 || selectedHistory.field3 || selectedHistory.field4 || selectedHistory.field5 || selectedHistory.field6 || consolidatedData) && (
                                 <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
                                     <div className="overflow-hidden">
@@ -1560,7 +1958,7 @@ export default function Home() {
                                                 </tr>
                                                 <tr>
                                                     <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Closing Balance</td>
-                                                    <td className="py-2 px-3 text-sm">{((parseFloat(selectedHistory.field1 || '0') + parseFloat(selectedHistory.field2 || '0') + parseFloat(selectedHistory.field4 || '0')) - parseFloat(selectedHistory.field6 || '0')).toString()}</td>
+                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field7 || ((parseFloat(selectedHistory.field1 || '0') + parseFloat(selectedHistory.field2 || '0') + parseFloat(selectedHistory.field4 || '0')) - parseFloat(selectedHistory.field6 || '0')).toString()}</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -1569,7 +1967,7 @@ export default function Home() {
                             )}
                             
                             {/* Payment Information in History */}
-                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && (
+                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && selectedHistory.paymentData.some((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments) && (
                                 <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Information</h3>
                                     <div className="overflow-x-auto">
@@ -1586,7 +1984,12 @@ export default function Home() {
                                             <tbody>
                                                 {selectedHistory.paymentData.map((payment: any, index: number) => (
                                                     <tr key={index} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.date}</td>
+                                                        <td className="px-4 py-3 border border-gray-300 text-sm">
+                                                            {payment.date}
+                                                            {consolidatedData && payment.recordDate && (
+                                                                <div className="text-xs text-gray-500">({payment.recordDate})</div>
+                                                            )}
+                                                        </td>
                                                         <td className="px-4 py-3 border border-gray-300 text-sm">{payment.phonepe}</td>
                                                         <td className="px-4 py-3 border border-gray-300 text-sm">{payment.cash}</td>
                                                         <td className="px-4 py-3 border border-gray-300 text-sm">{payment.amount}</td>
