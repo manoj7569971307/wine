@@ -70,6 +70,19 @@ export default function Home() {
     const [field4, setField4] = useState('');
     const [field5, setField5] = useState('');
     const [field6, setField6] = useState('');
+    const [field7, setField7] = useState('');
+    const [paymentData, setPaymentData] = useState([{ phonepe: '', cash: '', amount: '', comments: '' }]);
+
+    // Calculate field values
+    const totalSaleAmount = filterData.reduce((sum, item) => {
+        const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
+        return sum + amount;
+    }, 0);
+
+    const field1Value = totalSaleAmount.toString();
+    const field3Value = (parseFloat(field1Value) + parseFloat(field2 || '0')).toString();
+    const field5Value = (parseFloat(field3Value) + parseFloat(field4 || '0')).toString();
+    const field7Value = (parseFloat(field5Value) - parseFloat(field6 || '0')).toString();
 
     // Handle closing stock change
     const handleClosingStockChange = (index: number, value: string) => {
@@ -282,6 +295,8 @@ export default function Home() {
                 setField4(data.field4 || '');
                 setField5(data.field5 || '');
                 setField6(data.field6 || '');
+                setField7(data.field7 || '');
+                setPaymentData(data.paymentData || [{ phonepe: '', cash: '', amount: '', comments: '' }]);
                 setSaveStatus('success');
                 setSaveMessage('Data loaded successfully');
             } else {
@@ -343,7 +358,8 @@ export default function Home() {
                 field3: field3,
                 field4: field4,
                 field5: field5,
-                field6: field6
+                field6: field6,
+                paymentData: paymentData
             });
 
             // If closing stock is entered, update opening stock
@@ -377,7 +393,8 @@ export default function Home() {
                 field3: field3,
                 field4: field4,
                 field5: field5,
-                field6: field6
+                field6: field6,
+                paymentData: paymentData
             };
 
             await addDoc(collection(db, collectionName), docData);
@@ -391,6 +408,12 @@ export default function Home() {
             setSaveMessage(`Successfully saved ${filterData.length} items`);
             setSaveAllowed(false);
             setInvoiceName(''); // Reset invoice name
+            
+            // Store closing balance as opening balance for next day
+            const currentClosingBalance = field7Value;
+            setField2(currentClosingBalance);
+            setField4(''); // Clear Jama
+            setField6(''); // Clear Expenses
         } catch (error) {
             console.error('Error saving to Firebase:', error);
             console.error('Error details:', error);
@@ -412,6 +435,7 @@ export default function Home() {
             'Receipts': item.receipts,
             'Tran In': item.tranIn,
             'Tran Out': item.tranOut,
+            'Total': (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0),
             'Closing Stock': item.closingStock,
             'Sales': item.sales,
             'Rate': item.rate,
@@ -427,6 +451,7 @@ export default function Home() {
             'Receipts': filterData.reduce((sum, item) => sum + item.receipts, 0),
             'Tran In': filterData.reduce((sum, item) => sum + item.tranIn, 0),
             'Tran Out': filterData.reduce((sum, item) => sum + item.tranOut, 0),
+            'Total': filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0),
             'Closing Stock': filterData.reduce((sum, item) => sum + item.closingStock, 0),
             'Sales': filterData.reduce((sum, item) => sum + item.sales, 0),
             'Rate': '-',
@@ -455,8 +480,8 @@ export default function Home() {
         
         data.push({});
         data.push({
-            'Particulars': 'Field 1',
-            'Size': field1,
+            'Particulars': 'Total Sale',
+            'Size': field1Value,
             'Opening Stock': '',
             'Receipts': '',
             'Tran In': '',
@@ -470,7 +495,7 @@ export default function Home() {
         });
         
         data.push({
-            'Particulars': 'Field 2',
+            'Particulars': 'Opening Balance',
             'Size': field2,
             'Opening Stock': '',
             'Receipts': '',
@@ -485,8 +510,8 @@ export default function Home() {
         });
         
         data.push({
-            'Particulars': 'Field 3',
-            'Size': field3,
+            'Particulars': 'Total',
+            'Size': field3Value,
             'Opening Stock': '',
             'Receipts': '',
             'Tran In': '',
@@ -500,7 +525,7 @@ export default function Home() {
         });
         
         data.push({
-            'Particulars': 'Field 4',
+            'Particulars': 'Jama',
             'Size': field4,
             'Opening Stock': '',
             'Receipts': '',
@@ -515,8 +540,8 @@ export default function Home() {
         });
         
         data.push({
-            'Particulars': 'Field 5',
-            'Size': field5,
+            'Particulars': 'Total',
+            'Size': field5Value,
             'Opening Stock': '',
             'Receipts': '',
             'Tran In': '',
@@ -530,7 +555,7 @@ export default function Home() {
         });
         
         data.push({
-            'Particulars': 'Field 6',
+            'Particulars': 'Expenses',
             'Size': field6,
             'Opening Stock': '',
             'Receipts': '',
@@ -542,6 +567,54 @@ export default function Home() {
             'Amount': '',
             'Brand Number': '',
             'Issue Price': '',
+        });
+        
+        data.push({
+            'Particulars': 'Closing Balance',
+            'Size': field7Value,
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': '',
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+        
+        data.push({});
+        data.push({
+            'Particulars': 'PAYMENT INFORMATION',
+            'Size': '',
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': '',
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+        
+        paymentData.forEach((payment, index) => {
+            data.push({
+                'Particulars': `Payment ${index + 1}`,
+                'Size': `PhonePe: ${payment.phonepe}`,
+                'Opening Stock': `Cash: ${payment.cash}`,
+                'Receipts': `Amount: ${payment.amount}`,
+                'Tran In': `Comments: ${payment.comments}`,
+                'Tran Out': '',
+                'Closing Stock': '',
+                'Sales': '',
+                'Rate': '',
+                'Amount': '',
+                'Brand Number': '',
+                'Issue Price': '',
+            });
         });
         
         const worksheet = XLSX.utils.json_to_sheet(data);
@@ -590,6 +663,7 @@ export default function Home() {
                             <th class="text-center">Receipts</th>
                             <th class="text-center">Tran In</th>
                             <th class="text-center">Tran Out</th>
+                            <th class="text-center">Total</th>
                             <th class="text-center">Closing Stock</th>
                             <th class="text-center">Sales</th>
                             <th class="text-center">Rate</th>
@@ -605,6 +679,7 @@ export default function Home() {
                                 <td class="text-center">${item.receipts || 0}</td>
                                 <td class="text-center">${item.tranIn || 0}</td>
                                 <td class="text-center">${item.tranOut || 0}</td>
+                                <td class="text-center">${(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}</td>
                                 <td class="text-center">${item.closingStock || 0}</td>
                                 <td class="text-center">${item.sales || 0}</td>
                                 <td class="text-center">₹${item.rate}</td>
@@ -618,6 +693,7 @@ export default function Home() {
                             <td class="text-center">${filterData.reduce((sum, item) => sum + item.receipts, 0)}</td>
                             <td class="text-center">${filterData.reduce((sum, item) => sum + item.tranIn, 0)}</td>
                             <td class="text-center">${filterData.reduce((sum, item) => sum + item.tranOut, 0)}</td>
+                            <td class="text-center">${filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}</td>
                             <td class="text-center">${filterData.reduce((sum, item) => sum + item.closingStock, 0)}</td>
                             <td class="text-center">${filterData.reduce((sum, item) => sum + item.sales, 0)}</td>
                             <td class="text-center">-</td>
@@ -627,7 +703,7 @@ export default function Home() {
                             }, 0).toLocaleString()}</td>
                         </tr>
                         <tr style="background-color: #eff6ff; font-weight: bold;">
-                            <td colspan="9">CLOSING STOCK TOTAL AMOUNT</td>
+                            <td colspan="10">CLOSING STOCK TOTAL AMOUNT</td>
                             <td class="text-right">₹${filterData.reduce((sum, item) => {
                                 return sum + (item.closingStock * item.rate);
                             }, 0).toLocaleString()}</td>
@@ -639,29 +715,57 @@ export default function Home() {
                     <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 1</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field1}</td>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total Sale</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field1Value}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 2</td>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Opening Balance</td>
                             <td style="padding: 10px; border: 1px solid #ddd;">${field2}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 3</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field3}</td>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field3Value}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 4</td>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Jama</td>
                             <td style="padding: 10px; border: 1px solid #ddd;">${field4}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 5</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field5}</td>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field5Value}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Field 6</td>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Expenses</td>
                             <td style="padding: 10px; border: 1px solid #ddd;">${field6}</td>
                         </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Closing Balance</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field7Value}</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background-color: #f3e8ff;">
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">PhonePe</th>
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Cash</th>
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Amount</th>
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Comments</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${paymentData.map(payment => `
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
                     </table>
                 </div>
                 <script>
@@ -905,6 +1009,7 @@ export default function Home() {
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Receipts</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran In</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran Out</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Total</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Sales</th>
                                         <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
@@ -947,6 +1052,11 @@ export default function Home() {
                                                 />
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                <span className="text-purple-600 font-semibold text-xs sm:text-sm">
+                                                    {(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}
+                                                </span>
+                                            </td>
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                 <input
                                                     type="number"
                                                     value={item.closingStock}
@@ -981,6 +1091,9 @@ export default function Home() {
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm">
                                                 {filterData.reduce((sum, item) => sum + item.tranOut, 0)}
                                             </td>
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-purple-600">
+                                                {filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}
+                                            </td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm">
                                                 {filterData.reduce((sum, item) => sum + item.closingStock, 0)}
                                             </td>
@@ -996,7 +1109,7 @@ export default function Home() {
                                             </td>
                                         </tr>
                                         <tr className="font-bold bg-blue-50">
-                                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-800" colSpan={9}>CLOSING STOCK TOTAL AMOUNT</td>
+                                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-800" colSpan={10}>CLOSING STOCK TOTAL AMOUNT</td>
                                             <td className="px-2 sm:px-4 py-3 text-right text-sm text-purple-600">
                                                 ₹{filterData.reduce((sum, item) => {
                                                     return sum + (item.closingStock * item.rate);
@@ -1011,70 +1124,186 @@ export default function Home() {
                             </div>
                         </div>
                         
-                        {/* Additional Fields */}
+                        {/* Additional Fields Table */}
                         <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                             <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 1</label>
-                                    <input
-                                        type="text"
-                                        value={field1}
-                                        onChange={(e) => setField1(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Enter field 1 value"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 2</label>
-                                    <input
-                                        type="text"
-                                        value={field2}
-                                        onChange={(e) => setField2(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Enter field 2 value"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 3</label>
-                                    <input
-                                        type="text"
-                                        value={field3}
-                                        onChange={(e) => setField3(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Enter field 3 value"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 4</label>
-                                    <input
-                                        type="text"
-                                        value={field4}
-                                        onChange={(e) => setField4(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Enter field 4 value"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 5</label>
-                                    <input
-                                        type="text"
-                                        value={field5}
-                                        onChange={(e) => setField5(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Enter field 5 value"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Field 6</label>
-                                    <input
-                                        type="text"
-                                        value={field6}
-                                        onChange={(e) => setField6(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Enter field 6 value"
-                                    />
-                                </div>
+                            <div className="overflow-hidden">
+                                <table className="w-full border-collapse border border-gray-300">
+                                    <tbody>
+                                        <tr className="border-b border-gray-200">
+                                            <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Total Sale</td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={field1Value}
+                                                    readOnly
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                />
+                                            </td>
+                                        </tr>
+                                        <tr className="border-b border-gray-200">
+                                            <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Opening Balance</td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={field2}
+                                                    readOnly
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                />
+                                            </td>
+                                        </tr>
+                                        <tr className="border-b border-gray-200">
+                                            <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Total</td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={field3Value}
+                                                    readOnly
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                />
+                                            </td>
+                                        </tr>
+                                        <tr className="border-b border-gray-200">
+                                            <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Jama</td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={field4}
+                                                    onChange={(e) => setField4(e.target.value)}
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                />
+                                            </td>
+                                        </tr>
+                                        <tr className="border-b border-gray-200">
+                                            <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Total</td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={field5Value}
+                                                    readOnly
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                />
+                                            </td>
+                                        </tr>
+                                        <tr className="border-b border-gray-200">
+                                            <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Expenses</td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={field6}
+                                                    onChange={(e) => setField6(e.target.value)}
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                />
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Closing Balance</td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={field7Value}
+                                                    readOnly
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm"
+                                                />
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        {/* Payment Sheet */}
+                        <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Information</h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse border border-gray-300">
+                                    <thead>
+                                        <tr className="bg-purple-50">
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">PhonePe</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Cash</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Amount</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Comments</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border border-gray-300">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paymentData.map((row, index) => (
+                                            <tr key={index} className="hover:bg-gray-50">
+                                                <td className="px-4 py-3 border border-gray-300">
+                                                    <input
+                                                        type="text"
+                                                        value={row.phonepe}
+                                                        onChange={(e) => {
+                                                            const newData = [...paymentData];
+                                                            newData[index].phonepe = e.target.value;
+                                                            setPaymentData(newData);
+                                                        }}
+                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                        placeholder="PhonePe amount"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 border border-gray-300">
+                                                    <input
+                                                        type="text"
+                                                        value={row.cash}
+                                                        onChange={(e) => {
+                                                            const newData = [...paymentData];
+                                                            newData[index].cash = e.target.value;
+                                                            setPaymentData(newData);
+                                                        }}
+                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                        placeholder="Cash amount"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 border border-gray-300">
+                                                    <input
+                                                        type="text"
+                                                        value={row.amount}
+                                                        onChange={(e) => {
+                                                            const newData = [...paymentData];
+                                                            newData[index].amount = e.target.value;
+                                                            setPaymentData(newData);
+                                                        }}
+                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                        placeholder="Total amount"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 border border-gray-300">
+                                                    <input
+                                                        type="text"
+                                                        value={row.comments}
+                                                        onChange={(e) => {
+                                                            const newData = [...paymentData];
+                                                            newData[index].comments = e.target.value;
+                                                            setPaymentData(newData);
+                                                        }}
+                                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                                                        placeholder="Comments"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 border border-gray-300 text-center">
+                                                    {paymentData.length > 1 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const newData = paymentData.filter((_, i) => i !== index);
+                                                                setPaymentData(newData);
+                                                            }}
+                                                            className="text-red-600 hover:text-red-800 text-sm"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                <button
+                                    onClick={() => setPaymentData([...paymentData, { phonepe: '', cash: '', amount: '', comments: '' }])}
+                                    className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                                >
+                                    Add Row
+                                </button>
                             </div>
                         </div>
                     </>
