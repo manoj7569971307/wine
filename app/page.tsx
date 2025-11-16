@@ -446,6 +446,7 @@ export default function Home() {
             const currentClosingBalance = field7Value;
             setField2(currentClosingBalance);
             setField4(''); // Clear Jama
+            setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]); // Clear payment data
         } catch (error) {
             console.error('Error saving to Firebase:', error);
             console.error('Error details:', error);
@@ -1125,15 +1126,26 @@ export default function Home() {
             }
         });
         
-        const sum = (f: string) => records.reduce((s: number, r: any) => s + (+(r[f] || '0')), 0).toString();
-        const f1 = sum('field1'), f2 = first.field2 || '0', f4 = sum('field4'), f6 = sum('field6');
-        const f3 = (+f1 + +f2).toString(), f5 = (+f3 + +f4).toString(), f7 = (+f5 - +f6).toString();
+        // Sum all fields properly
+        const f1 = records.reduce((s: number, r: any) => s + (parseFloat(r.field1) || 0), 0).toFixed(2);
+        const f2 = (parseFloat(first.field2) || 0).toFixed(2);
+        const f4 = records.reduce((s: number, r: any) => s + (parseFloat(r.field4) || 0), 0).toFixed(2);
+        const f6 = records.reduce((s: number, r: any) => s + (parseFloat(r.field6) || 0), 0).toFixed(2);
+        const f3 = (parseFloat(f1) + parseFloat(f2)).toFixed(2);
+        const f5 = (parseFloat(f3) + parseFloat(f4)).toFixed(2);
+        const f7 = (parseFloat(f5) - parseFloat(f6)).toFixed(2);
+        
+        // Collect all payment data with record dates
+        const allPayments = records.flatMap((r: any) => 
+            (r.paymentData || []).filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments)
+                .map((p: any) => ({...p, recordDate: new Date(r.savedAt).toLocaleDateString()}))
+        );
         
         const data = {
             items: Array.from(items.values()),
             startDate, endDate, recordCount: records.length, savedAt: `${startDate} to ${endDate}`,
             field1: f1, field2: f2, field3: f3, field4: f4, field5: f5, field6: f6, field7: f7,
-            paymentData: records.flatMap((r: any) => (r.paymentData || []).filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments).map((p: any) => ({...p, recordDate: new Date(r.savedAt).toLocaleDateString()})))
+            paymentData: allPayments
         };
         
         setConsolidatedData(data);
@@ -1704,34 +1716,32 @@ export default function Home() {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                                     />
                                 </div>
-                                {userRole === 'Admin' && (
-                                    <div className="border-t pt-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Consolidate Date Range</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="date"
-                                                value={startDate}
-                                                onChange={(e) => setStartDate(e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                                placeholder="Start Date"
-                                            />
-                                            <input
-                                                type="date"
-                                                value={endDate}
-                                                onChange={(e) => setEndDate(e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                                placeholder="End Date"
-                                            />
-                                            <button
-                                                onClick={consolidateSheets}
-                                                disabled={!startDate || !endDate}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
-                                            >
-                                                Consolidate
-                                            </button>
-                                        </div>
+                                <div className="border-t pt-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Consolidate Date Range</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="date"
+                                            value={startDate}
+                                            onChange={(e) => setStartDate(e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                            placeholder="Start Date"
+                                        />
+                                        <input
+                                            type="date"
+                                            value={endDate}
+                                            onChange={(e) => setEndDate(e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                            placeholder="End Date"
+                                        />
+                                        <button
+                                            onClick={consolidateSheets}
+                                            disabled={!startDate || !endDate}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                                        >
+                                            Consolidate
+                                        </button>
                                     </div>
-                                )}
+                                </div>
                             </div>
                             {historyData.filter(record => record.hasClosingStock).length === 0 ? (
                                 <p className="text-center text-gray-500 py-8">No closing stock history found</p>
@@ -1838,34 +1848,24 @@ export default function Home() {
                                         <thead>
                                         <tr className="bg-purple-50 border-b-2 border-purple-200">
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
-                                            {consolidatedData ? (
-                                                ['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
-                                                    <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
-                                                ))
-                                            ) : (
-                                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
-                                            )}
+                                            {['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
+                                                <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
+                                            ))}
                                         </tr>
                                         </thead>
                                         <tbody>
                                         {selectedHistory.items.map((item: FilteredItem, i: number) => (
                                             <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
                                                 <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
-                                                {consolidatedData ? (
-                                                    <>
-                                                        <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
-                                                        <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-red-600">{item.tranOut}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
-                                                        <td className="px-4 py-3 text-center text-sm">₹{item.rate}</td>
-                                                        <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
-                                                    </>
-                                                ) : (
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
-                                                )}
+                                                <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
+                                                <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-red-600">{item.tranOut}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
+                                                <td className="px-4 py-3 text-center text-sm">₹{item.rate}</td>
+                                                <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
                                             </tr>
                                         ))}
                                         </tbody>
@@ -1892,44 +1892,56 @@ export default function Home() {
                                 </div>
                             )}
                             
-                            {/* Payment Information in History */}
-                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && (
-                                <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Information</h3>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full border-collapse border border-gray-300">
-                                            <thead>
-                                                <tr className="bg-purple-50">
-                                                    {['Date', 'PhonePe', 'Cash', 'Amount', 'Comments'].map(h => (
-                                                        <th key={h} className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">{h}</th>
-                                                    ))}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedHistory.paymentData.map((p: any, i: number) => (
+                            {/* Payment Information in History - Always show */}
+                            <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                    Payment Information {consolidatedData && <span className="text-sm text-gray-600">(Consolidated from {consolidatedData.recordCount} sheets)</span>}
+                                </h3>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse border border-gray-300">
+                                        <thead>
+                                            <tr className="bg-purple-50">
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Date</th>
+                                                {consolidatedData && <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Sheet Date</th>}
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">PhonePe</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Cash</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Amount</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Comments</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 ? (
+                                                selectedHistory.paymentData.map((p: any, i: number) => (
                                                     <tr key={i} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">
-                                                            {p.date}
-                                                            {consolidatedData && p.recordDate && <div className="text-xs text-gray-500">({p.recordDate})</div>}
-                                                        </td>
+                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.date}</td>
+                                                        {consolidatedData && <td className="px-4 py-3 text-sm border border-gray-300 text-gray-500">{p.recordDate}</td>}
                                                         <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.phonepe}</td>
                                                         <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.cash}</td>
                                                         <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.amount}</td>
                                                         <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.comments}</td>
                                                     </tr>
-                                                ))}
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={consolidatedData ? 6 : 5} className="px-4 py-8 text-center text-gray-500 border border-gray-300">
+                                                        No payment information available
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && (
                                                 <tr className="bg-gray-100 font-semibold">
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">TOTAL</td>
+                                                    {consolidatedData && <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">-</td>}
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.phonepe) || 0), 0) || 0}</td>
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.cash) || 0), 0) || 0}</td>
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0) || 0}</td>
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">-</td>
                                                 </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 </div>
