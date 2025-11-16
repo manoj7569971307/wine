@@ -1375,6 +1375,16 @@ export default function Home() {
 
             <main className="container mx-auto p-2 sm:p-4 md:p-6">
                 <div className="bg-white shadow-lg rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
+                    <div className="text-center mb-4 p-3 bg-blue-50 rounded-lg">
+                        <h2 className="text-lg font-semibold text-blue-800">
+                            {new Date().toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            })}
+                        </h2>
+                    </div>
                     <PDFToExcelConverter sendDataToParent={handleDataFromChild} saveAllowed={saveAllowed} />
                 </div>
 
