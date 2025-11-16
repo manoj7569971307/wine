@@ -82,6 +82,10 @@ export default function Home() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [consolidatedData, setConsolidatedData] = useState<any>(null);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [pendingData, setPendingData] = useState<FilteredItem[]>([]);
+    const [pdfTotal, setPdfTotal] = useState(0);
+    const [matchedItemsCount, setMatchedItemsCount] = useState(0);
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -209,6 +213,8 @@ export default function Home() {
 
     const filterWineData = useCallback((): void => {
         const filtered: FilteredItem[] = [...filterData];
+        let totalAmount = 0;
+        let matchedCount = 0;
 
         for (let j = 1; j < childData.length; j++) {
             const row = childData[j];
@@ -246,9 +252,14 @@ export default function Home() {
                 if (brandNumberFromChild === brandNumberFromSample &&
                     Math.abs(issuePrice - sampleIssuePrice) < 1) {
 
+                    matchedCount++;
+                    
                     const calculatedQuantity = firstIndex
                         ? (Number(firstIndex) * quantity) + Number(row[7])
                         : quantity;
+
+                    const itemTotal = (issuePrice / Number(firstIndex)) * calculatedQuantity;
+                    totalAmount += itemTotal;
 
                     const existingItemIndex = filtered.findIndex(
                         item => item.brandNumber === wine['Brand Number'] &&
@@ -280,10 +291,12 @@ export default function Home() {
             }
         }
 
-        setFilterData(filtered.sort((a, b) =>
-            a.particulars?.localeCompare(b.particulars || '') || 0
-        ));
-    }, [childData]);
+        console.log('Total PDF Amount:', totalAmount);
+        setPdfTotal(totalAmount);
+        setMatchedItemsCount(matchedCount);
+        setPendingData(filtered.sort((a, b) => a.particulars?.localeCompare(b.particulars || '') || 0));
+        setShowConfirmModal(true);
+    }, [childData, filterData]);
 
     const loadFromFirebase = async () => {
         if (!username) {
@@ -1917,6 +1930,53 @@ export default function Home() {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PDF Confirmation Modal */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
+                        <div className="bg-blue-600 text-white p-4 rounded-t-lg">
+                            <h2 className="text-xl font-bold">Confirm PDF Data</h2>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-4">
+                                PDF data processed successfully.
+                            </p>
+                            <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                                <p className="font-semibold text-blue-800 mb-2">
+                                    Items Found: {matchedItemsCount}
+                                </p>
+                                <p className="font-semibold text-blue-800">
+                                    Total Amount: ₹{pdfTotal.toFixed(2)}
+                                </p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setFilterData(pendingData);
+                                        setShowConfirmModal(false);
+                                        setPendingData([]);
+                                        setChildData([]);
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                                >
+                                    Add
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setChildData([]);
+                                        setShowConfirmModal(false);
+                                        setPendingData([]);
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
