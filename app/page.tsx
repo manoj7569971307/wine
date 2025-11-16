@@ -104,18 +104,16 @@ export default function Home() {
     const totalExpenses = phonepeTotal + cashTotal + amountTotal;
     
     const field6Value = totalExpenses.toString();
-    const field7Value = (parseFloat(field5Value) - parseFloat(field6Value)).toString();
+    const field7Value = Math.abs(parseFloat(field5Value) - parseFloat(field6Value)).toString();
 
     // Handle closing stock change
     const handleClosingStockChange = (index: number, value: string) => {
         const newValue = parseInt(value) || 0;
+        if (newValue < 0) return;
 
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-
-            // Update closing stock
-            item.closingStock = newValue;
 
             // Ensure all values are numbers
             const openingStock = Number(item.openingStock) || 0;
@@ -124,11 +122,13 @@ export default function Home() {
             const tranOut = Number(item.tranOut) || 0;
             const rate = Number(item.rate) || 0;
 
-            // Calculate: opening stock + receipts + tran in = closing stock + sales + tran out
-            // So: sales = opening stock + receipts + tran in - closing stock - tran out
-            item.sales = openingStock + receipts + tranIn - newValue - tranOut;
+            // Total column = openingStock + receipts + tranIn - tranOut
+            const totalColumn = openingStock + receipts + tranIn - tranOut;
+            if (newValue > totalColumn) return prevData;
 
-            // Calculate amount: sales * rate
+            // Update closing stock
+            item.closingStock = newValue;
+            item.sales = openingStock + receipts + tranIn - newValue - tranOut;
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
 
             return newData;
@@ -138,6 +138,7 @@ export default function Home() {
     // Handle tran in change
     const handleTranInChange = (index: number, value: string) => {
         const newValue = parseInt(value) || 0;
+        if (newValue < 0) return;
 
         setFilterData(prevData => {
             const newData = [...prevData];
@@ -164,13 +165,11 @@ export default function Home() {
     // Handle tran out change
     const handleTranOutChange = (index: number, value: string) => {
         const newValue = parseInt(value) || 0;
+        if (newValue < 0) return;
 
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-
-            // Update tran out
-            item.tranOut = newValue;
 
             // Ensure all values are numbers
             const openingStock = Number(item.openingStock) || 0;
@@ -179,7 +178,12 @@ export default function Home() {
             const closingStock = Number(item.closingStock) || 0;
             const rate = Number(item.rate) || 0;
 
-            // Recalculate sales
+            // Don't allow tran out to exceed available stock
+            const availableForTranOut = openingStock + receipts + tranIn;
+            if (newValue > availableForTranOut) return prevData;
+
+            // Update tran out
+            item.tranOut = newValue;
             item.sales = openingStock + receipts + tranIn - closingStock - newValue;
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
 
@@ -1126,8 +1130,19 @@ export default function Home() {
             }
         });
         
-        // Sum all fields properly
-        const f1 = records.reduce((s: number, r: any) => s + (parseFloat(r.field1) || 0), 0).toFixed(2);
+        // Recalculate amounts for all items after consolidation
+        Array.from(items.values()).forEach(item => {
+            if (item.sales >= 0) {
+                item.amount = `₹${(item.sales * item.rate).toFixed(2)}`;
+            }
+        });
+        
+        // Calculate total sale amount from consolidated items
+        const totalSaleFromItems = Array.from(items.values()).reduce((sum, item) => {
+            const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
+            return sum + amount;
+        }, 0);
+        const f1 = totalSaleFromItems.toFixed(2);
         const f2 = (parseFloat(first.field2) || 0).toFixed(2);
         const f4 = records.reduce((s: number, r: any) => s + (parseFloat(r.field4) || 0), 0).toFixed(2);
         const f6 = records.reduce((s: number, r: any) => s + (parseFloat(r.field6) || 0), 0).toFixed(2);
@@ -1399,7 +1414,7 @@ export default function Home() {
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                 <span className="text-purple-600 font-semibold text-xs sm:text-sm">
-                                                    {(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}
+                                                    {(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
                                                 </span>
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
