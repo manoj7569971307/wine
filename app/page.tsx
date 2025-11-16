@@ -52,6 +52,36 @@ const removeCommas = (value: string): number =>
 const calcBalance = (f1?: string, f2?: string, f4?: string, f6?: string): string => 
     ((+(f1 || '0')) + (+(f2 || '0')) + (+(f4 || '0')) - (+(f6 || '0'))).toString();
 
+// Date format helpers
+const formatDateForDisplay = (dateStr: string): string => {
+    if (!dateStr) return '';
+    if (dateStr.includes('/')) return dateStr; // Already in dd/mm/yyyy format
+    const date = new Date(dateStr);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
+const formatDateForInput = (dateStr: string): string => {
+    if (!dateStr) return '';
+    if (dateStr.includes('-')) return dateStr; // Already in yyyy-mm-dd format
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`; // yyyy-mm-dd
+    }
+    return dateStr;
+};
+
+const formatDateFromInput = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
 export default function Home() {
     const [childData, setChildData] = useState<ChildData>([]);
     const [filterData, setFilterData] = useState<FilteredItem[]>([]);
@@ -86,6 +116,8 @@ export default function Home() {
     const [pendingData, setPendingData] = useState<FilteredItem[]>([]);
     const [pdfTotal, setPdfTotal] = useState(0);
     const [matchedItemsCount, setMatchedItemsCount] = useState(0);
+    const [sheetFromDate, setSheetFromDate] = useState('');
+    const [sheetToDate, setSheetToDate] = useState('');
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -331,6 +363,9 @@ export default function Home() {
                 setField5(data.field5 || '');
                 setField6(data.field6 || '');
                 setField7(data.field7 || '');
+                // Only load dates if they exist, otherwise keep current auto-generated dates
+                if (data.sheetFromDate) setSheetFromDate(data.sheetFromDate);
+                if (data.sheetToDate) setSheetToDate(data.sheetToDate);
                 // Don't load payment data - always start fresh
                 setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
                 setSaveStatus('success');
@@ -396,7 +431,9 @@ export default function Home() {
                 field5: field5Value,
                 field6: field6Value,
                 field7: field7Value,
-                paymentData: paymentData
+                paymentData: paymentData,
+                sheetFromDate: sheetFromDate,
+                sheetToDate: sheetToDate
             });
 
             // If closing stock is entered, update opening stock
@@ -431,7 +468,9 @@ export default function Home() {
                 field4: field4,
                 field5: field5Value,
                 field6: field6Value,
-                field7: field7Value
+                field7: field7Value,
+                sheetFromDate: sheetFromDate,
+                sheetToDate: sheetToDate
             };
 
             await addDoc(collection(db, collectionName), docData);
@@ -451,6 +490,17 @@ export default function Home() {
             setField2(currentClosingBalance);
             setField4(''); // Clear Jama
             setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]); // Clear payment data
+            
+            // Auto-set next sheet's from date to day after current to date
+            // if (sheetToDate) {
+            //     const parts = sheetToDate.split('/');
+            //     if (parts.length === 3) {
+            //         const nextDay = new Date(parts[2], parts[1] - 1, parts[0]);
+            //         nextDay.setDate(nextDay.getDate() + 1);
+            //         setSheetFromDate(formatDateForDisplay(nextDay.toISOString()));
+            //     }
+            //     setSheetToDate(''); // Clear to date for next sheet
+            // }
         } catch (error) {
             console.error('Error saving to Firebase:', error);
             console.error('Error details:', error);
@@ -477,8 +527,6 @@ export default function Home() {
             'Sales': item.sales,
             'Rate': item.rate,
             'Amount': item.amount,
-            'Brand Number': item.brandNumber,
-            'Issue Price': item.issuePrice,
         }));
         
         data.push({
@@ -496,8 +544,6 @@ export default function Home() {
                 const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
                 return sum + amount;
             }, 0).toLocaleString()}`,
-            'Brand Number': '-',
-            'Issue Price': '-',
         });
         
         data.push({
@@ -511,8 +557,6 @@ export default function Home() {
             'Sales': '',
             'Rate': '',
             'Amount': `₹${filterData.reduce((sum, item) => sum + (item.closingStock * item.rate), 0).toLocaleString()}`,
-            'Brand Number': '',
-            'Issue Price': '',
         });
         
         data.push({});
@@ -527,8 +571,6 @@ export default function Home() {
             'Sales': '',
             'Rate': '',
             'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
         });
         
         data.push({
@@ -649,16 +691,36 @@ export default function Home() {
                 'Sales': '',
                 'Rate': '',
                 'Amount': '',
+            });
+        });
+        
+        // Add sheet period information if available
+        if (sheetFromDate || sheetToDate) {
+            data.push({});
+            data.push({
+                'Particulars': 'SHEET PERIOD',
+                'Size': `From: ${sheetFromDate || 'N/A'} To: ${sheetToDate || 'N/A'}`,
+                'Opening Stock': '',
+                'Receipts': '',
+                'Tran In': '',
+                'Tran Out': '',
+                'Closing Stock': '',
+                'Sales': '',
+                'Rate': '',
+                'Amount': '',
                 'Brand Number': '',
                 'Issue Price': '',
             });
-        });
+        }
         
         const worksheet = XLSX.utils.json_to_sheet(data);
 
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Wine Invoice');
-        XLSX.writeFile(workbook, `wine-invoice-${username}-${new Date().toISOString().split('T')[0]}.xlsx`);
+        const filename = sheetFromDate && sheetToDate ? 
+            `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}.xlsx` :
+            `wine-invoice-${username}-${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, filename);
     };
 
     const downloadPDF = () => {
@@ -747,6 +809,22 @@ export default function Home() {
                         </tr>
                     </tbody>
                 </table>
+                
+                ${(sheetFromDate || sheetToDate) ? `
+                    <div style="margin-top: 30px;">
+                        <h3 style="color: #2563eb; margin-bottom: 15px;">Sheet Period</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">From Date</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${sheetFromDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">To Date</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${sheetToDate || 'Not specified'}</td>
+                            </tr>
+                        </table>
+                    </div>
+                ` : ''}
                 
                 <div style="margin-top: 30px;">
                     <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
@@ -916,8 +994,6 @@ export default function Home() {
             'Sales': item.sales,
             'Rate': item.rate,
             'Amount': item.amount,
-            'Brand Number': item.brandNumber,
-            'Issue Price': item.issuePrice,
         }));
         
         data.push({
@@ -935,8 +1011,7 @@ export default function Home() {
                 const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
                 return sum + amount;
             }, 0).toLocaleString()}`,
-            'Brand Number': '-',
-            'Issue Price': '-',
+
         });
         
         data.push({
@@ -955,6 +1030,12 @@ export default function Home() {
         });
 
         data.push({});
+        if (historyItem.sheetFromDate || historyItem.sheetToDate) {
+            data.push({ 'Particulars': 'SHEET PERIOD' });
+            data.push({ 'Particulars': 'From Date', 'Size': historyItem.sheetFromDate || 'Not specified' });
+            data.push({ 'Particulars': 'To Date', 'Size': historyItem.sheetToDate || 'Not specified' });
+            data.push({});
+        }
         data.push({ 'Particulars': 'ADDITIONAL INFORMATION' });
         data.push({ 'Particulars': 'Total Sale', 'Size': historyItem.field1 || '0' });
         data.push({ 'Particulars': 'Opening Balance', 'Size': historyItem.field2 || '0' });
@@ -1201,7 +1282,13 @@ export default function Home() {
 
     const consolidateSheets = () => {
         if (!startDate || !endDate) return;
-        const records = historyData.filter((r: any) => r.hasClosingStock && new Date(r.savedAt).toISOString().split('T')[0] >= startDate && new Date(r.savedAt).toISOString().split('T')[0] <= endDate).sort((a: any, b: any) => +new Date(a.savedAt) - +new Date(b.savedAt));
+        const records = historyData.filter((r: any) => {
+            if (!r.hasClosingStock) return false;
+            const sheetStart = r.sheetFromDate;
+            const sheetEnd = r.sheetToDate;
+            if (!sheetStart || !sheetEnd) return false;
+            return sheetStart <= endDate && sheetEnd >= startDate;
+        }).sort((a: any, b: any) => new Date(a.sheetFromDate).getTime() - new Date(b.sheetFromDate).getTime());
         if (!records.length) return;
         
         const [first, last] = [records[0], records[records.length - 1]];
@@ -1209,7 +1296,7 @@ export default function Home() {
         
         records.forEach((r: any) => r.items.forEach((item: FilteredItem) => {
             const key = item.particulars;
-            if (!items.has(key)) items.set(key, {...item, openingStock: 0, receipts: 0, tranIn: 0, tranOut: 0, sales: 0, closingStock: 0});
+            if (!items.has(key)) items.set(key, {...item, openingStock: 0, receipts: 0, tranIn: 0, tranOut: 0, sales: 0});
             const c = items.get(key)!;
             (['receipts', 'tranIn', 'tranOut', 'sales'] as const).forEach((f: keyof FilteredItem) => {
                 c[f] = (c[f] || 0) + (item[f] || 0);
@@ -1224,9 +1311,7 @@ export default function Home() {
         
         last.items.forEach((item: FilteredItem) => {
             if (items.has(item.particulars)) {
-                const c = items.get(item.particulars)!;
-                c.closingStock = item.closingStock;
-                c.amount = `₹${(c.sales * c.rate).toFixed(2)}`;
+                items.get(item.particulars)!.closingStock = item.closingStock;
             }
         });
         
@@ -1253,14 +1338,16 @@ export default function Home() {
         // Collect all payment data with record dates
         const allPayments = records.flatMap((r: any) => 
             (r.paymentData || []).filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments)
-                .map((p: any) => ({...p, recordDate: new Date(r.savedAt).toLocaleDateString()}))
+                .map((p: any) => ({...p, recordDate: `${r.sheetFromDate} to ${r.sheetToDate}`}))
         );
         
         const data = {
             items: Array.from(items.values()),
             startDate, endDate, recordCount: records.length, savedAt: `${startDate} to ${endDate}`,
             field1: f1, field2: f2, field3: f3, field4: f4, field5: f5, field6: f6, field7: f7,
-            paymentData: allPayments
+            paymentData: allPayments,
+            sheetFromDate: startDate,
+            sheetToDate: endDate
         };
         
         setConsolidatedData(data);
@@ -1391,17 +1478,40 @@ export default function Home() {
                 {filterData.length > 0 && (
                     <>
                         <div className="mb-4 bg-white shadow-lg rounded-lg p-4">
+                            {userRole === 'Shop Owner' && (
+                                <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                    <h3 className="text-sm font-semibold text-blue-800 mb-3">Sheet Information</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        {/*<input*/}
+                                        {/*    type="text"*/}
+                                        {/*    placeholder="Invoice Name (optional)"*/}
+                                        {/*    value={invoiceName}*/}
+                                        {/*    onChange={(e) => setInvoiceName(e.target.value)}*/}
+                                        {/*    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"*/}
+                                        {/*/>*/}
+                                        <div className="flex flex-col">
+                                            <label className="text-xs text-gray-600 mb-1">From Date</label>
+                                            <input
+                                                type="date"
+                                                value={formatDateForInput(sheetFromDate)}
+                                                onChange={(e) => setSheetFromDate(formatDateFromInput(e.target.value))}
+                                                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <label className="text-xs text-gray-600 mb-1">To Date</label>
+                                            <input
+                                                type="date"
+                                                value={formatDateForInput(sheetToDate)}
+                                                onChange={(e) => setSheetToDate(formatDateFromInput(e.target.value))}
+                                                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div className="flex flex-wrap items-center gap-3">
-                                    {userRole === 'Shop Owner' && (
-                                        <input
-                                            type="text"
-                                            placeholder="Invoice Name (optional)"
-                                            value={invoiceName}
-                                            onChange={(e) => setInvoiceName(e.target.value)}
-                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    )}
 
                                     <button
                                         onClick={() => {
@@ -1866,14 +1976,14 @@ export default function Home() {
                                             value={startDate}
                                             onChange={(e) => setStartDate(e.target.value)}
                                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                            placeholder="Start Date"
+                                            placeholder="Period Start"
                                         />
                                         <input
                                             type="date"
                                             value={endDate}
                                             onChange={(e) => setEndDate(e.target.value)}
                                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                            placeholder="End Date"
+                                            placeholder="Period End"
                                         />
                                         <button
                                             onClick={consolidateSheets}
@@ -1883,6 +1993,7 @@ export default function Home() {
                                             Consolidate
                                         </button>
                                     </div>
+                                    <p className="text-xs text-gray-600 mt-2">Consolidates sheets that overlap with the selected date range</p>
                                 </div>
                             </div>
                             {historyData.filter(record => record.hasClosingStock).length === 0 ? (
@@ -1904,14 +2015,20 @@ export default function Home() {
                                             className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition"
                                         >
                                             <p className="font-semibold text-blue-600 hover:text-blue-700">
-                                                {record.invoiceName || new Date(record.savedAt).toLocaleDateString('en-US', {
-                                                    year: 'numeric',
-                                                    month: 'long',
-                                                    day: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
+                                                {/*{record.invoiceName || new Date(record.savedAt).toLocaleDateString('en-US', {*/}
+                                                {/*    year: 'numeric',*/}
+                                                {/*    month: 'long',*/}
+                                                {/*    day: 'numeric',*/}
+                                                {/*    hour: '2-digit',*/}
+                                                {/*    minute: '2-digit'*/}
+                                                {/*})}*/}
+                                                Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}
                                             </p>
+                                            {/*{(record.sheetFromDate || record.sheetToDate) && (*/}
+                                            {/*    <p className="text-xs text-gray-600 mt-1">*/}
+                                            {/*        Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}*/}
+                                            {/*    </p>*/}
+                                            {/*)}*/}
                                             {record.hasClosingStock && (
                                                 <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
                                                     Closing Stock Entered
@@ -2003,7 +2120,7 @@ export default function Home() {
                                                 <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-red-600">{item.tranOut}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">{item.tranOut}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
                                                 <td className="px-4 py-3 text-center text-sm">₹{item.rate}</td>
@@ -2014,6 +2131,27 @@ export default function Home() {
                                     </table>
                                 </div>
                             </div>
+                            
+                            {/* Sheet Period Information in History */}
+                            {(selectedHistory.sheetFromDate || selectedHistory.sheetToDate) && (
+                                <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Sheet Period</h3>
+                                    <div className="overflow-hidden">
+                                        <table className="w-full border-collapse border border-gray-300">
+                                            <tbody>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">From Date</td>
+                                                    <td className="py-2 px-3 text-sm text-gray-900">{selectedHistory.sheetFromDate || 'Not specified'}</td>
+                                                </tr>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">To Date</td>
+                                                    <td className="py-2 px-3 text-sm text-gray-900">{selectedHistory.sheetToDate || 'Not specified'}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                             
                             {/* Additional Information in History */}
                             {(selectedHistory.field1 || selectedHistory.field2 || selectedHistory.field3 || selectedHistory.field4 || selectedHistory.field5 || selectedHistory.field6 || consolidatedData) && (
