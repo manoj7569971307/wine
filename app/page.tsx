@@ -331,7 +331,8 @@ export default function Home() {
                 setField5(data.field5 || '');
                 setField6(data.field6 || '');
                 setField7(data.field7 || '');
-                setPaymentData(data.paymentData && data.paymentData.length > 0 ? data.paymentData : [{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
+                // Don't load payment data - always start fresh
+                setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
                 setSaveStatus('success');
                 setSaveMessage('Data loaded successfully');
             } else {
@@ -416,7 +417,7 @@ export default function Home() {
                 updatedData = filterData;
             }
 
-            // Save updated data to main collection (latest state)
+            // Save updated data to main collection (latest state) - without payment data
             const docData = {
                 items: updatedData,
                 timestamp: serverTimestamp(),
@@ -430,8 +431,7 @@ export default function Home() {
                 field4: field4,
                 field5: field5Value,
                 field6: field6Value,
-                field7: field7Value,
-                paymentData: paymentData
+                field7: field7Value
             };
 
             await addDoc(collection(db, collectionName), docData);
@@ -824,6 +824,16 @@ export default function Home() {
         setIsLoggedIn(true);
         setUserRole(role);
         setUsername(user);
+        
+        // Save login data to localStorage with 24-hour expiration
+        const expiresAt = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours
+        localStorage.setItem('wineAppLogin', JSON.stringify({
+            isLoggedIn: true,
+            userRole: role,
+            username: user,
+            expiresAt
+        }));
+        
         if (role === 'Admin') {
             loadAvailableShops();
             setShowShopSelection(true);
@@ -849,6 +859,15 @@ export default function Home() {
         setSelectedShop(shopName);
         setUsername(shopName);
         setShowShopSelection(false);
+        
+        // Update localStorage with selected shop
+        const loginData = JSON.parse(localStorage.getItem('wineAppLogin') || '{}');
+        const expiresAt = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours
+        localStorage.setItem('wineAppLogin', JSON.stringify({
+            ...loginData,
+            selectedShop: shopName,
+            expiresAt
+        }));
     };
 
     const loadHistory = async () => {
@@ -885,49 +904,100 @@ export default function Home() {
     const downloadHistoryExcel = (historyItem: any) => {
         if (!historyItem.items || historyItem.items.length === 0) return;
 
-        const data = consolidatedData ? 
-            historyItem.items.map((item: FilteredItem) => ({
-                'Particulars': item.particulars,
-                'Size': item.size,
-                'Opening Stock': item.openingStock,
-                'Receipts': item.receipts,
-                'Tran In': item.tranIn,
-                'Tran Out': item.tranOut,
-                'Closing Stock': item.closingStock,
-                'Sales': item.sales,
-                'Rate': item.rate,
-                'Amount': item.amount,
-            })) :
-            historyItem.items.map((item: FilteredItem) => ({
-                'Particulars': item.particulars,
-                'Closing Stock': item.closingStock,
-            }));
+        const data = historyItem.items.map((item: FilteredItem) => ({
+            'Particulars': item.particulars,
+            'Size': item.size,
+            'Opening Stock': item.openingStock,
+            'Receipts': item.receipts,
+            'Tran In': item.tranIn,
+            'Tran Out': item.tranOut,
+            'Total': (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0),
+            'Closing Stock': item.closingStock,
+            'Sales': item.sales,
+            'Rate': item.rate,
+            'Amount': item.amount,
+            'Brand Number': item.brandNumber,
+            'Issue Price': item.issuePrice,
+        }));
+        
+        data.push({
+            'Particulars': 'TOTAL',
+            'Size': '-',
+            'Opening Stock': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.openingStock || 0), 0),
+            'Receipts': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.receipts || 0), 0),
+            'Tran In': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.tranIn || 0), 0),
+            'Tran Out': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.tranOut || 0), 0),
+            'Total': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0),
+            'Closing Stock': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.closingStock || 0), 0),
+            'Sales': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.sales || 0), 0),
+            'Rate': '-',
+            'Amount': `₹${historyItem.items.reduce((sum: number, item: FilteredItem) => {
+                const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
+                return sum + amount;
+            }, 0).toLocaleString()}`,
+            'Brand Number': '-',
+            'Issue Price': '-',
+        });
+        
+        data.push({
+            'Particulars': 'CLOSING STOCK TOTAL AMOUNT',
+            'Size': '',
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': `₹${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + ((item.closingStock || 0) * (item.rate || 0)), 0).toLocaleString()}`,
+            'Brand Number': '',
+            'Issue Price': '',
+        });
 
-        if (consolidatedData) {
-            data.push({});
-            data.push({ 'Particulars': 'ADDITIONAL INFORMATION' });
-            data.push({ 'Particulars': 'Total Sale', 'Size': historyItem.field1 || '0' });
-            data.push({ 'Particulars': 'Opening Balance', 'Size': historyItem.field2 || '0' });
-            data.push({ 'Particulars': 'Total', 'Size': historyItem.field3 || '0' });
-            data.push({ 'Particulars': 'Jama', 'Size': historyItem.field4 || '0' });
-            data.push({ 'Particulars': 'Total', 'Size': historyItem.field5 || '0' });
-            data.push({ 'Particulars': 'Expenses', 'Size': historyItem.field6 || '0' });
-            data.push({ 'Particulars': 'Closing Balance', 'Size': historyItem.field7 || '0' });
-            
-            if (historyItem.paymentData && historyItem.paymentData.length > 0) {
-                data.push({});
-                data.push({ 'Particulars': 'PAYMENT INFORMATION' });
-                historyItem.paymentData.forEach((payment: any, index: number) => {
-                    data.push({
-                        'Particulars': `Payment ${index + 1}`,
-                        'Size': payment.date + (payment.recordDate ? ` (${payment.recordDate})` : ''),
-                        'Opening Stock': payment.phonepe,
-                        'Receipts': payment.cash,
-                        'Tran In': payment.amount,
-                        'Tran Out': payment.comments
-                    });
+        data.push({});
+        data.push({ 'Particulars': 'ADDITIONAL INFORMATION' });
+        data.push({ 'Particulars': 'Total Sale', 'Size': historyItem.field1 || '0' });
+        data.push({ 'Particulars': 'Opening Balance', 'Size': historyItem.field2 || '0' });
+        data.push({ 'Particulars': 'Total', 'Size': historyItem.field3 || '0' });
+        data.push({ 'Particulars': 'Jama', 'Size': historyItem.field4 || '0' });
+        data.push({ 'Particulars': 'Total', 'Size': historyItem.field5 || '0' });
+        data.push({ 'Particulars': 'Expenses', 'Size': historyItem.field6 || '0' });
+        data.push({ 'Particulars': 'Closing Balance', 'Size': historyItem.field7 || '0' });
+        
+        data.push({});
+        data.push({ 'Particulars': 'PAYMENT INFORMATION' });
+        if (historyItem.paymentData && historyItem.paymentData.length > 0) {
+            historyItem.paymentData.forEach((payment: any, index: number) => {
+                data.push({
+                    'Particulars': `Payment ${index + 1}`,
+                    'Size': `Date: ${payment.date}${payment.recordDate ? ` (${payment.recordDate})` : ''}`,
+                    'Opening Stock': `PhonePe: ${payment.phonepe}`,
+                    'Receipts': `Cash: ${payment.cash}`,
+                    'Tran In': `Amount: ${payment.amount}`,
+                    'Tran Out': `Comments: ${payment.comments}`,
+                    'Closing Stock': '',
+                    'Sales': '',
+                    'Rate': '',
+                    'Amount': '',
+                    'Brand Number': '',
+                    'Issue Price': '',
                 });
-            }
+            });
+        } else {
+            data.push({
+                'Particulars': 'No payment information available',
+                'Size': '',
+                'Opening Stock': '',
+                'Receipts': '',
+                'Tran In': '',
+                'Tran Out': '',
+                'Closing Stock': '',
+                'Sales': '',
+                'Rate': '',
+                'Amount': '',
+                'Brand Number': '',
+                'Issue Price': '',
+            });
         }
 
         const worksheet = XLSX.utils.json_to_sheet(data);
@@ -967,55 +1037,72 @@ export default function Home() {
                     td { padding: 10px; border: 1px solid #ddd; }
                     tr:nth-child(even) { background-color: #f9f9f9; }
                     .text-center { text-align: center; }
+                    .text-right { text-align: right; }
                     @media print { body { padding: 10px; } }
                 </style>
             </head>
             <body>
-                <h1>${consolidatedData ? 'Consolidated Closing Stock Report' : 'Closing Stock History'}</h1>
+                <h1>${consolidatedData ? 'Consolidated Report' : 'Wine Invoice History'}</h1>
                 <div class="user-info">${userRole}: ${username}</div>
                 <div class="date">${subtitle}</div>
                 <table>
                     <thead>
                         <tr>
                             <th>Particulars</th>
-                            ${consolidatedData ? `
-                                <th class="text-center">Size</th>
-                                <th class="text-center">Opening Stock</th>
-                                <th class="text-center">Receipts</th>
-                                <th class="text-center">Tran In</th>
-                                <th class="text-center">Tran Out</th>
-                                <th class="text-center">Closing Stock</th>
-                                <th class="text-center">Sales</th>
-                                <th class="text-center">Rate</th>
-                                <th class="text-center">Amount</th>
-                            ` : `
-                                <th class="text-center">Closing Stock</th>
-                            `}
+                            <th class="text-center">Size</th>
+                            <th class="text-center">Opening Stock</th>
+                            <th class="text-center">Receipts</th>
+                            <th class="text-center">Tran In</th>
+                            <th class="text-center">Tran Out</th>
+                            <th class="text-center">Total</th>
+                            <th class="text-center">Closing Stock</th>
+                            <th class="text-center">Sales</th>
+                            <th class="text-center">Rate</th>
+                            <th class="text-right">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${historyItem.items.map((item: FilteredItem) => `
                             <tr>
                                 <td>${item.particulars}</td>
-                                ${consolidatedData ? `
-                                    <td class="text-center">${item.size}</td>
-                                    <td class="text-center">${item.openingStock || 0}</td>
-                                    <td class="text-center">${item.receipts || 0}</td>
-                                    <td class="text-center">${item.tranIn || 0}</td>
-                                    <td class="text-center">${item.tranOut || 0}</td>
-                                    <td class="text-center">${item.closingStock || 0}</td>
-                                    <td class="text-center">${item.sales || 0}</td>
-                                    <td class="text-center">₹${item.rate}</td>
-                                    <td class="text-center">${item.amount}</td>
-                                ` : `
-                                    <td class="text-center">${item.closingStock || 0}</td>
-                                `}
+                                <td class="text-center">${item.size}</td>
+                                <td class="text-center">${item.openingStock || 0}</td>
+                                <td class="text-center">${item.receipts || 0}</td>
+                                <td class="text-center">${item.tranIn || 0}</td>
+                                <td class="text-center">${item.tranOut || 0}</td>
+                                <td class="text-center">${(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}</td>
+                                <td class="text-center">${item.closingStock || 0}</td>
+                                <td class="text-center">${item.sales || 0}</td>
+                                <td class="text-center">₹${item.rate}</td>
+                                <td class="text-right">${item.amount}</td>
                             </tr>
                         `).join('')}
+                        <tr style="background-color: #f3f4f6; border-top: 2px solid #d1d5db; font-weight: bold;">
+                            <td>TOTAL</td>
+                            <td class="text-center">-</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.openingStock || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.receipts || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.tranIn || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.tranOut || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.closingStock || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.sales || 0), 0)}</td>
+                            <td class="text-center">-</td>
+                            <td class="text-right">₹${historyItem.items.reduce((sum: number, item: FilteredItem) => {
+                                const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
+                                return sum + amount;
+                            }, 0).toLocaleString()}</td>
+                        </tr>
+                        <tr style="background-color: #eff6ff; font-weight: bold;">
+                            <td colspan="10">CLOSING STOCK TOTAL AMOUNT</td>
+                            <td class="text-right">₹${historyItem.items.reduce((sum: number, item: FilteredItem) => {
+                                return sum + ((item.closingStock || 0) * (item.rate || 0));
+                            }, 0).toLocaleString()}</td>
+                        </tr>
                     </tbody>
                 </table>
                 
-                ${consolidatedData && (historyItem.field1 || historyItem.field2 || historyItem.field3 || historyItem.field4 || historyItem.field5 || historyItem.field6) ? `
+                ${(historyItem.field1 || historyItem.field2 || historyItem.field3 || historyItem.field4 || historyItem.field5 || historyItem.field6) ? `
                     <div style="margin-top: 30px;">
                         <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
                         <table style="width: 100%; border-collapse: collapse;">
@@ -1051,33 +1138,46 @@ export default function Home() {
                     </div>
                 ` : ''}
                 
-                ${consolidatedData && historyItem.paymentData && historyItem.paymentData.length > 0 ? `
-                    <div style="margin-top: 30px;">
-                        <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information</h3>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <thead>
-                                <tr style="background-color: #f3e8ff;">
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Date</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">PhonePe</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Cash</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Amount</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Comments</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${historyItem.paymentData.map((payment: any) => `
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information${consolidatedData ? ` (Consolidated from ${consolidatedData.recordCount} sheets)` : ''}</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background-color: #f3e8ff;">
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Date</th>
+                                ${consolidatedData ? '<th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Sheet Date</th>' : ''}
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">PhonePe</th>
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Cash</th>
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Amount</th>
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Comments</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${historyItem.paymentData && historyItem.paymentData.length > 0 ? 
+                                historyItem.paymentData.map((payment: any) => `
                                     <tr>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}${payment.recordDate ? ` (${payment.recordDate})` : ''}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}</td>
+                                        ${consolidatedData ? `<td style="padding: 10px; border: 1px solid #ddd;">${payment.recordDate || ''}</td>` : ''}
                                         <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe}</td>
                                         <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash}</td>
                                         <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount}</td>
                                         <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments}</td>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                ` : ''}
+                                `).join('') :
+                                `<tr><td colspan="${consolidatedData ? '6' : '5'}" style="padding: 20px; text-align: center; color: #666; border: 1px solid #ddd;">No payment information available</td></tr>`
+                            }
+                            ${historyItem.paymentData && historyItem.paymentData.length > 0 ? `
+                                <tr style="background-color: #f3f4f6; font-weight: bold;">
+                                    <td style="padding: 10px; border: 1px solid #ddd;">TOTAL</td>
+                                    ${consolidatedData ? '<td style="padding: 10px; border: 1px solid #ddd;">-</td>' : ''}
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.phonepe) || 0), 0)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.cash) || 0), 0)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">-</td>
+                                </tr>
+                            ` : ''}
+                        </tbody>
+                    </table>
+                </div>
                 <script>
                     window.onload = () => {
                         window.print();
@@ -1174,7 +1274,24 @@ export default function Home() {
         setFilterData([]);
         setChildData([]);
         setSaveStatus('idle');
+        localStorage.removeItem('wineAppLogin');
     };
+
+    // Check for stored login data on component mount
+    useEffect(() => {
+        const storedLoginData = localStorage.getItem('wineAppLogin');
+        if (storedLoginData) {
+            const { isLoggedIn, userRole, username, selectedShop, expiresAt } = JSON.parse(storedLoginData);
+            if (new Date().getTime() < expiresAt) {
+                setIsLoggedIn(isLoggedIn);
+                setUserRole(userRole);
+                setUsername(username);
+                if (selectedShop) setSelectedShop(selectedShop);
+            } else {
+                localStorage.removeItem('wineAppLogin');
+            }
+        }
+    }, []);
 
     useEffect(() => {
         if (isLoggedIn && username) {
