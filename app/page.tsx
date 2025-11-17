@@ -470,8 +470,8 @@ export default function Home() {
                     // If no closing stock, add receipts to opening stock
                     return {
                         ...item,
-                        openingStock: item.openingStock + item.receipts,
-                        receipts: 0,
+                        openingStock: hasClosingStock ? item.openingStock + item.receipts : item.openingStock,
+                        receipts: hasClosingStock ? 0 : item.receipts,
                         tranIn: 0,
                         tranOut: 0,
                         closingStock: 0,
@@ -1372,117 +1372,144 @@ export default function Home() {
         setConsolidatedData(null);
     };
 
-    const consolidateSheets = () => {
-        if (!startDate || !endDate) {
-            alert('Please select both start and end dates for consolidation.');
-            return;
-        }
-        
-        const records = historyData.filter((r: any) => {
-            if (!r.hasClosingStock) return false;
-            
-            let sheetStart = r.sheetFromDate;
-            let sheetEnd = r.sheetToDate;
-            
-            if (!sheetStart || !sheetEnd) return false;
-            
-            // Convert dates to consistent format for comparison
+    const consolidateSheets = async () => {
+        if (!startDate || !endDate || !username) return;
+
+        try {
+            // Parse date helper function
             const parseDate = (dateStr: string) => {
+                if (!dateStr) return null;
                 if (dateStr.includes('/')) {
                     const parts = dateStr.split('/');
                     return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
                 }
                 return dateStr;
             };
-            
-            sheetStart = parseDate(sheetStart);
-            sheetEnd = parseDate(sheetEnd);
-            
-            console.log('Checking record:', { sheetStart, sheetEnd, startDate, endDate });
-            
-            // Check if the sheet period overlaps with the selected date range
-            const overlaps = sheetStart <= endDate && sheetEnd >= startDate;
-            console.log('Overlaps:', overlaps);
-            
-            return overlaps;
-        }).sort((a: any, b: any) => {
-            const parseDate = (dateStr: string) => {
-                if (dateStr.includes('/')) {
-                    const parts = dateStr.split('/');
-                    return new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
-                }
-                return new Date(dateStr);
-            };
-            return parseDate(a.sheetFromDate).getTime() - parseDate(b.sheetFromDate).getTime();
-        });
 
-        
-        if (!records.length) {
-            alert('No records found in the selected date range with closing stock data.');
-            return;
-        }
-        
-        const [first, last] = [records[0], records[records.length - 1]];
-        const items = new Map<string, any>();
-        
-        records.forEach((r: any) => r.items.forEach((item: FilteredItem) => {
-            const key = item.particulars;
-            if (!items.has(key)) items.set(key, {...item, openingStock: 0, receipts: 0, tranIn: 0, tranOut: 0, sales: 0});
-            const c = items.get(key)!;
-            (['receipts', 'tranIn', 'tranOut', 'sales'] as const).forEach((f: keyof FilteredItem) => {
-                c[f] = (c[f] || 0) + (item[f] || 0);
+            // Filter records that have closing stock and overlap with the selected date range
+            const matchingRecords = historyData.filter((record: any) => {
+                if (!record.hasClosingStock) return false;
+                
+                const sheetStart = parseDate(record.sheetFromDate);
+                const sheetEnd = parseDate(record.sheetToDate);
+                
+                if (!sheetStart || !sheetEnd) return false;
+                
+                // Check if the sheet period overlaps with the selected range
+                return sheetStart <= endDate && sheetEnd >= startDate;
             });
-        }));
-        
-        last.items.forEach((item: FilteredItem) => {
-            if (items.has(item.particulars)) {
-                const consolidatedItem = items.get(item.particulars)!;
-                consolidatedItem.openingStock = item.openingStock;
-                consolidatedItem.closingStock = item.closingStock;
+
+            if (matchingRecords.length === 0) {
+                alert('No records found with closing stock data in the selected date range.');
+                return;
             }
-        });
-        
-        // Recalculate amounts for all items after consolidation
-        Array.from(items.values()).forEach(item => {
-            if (item.sales >= 0) {
-                item.amount = `₹${(item.sales * item.rate).toFixed(2)}`;
-            }
-        });
-        
-        // Calculate total sale amount from consolidated items
-        const totalSaleFromItems = Array.from(items.values()).reduce((sum, item) => {
-            const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
-            return sum + amount;
-        }, 0);
-        const f1 = totalSaleFromItems.toFixed(2);
-        const f2 = (parseFloat(first.field2) || 0).toFixed(2);
-        const f4 = records.reduce((s: number, r: any) => s + (parseFloat(r.field4) || 0), 0).toFixed(2);
-        const f6 = records.reduce((s: number, r: any) => s + (parseFloat(r.field6) || 0), 0).toFixed(2);
-        const f3 = (parseFloat(f1) + parseFloat(f2)).toFixed(2);
-        const f5 = (parseFloat(f3) + parseFloat(f4)).toFixed(2);
-        const f7 = (parseFloat(f5) - parseFloat(f6)).toFixed(2);
-        
-        // Collect all payment data with record dates
-        const allPayments = records.flatMap((r: any) => 
-            (r.paymentData || []).filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments)
-                .map((p: any) => ({...p, recordDate: `${r.sheetFromDate} to ${r.sheetToDate}`}))
-        );
-        
-        const data = {
-            items: Array.from(items.values()),
-            startDate, endDate, recordCount: records.length, savedAt: `${startDate} to ${endDate}`,
-            field1: f1, field2: f2, field3: f3, field4: f4, field5: f5, field6: f6, field7: f7,
-            paymentData: allPayments,
-            sheetFromDate: startDate,
-            sheetToDate: endDate
-        };
-        
-        setConsolidatedData(data);
-        setSelectedHistory(data);
-        
-        // Show success message
-        alert(`Successfully consolidated ${records.length} sheets from ${startDate} to ${endDate}`);
+
+            // Consolidate items from all matching records
+            const consolidatedItems: { [key: string]: FilteredItem } = {};
+            const allPaymentData: any[] = [];
+            
+            // Aggregate totals
+            let totalField1 = 0;
+            let totalField2 = 0;
+            let totalField3 = 0;
+            let totalField4 = 0;
+            let totalField5 = 0;
+            let totalField6 = 0;
+            let totalField7 = 0;
+
+            matchingRecords.forEach((record: any) => {
+                // Consolidate items by particulars + rate (to handle same product with different rates)
+                if (record.items && Array.isArray(record.items)) {
+                    record.items.forEach((item: FilteredItem) => {
+                        const key = `${item.particulars}_${item.rate}`;
+                        
+                        if (consolidatedItems[key]) {
+                            // Add to existing item
+                            consolidatedItems[key].openingStock += item.openingStock || 0;
+                            consolidatedItems[key].receipts += item.receipts || 0;
+                            consolidatedItems[key].tranIn += item.tranIn || 0;
+                            consolidatedItems[key].tranOut += item.tranOut || 0;
+                            consolidatedItems[key].closingStock += item.closingStock || 0;
+                            consolidatedItems[key].sales += item.sales || 0;
+                            
+                            // Recalculate amount
+                            const totalSales = consolidatedItems[key].sales;
+                            consolidatedItems[key].amount = `₹${(totalSales * consolidatedItems[key].rate).toFixed(2)}`;
+                        } else {
+                            // Create new item
+                            consolidatedItems[key] = {
+                                ...item,
+                                openingStock: item.openingStock || 0,
+                                receipts: item.receipts || 0,
+                                tranIn: item.tranIn || 0,
+                                tranOut: item.tranOut || 0,
+                                closingStock: item.closingStock || 0,
+                                sales: item.sales || 0
+                            };
+                        }
+                    });
+                }
+
+                // Consolidate payment data with record date information
+                if (record.paymentData && Array.isArray(record.paymentData)) {
+                    record.paymentData.forEach((payment: any) => {
+                        // Only include payments that have actual data
+                        if (payment.date || payment.phonepe || payment.cash || payment.amount || payment.comments) {
+                            allPaymentData.push({
+                                ...payment,
+                                recordDate: `${record.sheetFromDate || 'N/A'} to ${record.sheetToDate || 'N/A'}`
+                            });
+                        }
+                    });
+                }
+
+                // Sum up field values
+                totalField1 += parseFloat(record.field1 || '0');
+                totalField2 += parseFloat(record.field2 || '0');
+                totalField3 += parseFloat(record.field3 || '0');
+                totalField4 += parseFloat(record.field4 || '0');
+                totalField5 += parseFloat(record.field5 || '0');
+                totalField6 += parseFloat(record.field6 || '0');
+                totalField7 += parseFloat(record.field7 || '0');
+            });
+
+            // Convert consolidated items back to array
+            const consolidatedItemsArray = Object.values(consolidatedItems);
+
+            // Create consolidated record
+            const consolidatedRecord = {
+                items: consolidatedItemsArray,
+                paymentData: allPaymentData,
+                field1: totalField1.toString(),
+                field2: totalField2.toString(),
+                field3: totalField3.toString(),
+                field4: totalField4.toString(),
+                field5: totalField5.toString(),
+                field6: totalField6.toString(),
+                field7: totalField7.toString(),
+                sheetFromDate: startDate,
+                sheetToDate: endDate,
+                savedAt: new Date().toISOString()
+            };
+
+            // Set consolidated data info
+            setConsolidatedData({
+                startDate,
+                endDate,
+                recordCount: matchingRecords.length
+            });
+
+            // Show the consolidated record
+            setSelectedHistory(consolidatedRecord);
+            setShowHistory(false);
+
+        } catch (error) {
+            console.error('Error consolidating sheets:', error);
+            alert('Error consolidating sheets. Please try again.');
+        }
     };
+
+    
 
     const handleLogout = () => {
         setIsLoggedIn(false);
@@ -2202,11 +2229,32 @@ export default function Home() {
                                             const recordMonth = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
                                             return recordMonth === selectedMonth;
                                         })
-                                        .map((record) => (
+                                        .map((record) => {
+                                            // Check if this record matches the selected date range
+                                            const isMatched = startDate && endDate && (() => {
+                                                const parseDate = (dateStr: string) => {
+                                                    if (!dateStr) return null;
+                                                    if (dateStr.includes('/')) {
+                                                        const parts = dateStr.split('/');
+                                                        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                                                    }
+                                                    return dateStr;
+                                                };
+                                                const sheetStart = parseDate(record.sheetFromDate);
+                                                const sheetEnd = parseDate(record.sheetToDate);
+                                                if (!sheetStart || !sheetEnd) return false;
+                                                return sheetStart <= endDate && sheetEnd >= startDate;
+                                            })();
+                                            
+                                            return (
                                         <button
                                             key={record.id}
                                             onClick={() => viewHistorySheet(record)}
-                                            className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition"
+                                            className={`w-full text-left px-4 py-3 border rounded-lg transition ${
+                                                isMatched 
+                                                    ? 'border-green-400 bg-green-50 hover:bg-green-100' 
+                                                    : 'border-gray-200 hover:bg-blue-50 hover:border-blue-300'
+                                            }`}
                                         >
                                             <p className="font-semibold text-blue-600 hover:text-blue-700">
                                                 {/*{record.invoiceName || new Date(record.savedAt).toLocaleDateString('en-US', {*/}
@@ -2229,7 +2277,8 @@ export default function Home() {
                                                 </span>
                                             )}
                                         </button>
-                                    ))}
+                                            );
+                                        })}
                                     {historyData
                                         .filter(record => record.hasClosingStock)
                                         .filter(record => {
