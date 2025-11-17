@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, ChangeEvent } from 'react';
+import { useEffect, useState, useCallback, ChangeEvent, useImperativeHandle, forwardRef } from 'react';
 import { AlertCircle, CheckCircle, X } from 'lucide-react';
 
 interface TextItem {
@@ -13,6 +13,11 @@ interface TextItem {
 interface PDFToExcelConverterProps {
     sendDataToParent: (data: string[][]) => void;
     saveAllowed: boolean;
+    onReset?: () => void;
+}
+
+interface PDFToExcelConverterRef {
+    confirmProcessing: () => void;
 }
 
 type TableData = string[][];
@@ -28,7 +33,7 @@ const firebaseConfig = {
     measurementId: "G-C8JCT3DNNH"
 };
 
-export default function PDFToExcelConverter({ sendDataToParent, saveAllowed }: PDFToExcelConverterProps) {
+const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConverterProps>(({ sendDataToParent, saveAllowed, onReset }, ref) => {
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [tableData, setTableData] = useState<TableData>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -316,7 +321,7 @@ export default function PDFToExcelConverter({ sendDataToParent, saveAllowed }: P
             if (!idocMatch) {
                 setError('No iDOC number found in this PDF');
                 setLoading(false);
-                setPdfFile(null);
+                resetPdfState();
                 return;
             }
 
@@ -327,7 +332,6 @@ export default function PDFToExcelConverter({ sendDataToParent, saveAllowed }: P
                 setDuplicateIdoc(extractedIdoc);
                 setShowDuplicateModal(true);
                 setLoading(false);
-                setPdfFile(null);
                 return;
             }
 
@@ -338,13 +342,11 @@ export default function PDFToExcelConverter({ sendDataToParent, saveAllowed }: P
                     setDuplicateIdoc(extractedIdoc);
                     setShowDuplicateModal(true);
                     setLoading(false);
-                    setPdfFile(null);
                     return;
                 }
             }
 
             setIdocNumber(extractedIdoc);
-            setProcessedIdocs(prev => new Set([...prev, extractedIdoc]));
 
             const parsedData = parseInvoiceText(rows);
             setTableData(parsedData);
@@ -364,18 +366,50 @@ export default function PDFToExcelConverter({ sendDataToParent, saveAllowed }: P
 
         if (file.type !== 'application/pdf') {
             setError('Please upload a PDF file');
+            e.target.value = ''; // Clear input on error
             return;
         }
 
         setPdfFile(file);
         setTableData([]);
         await extractTextFromPDF(file);
+        
+        // Clear the input value after processing to allow re-upload of same file
+        e.target.value = '';
     };
 
     const closeDuplicateModal = (): void => {
         setShowDuplicateModal(false);
         setDuplicateIdoc('');
+        resetPdfState();
     };
+
+    const resetPdfState = (): void => {
+        setPdfFile(null);
+        setTableData([]);
+        setConverted(false);
+        setError('');
+        setIdocNumber('');
+        // Reset file input
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        // Call parent reset if provided
+        if (onReset) {
+            onReset();
+        }
+    };
+
+    const confirmProcessing = (): void => {
+        if (idocNumber) {
+            setProcessedIdocs(prev => new Set([...prev, idocNumber]));
+        }
+    };
+
+    useImperativeHandle(ref, () => ({
+        confirmProcessing
+    }));
 
     return (
         <div className="bg-gradient-to-br from-green-50 to-blue-100 sm:p-6 md:p-8">
@@ -485,4 +519,9 @@ export default function PDFToExcelConverter({ sendDataToParent, saveAllowed }: P
       `}</style>
         </div>
     );
-}
+});
+
+PDFToExcelConverter.displayName = 'PDFToExcelConverter';
+
+export default PDFToExcelConverter;
+export type { PDFToExcelConverterRef };

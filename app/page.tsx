@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
-import PDFToExcelConverter from "@/app/invoice-pdf";
+import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
 import LoginForm from "@/app/login";
 
 // Firebase configuration
@@ -83,6 +83,7 @@ const formatDateFromInput = (dateStr: string): string => {
 };
 
 export default function Home() {
+    const pdfConverterRef = useRef<PDFToExcelConverterRef>(null);
     const [childData, setChildData] = useState<ChildData>([]);
     const [filterData, setFilterData] = useState<FilteredItem[]>([]);
     const [isSaving, setIsSaving] = useState(false);
@@ -245,6 +246,18 @@ export default function Home() {
         setChildData(data);
         setSaveAllowed(false);
         setSaveStatus('idle');
+    }, []);
+
+    const handlePdfReset = useCallback((): void => {
+        setChildData([]);
+        setPendingData([]);
+        setPdfTotal(0);
+        setMatchedItemsCount(0);
+        setShowConfirmModal(false);
+    }, []);
+
+    const handlePdfConfirm = useCallback((): void => {
+        pdfConverterRef.current?.confirmProcessing();
     }, []);
 
     const filterWineData = useCallback((): void => {
@@ -1564,7 +1577,12 @@ export default function Home() {
                             })}
                         </h2>
                     </div>
-                    <PDFToExcelConverter sendDataToParent={handleDataFromChild} saveAllowed={saveAllowed} />
+                    <PDFToExcelConverter 
+                        ref={pdfConverterRef}
+                        sendDataToParent={handleDataFromChild} 
+                        saveAllowed={saveAllowed} 
+                        onReset={handlePdfReset}
+                    />
                 </div>
 
                 {filterData.length > 0 && (
@@ -2390,6 +2408,7 @@ export default function Home() {
                                         setShowConfirmModal(false);
                                         setPendingData([]);
                                         setChildData([]);
+                                        handlePdfConfirm();
                                     }}
                                     className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
                                 >
@@ -2397,9 +2416,7 @@ export default function Home() {
                                 </button>
                                 <button
                                     onClick={() => {
-                                        setChildData([]);
-                                        setShowConfirmModal(false);
-                                        setPendingData([]);
+                                        handlePdfReset();
                                     }}
                                     className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition"
                                 >
