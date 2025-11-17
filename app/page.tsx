@@ -1404,48 +1404,51 @@ export default function Home() {
                 return;
             }
 
-            // Consolidate items from all matching records
+            // Sort records by date to get the last sheet
+            const sortedRecords = matchingRecords.sort((a: any, b: any) => {
+                const dateA = parseDate(a.sheetToDate) || '0';
+                const dateB = parseDate(b.sheetToDate) || '0';
+                return dateA.localeCompare(dateB);
+            });
+            
+            const lastSheet = sortedRecords[sortedRecords.length - 1];
+            
+            // Get particulars from the last sheet
             const consolidatedItems: { [key: string]: FilteredItem } = {};
             const allPaymentData: any[] = [];
             
-            // Aggregate totals
-            let totalField1 = 0;
-            let totalField2 = 0;
-            let totalField3 = 0;
-            let totalField4 = 0;
-            let totalField5 = 0;
-            let totalField6 = 0;
-            let totalField7 = 0;
-
-            matchingRecords.forEach((record: any) => {
-                // Consolidate items by particulars + rate (to handle same product with different rates)
+            // Initialize with particulars from last sheet
+            if (lastSheet.items && Array.isArray(lastSheet.items)) {
+                lastSheet.items.forEach((item: FilteredItem) => {
+                    const key = `${item.particulars}_${item.rate}`;
+                    consolidatedItems[key] = {
+                        ...item,
+                        openingStock: item.openingStock || 0,
+                        receipts: 0, // Will be summed from all sheets
+                        tranIn: 0, // Will be summed from all sheets
+                        tranOut: 0, // Will be summed from all sheets
+                        closingStock: item.closingStock || 0, // From last sheet
+                        sales: 0 // Will be summed from all sheets
+                    };
+                });
+            }
+            
+            // Sum receipts, tranIn, tranOut, and sales from all sheets
+            sortedRecords.forEach((record: any) => {
                 if (record.items && Array.isArray(record.items)) {
                     record.items.forEach((item: FilteredItem) => {
                         const key = `${item.particulars}_${item.rate}`;
                         
                         if (consolidatedItems[key]) {
-                            // Add to existing item
-                            consolidatedItems[key].openingStock += item.openingStock || 0;
+                            // Sum these values from all sheets
                             consolidatedItems[key].receipts += item.receipts || 0;
                             consolidatedItems[key].tranIn += item.tranIn || 0;
                             consolidatedItems[key].tranOut += item.tranOut || 0;
-                            consolidatedItems[key].closingStock += item.closingStock || 0;
                             consolidatedItems[key].sales += item.sales || 0;
                             
-                            // Recalculate amount
+                            // Recalculate amount based on total sales
                             const totalSales = consolidatedItems[key].sales;
                             consolidatedItems[key].amount = `₹${(totalSales * consolidatedItems[key].rate).toFixed(2)}`;
-                        } else {
-                            // Create new item
-                            consolidatedItems[key] = {
-                                ...item,
-                                openingStock: item.openingStock || 0,
-                                receipts: item.receipts || 0,
-                                tranIn: item.tranIn || 0,
-                                tranOut: item.tranOut || 0,
-                                closingStock: item.closingStock || 0,
-                                sales: item.sales || 0
-                            };
                         }
                     });
                 }
@@ -1462,8 +1465,18 @@ export default function Home() {
                         }
                     });
                 }
+            });
+            
+            // Sum field values from all sheets
+            let totalField1 = 0;
+            let totalField2 = 0;
+            let totalField3 = 0;
+            let totalField4 = 0;
+            let totalField5 = 0;
+            let totalField6 = 0;
+            let totalField7 = 0;
 
-                // Sum up field values
+            sortedRecords.forEach((record: any) => {
                 totalField1 += parseFloat(record.field1 || '0');
                 totalField2 += parseFloat(record.field2 || '0');
                 totalField3 += parseFloat(record.field3 || '0');
