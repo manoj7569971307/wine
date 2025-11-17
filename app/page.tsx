@@ -1404,13 +1404,14 @@ export default function Home() {
                 return;
             }
 
-            // Sort records by date to get the last sheet
+            // Sort records by date to get first and last sheets
             const sortedRecords = matchingRecords.sort((a: any, b: any) => {
                 const dateA = parseDate(a.sheetToDate) || '0';
                 const dateB = parseDate(b.sheetToDate) || '0';
                 return dateA.localeCompare(dateB);
             });
             
+            const firstSheet = sortedRecords[0];
             const lastSheet = sortedRecords[sortedRecords.length - 1];
             
             // Get particulars from the last sheet
@@ -1423,13 +1424,23 @@ export default function Home() {
                     const key = `${item.particulars}_${item.rate}`;
                     consolidatedItems[key] = {
                         ...item,
-                        openingStock: item.openingStock || 0,
+                        openingStock: 0, // Will be set from first sheet
                         receipts: 0, // Will be summed from all sheets
                         tranIn: 0, // Will be summed from all sheets
                         tranOut: 0, // Will be summed from all sheets
                         closingStock: item.closingStock || 0, // From last sheet
                         sales: 0 // Will be summed from all sheets
                     };
+                });
+            }
+            
+            // Set opening stock from first sheet
+            if (firstSheet.items && Array.isArray(firstSheet.items)) {
+                firstSheet.items.forEach((item: FilteredItem) => {
+                    const key = `${item.particulars}_${item.rate}`;
+                    if (consolidatedItems[key]) {
+                        consolidatedItems[key].openingStock = item.openingStock || 0;
+                    }
                 });
             }
             
@@ -1467,9 +1478,9 @@ export default function Home() {
                 }
             });
             
-            // Sum field values from all sheets
+            // Sum field values from all sheets, but use opening balance from first sheet
             let totalField1 = 0;
-            let totalField2 = 0;
+            let totalField2 = parseFloat(firstSheet.field2 || '0'); // Opening balance from first sheet
             let totalField3 = 0;
             let totalField4 = 0;
             let totalField5 = 0;
@@ -1478,7 +1489,7 @@ export default function Home() {
 
             sortedRecords.forEach((record: any) => {
                 totalField1 += parseFloat(record.field1 || '0');
-                totalField2 += parseFloat(record.field2 || '0');
+                // Skip field2 - already set from first sheet
                 totalField3 += parseFloat(record.field3 || '0');
                 totalField4 += parseFloat(record.field4 || '0');
                 totalField5 += parseFloat(record.field5 || '0');
