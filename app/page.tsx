@@ -119,6 +119,7 @@ export default function Home() {
     const [matchedItemsCount, setMatchedItemsCount] = useState(0);
     const [sheetFromDate, setSheetFromDate] = useState('');
     const [sheetToDate, setSheetToDate] = useState('');
+    const [lastSavedToDate, setLastSavedToDate] = useState('');
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -379,6 +380,8 @@ export default function Home() {
                 // Only load dates if they exist, otherwise keep current auto-generated dates
                 if (data.sheetFromDate) setSheetFromDate(data.sheetFromDate);
                 if (data.sheetToDate) setSheetToDate(data.sheetToDate);
+                // Set last saved to date for validation
+                if (data.sheetToDate) setLastSavedToDate(data.sheetToDate);
                 // Don't load payment data - always start fresh
                 setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
                 setSaveStatus('success');
@@ -449,23 +452,34 @@ export default function Home() {
                 sheetToDate: sheetToDate
             });
 
-            // If closing stock is entered, update opening stock
-            let updatedData;
-            if (hasClosingStock) {
-                updatedData = filterData.map(item => ({
-                    ...item,
-                    openingStock: item.closingStock > 0 ? item.closingStock : item.openingStock,
-                    receipts: item.closingStock > 0 ? 0 : item.receipts,
-                    tranIn: 0,
-                    tranOut: 0,
-                    closingStock: 0,
-                    sales: 0,
-                    amount: '₹0',
-                }));
-            } else {
-                // Keep data as is if no closing stock
-                updatedData = filterData;
-            }
+            // Update opening stock based on closing stock or receipts
+            let updatedData = filterData.map(item => {
+                if (item.closingStock > 0) {
+                    // If closing stock is entered, use it as next opening stock
+                    return {
+                        ...item,
+                        openingStock: item.closingStock,
+                        receipts: 0,
+                        tranIn: 0,
+                        tranOut: 0,
+                        closingStock: 0,
+                        sales: 0,
+                        amount: '₹0',
+                    };
+                } else {
+                    // If no closing stock, add receipts to opening stock
+                    return {
+                        ...item,
+                        openingStock: item.openingStock + item.receipts,
+                        receipts: 0,
+                        tranIn: 0,
+                        tranOut: 0,
+                        closingStock: 0,
+                        sales: 0,
+                        amount: '₹0',
+                    };
+                }
+            });
 
             // Save updated data to main collection (latest state) - without payment data
             const docData = {
@@ -505,15 +519,16 @@ export default function Home() {
             setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]); // Clear payment data
             
             // Auto-set next sheet's from date to day after current to date
-            // if (sheetToDate) {
-            //     const parts = sheetToDate.split('/');
-            //     if (parts.length === 3) {
-            //         const nextDay = new Date(parts[2], parts[1] - 1, parts[0]);
-            //         nextDay.setDate(nextDay.getDate() + 1);
-            //         setSheetFromDate(formatDateForDisplay(nextDay.toISOString()));
-            //     }
-            //     setSheetToDate(''); // Clear to date for next sheet
-            // }
+            if (sheetToDate) {
+                const parts = sheetToDate.split('/');
+                if (parts.length === 3) {
+                    const nextDay = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                    nextDay.setDate(nextDay.getDate());
+                    setSheetFromDate(formatDateForDisplay(nextDay.toISOString()));
+                }
+                setLastSavedToDate(sheetToDate); // Update last saved date
+                setSheetToDate(''); // Clear to date for next sheet
+            }
         } catch (error) {
             console.error('Error saving to Firebase:', error);
             console.error('Error details:', error);
@@ -943,12 +958,22 @@ export default function Home() {
             const shops = new Set<string>();
             
             // Get all collection names that start with 'invoices_'
-            const allCollections = ['shop1', 'shop2', 'shop3']; // You can expand this list
+            const allCollections = [
+                'shop1', 'shop2', 'shop3', 'shop4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
+                'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
+                'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
+                'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
+            ];
             setAvailableShops(allCollections);
         } catch (error) {
             console.error('Error loading shops:', error);
             // Fallback to predefined shops
-            setAvailableShops(['shop1', 'shop2', 'shop3']);
+            setAvailableShops([
+                'shop1', 'shop2', 'shop3', 'shop4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
+                'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
+                'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
+                'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
+            ]);
         }
     };
 
@@ -956,6 +981,20 @@ export default function Home() {
         setSelectedShop(shopName);
         setUsername(shopName);
         setShowShopSelection(false);
+        
+        // Clear all data when switching shops
+        setFilterData([]);
+        setField1('');
+        setField2('');
+        setField3('');
+        setField4('');
+        setField5('');
+        setField6('');
+        setField7('');
+        setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
+        setSheetFromDate('');
+        setSheetToDate('');
+        setChildData([]);
         
         // Update localStorage with selected shop
         const loginData = JSON.parse(localStorage.getItem('wineAppLogin') || '{}');
@@ -1339,9 +1378,6 @@ export default function Home() {
             return;
         }
         
-        console.log('Consolidation input:', { startDate, endDate });
-        console.log('Available history records:', historyData.length);
-        
         const records = historyData.filter((r: any) => {
             if (!r.hasClosingStock) return false;
             
@@ -1379,8 +1415,7 @@ export default function Home() {
             };
             return parseDate(a.sheetFromDate).getTime() - parseDate(b.sheetFromDate).getTime();
         });
-        
-        console.log('Filtered records for consolidation:', records.length);
+
         
         if (!records.length) {
             alert('No records found in the selected date range with closing stock data.');
@@ -1399,15 +1434,11 @@ export default function Home() {
             });
         }));
         
-        first.items.forEach((item: FilteredItem) => {
-            if (items.has(item.particulars)) {
-                items.get(item.particulars)!.openingStock = item.openingStock;
-            }
-        });
-        
         last.items.forEach((item: FilteredItem) => {
             if (items.has(item.particulars)) {
-                items.get(item.particulars)!.closingStock = item.closingStock;
+                const consolidatedItem = items.get(item.particulars)!;
+                consolidatedItem.openingStock = item.openingStock;
+                consolidatedItem.closingStock = item.closingStock;
             }
         });
         
@@ -1446,12 +1477,6 @@ export default function Home() {
             sheetToDate: endDate
         };
         
-        console.log('Consolidation completed:', {
-            itemCount: data.items.length,
-            recordCount: data.recordCount,
-            dateRange: `${data.startDate} to ${data.endDate}`
-        });
-        
         setConsolidatedData(data);
         setSelectedHistory(data);
         
@@ -1487,6 +1512,20 @@ export default function Home() {
 
     useEffect(() => {
         if (isLoggedIn && username) {
+            // Clear all data before loading new shop data
+            setFilterData([]);
+            setField1('');
+            setField2('');
+            setField3('');
+            setField4('');
+            setField5('');
+            setField6('');
+            setField7('');
+            setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
+            setSheetFromDate('');
+            setSheetToDate('');
+            setChildData([]);
+            
             loadFromFirebase();
         }
     }, [isLoggedIn, username]);
@@ -1733,7 +1772,7 @@ export default function Home() {
                                                     {item.size}
                                                 </span>
                                             </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-900">
                                                 <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
@@ -2272,13 +2311,13 @@ export default function Home() {
                                             <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
                                                 <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
                                                 <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
-                                                <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
+                                                <td className="px-4 py-3 text-center text-sm text-gray-900">{item.openingStock}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">{item.tranOut}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
-                                                <td className="px-4 py-3 text-center text-sm">₹{item.rate}</td>
+                                                <td className="px-4 py-3 text-center text-sm text-gray-900">₹{item.rate}</td>
                                                 <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
                                             </tr>
                                         ))}
