@@ -1321,15 +1321,58 @@ export default function Home() {
     };
 
     const consolidateSheets = () => {
-        if (!startDate || !endDate) return;
+        if (!startDate || !endDate) {
+            alert('Please select both start and end dates for consolidation.');
+            return;
+        }
+        
+        console.log('Consolidation input:', { startDate, endDate });
+        console.log('Available history records:', historyData.length);
+        
         const records = historyData.filter((r: any) => {
             if (!r.hasClosingStock) return false;
-            const sheetStart = r.sheetFromDate;
-            const sheetEnd = r.sheetToDate;
+            
+            let sheetStart = r.sheetFromDate;
+            let sheetEnd = r.sheetToDate;
+            
             if (!sheetStart || !sheetEnd) return false;
-            return sheetStart <= endDate && sheetEnd >= startDate;
-        }).sort((a: any, b: any) => new Date(a.sheetFromDate).getTime() - new Date(b.sheetFromDate).getTime());
-        if (!records.length) return;
+            
+            // Convert dates to consistent format for comparison
+            const parseDate = (dateStr: string) => {
+                if (dateStr.includes('/')) {
+                    const parts = dateStr.split('/');
+                    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                }
+                return dateStr;
+            };
+            
+            sheetStart = parseDate(sheetStart);
+            sheetEnd = parseDate(sheetEnd);
+            
+            console.log('Checking record:', { sheetStart, sheetEnd, startDate, endDate });
+            
+            // Check if the sheet period overlaps with the selected date range
+            const overlaps = sheetStart <= endDate && sheetEnd >= startDate;
+            console.log('Overlaps:', overlaps);
+            
+            return overlaps;
+        }).sort((a: any, b: any) => {
+            const parseDate = (dateStr: string) => {
+                if (dateStr.includes('/')) {
+                    const parts = dateStr.split('/');
+                    return new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+                }
+                return new Date(dateStr);
+            };
+            return parseDate(a.sheetFromDate).getTime() - parseDate(b.sheetFromDate).getTime();
+        });
+        
+        console.log('Filtered records for consolidation:', records.length);
+        
+        if (!records.length) {
+            alert('No records found in the selected date range with closing stock data.');
+            return;
+        }
         
         const [first, last] = [records[0], records[records.length - 1]];
         const items = new Map<string, any>();
@@ -1390,8 +1433,17 @@ export default function Home() {
             sheetToDate: endDate
         };
         
+        console.log('Consolidation completed:', {
+            itemCount: data.items.length,
+            recordCount: data.recordCount,
+            dateRange: `${data.startDate} to ${data.endDate}`
+        });
+        
         setConsolidatedData(data);
         setSelectedHistory(data);
+        
+        // Show success message
+        alert(`Successfully consolidated ${records.length} sheets from ${startDate} to ${endDate}`);
     };
 
     const handleLogout = () => {
@@ -2010,34 +2062,79 @@ export default function Home() {
                                 </div>
                                 <div className="border-t pt-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Consolidate Date Range</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="date"
-                                            value={startDate}
-                                            onChange={(e) => setStartDate(e.target.value)}
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                            placeholder="Period Start"
-                                        />
-                                        <input
-                                            type="date"
-                                            value={endDate}
-                                            onChange={(e) => setEndDate(e.target.value)}
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                            placeholder="Period End"
-                                        />
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <div className="flex-1">
+                                                <label className="block text-xs text-gray-600 mb-1">Start Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={startDate}
+                                                    onChange={(e) => setStartDate(e.target.value)}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="block text-xs text-gray-600 mb-1">End Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={endDate}
+                                                    onChange={(e) => setEndDate(e.target.value)}
+                                                    min={startDate}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-center">
                                         <button
                                             onClick={consolidateSheets}
                                             disabled={!startDate || !endDate}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm transition-colors"
+                                            title={!startDate || !endDate ? 'Please select both start and end dates' : 'Consolidate sheets in date range'}
                                         >
                                             Consolidate
                                         </button>
+                                        </div>
+                                        {startDate && endDate && startDate > endDate && (
+                                            <p className="text-xs text-red-600 mt-1">End date must be after start date</p>
+                                        )}
                                     </div>
-                                    <p className="text-xs text-gray-600 mt-2">Consolidates sheets that overlap with the selected date range</p>
+                                    <p className="text-xs text-gray-600 mt-2">Consolidates all sheets with closing stock data that overlap with the selected date range</p>
+                                    
+                                    {/* Debug Information */}
+                                    {startDate && endDate && (
+                                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                            <p className="text-xs font-medium text-gray-700 mb-2">Debug Info:</p>
+                                            <p className="text-xs text-gray-600">Total records: {historyData.length}</p>
+                                            <p className="text-xs text-gray-600">Records with closing stock: {historyData.filter(r => r.hasClosingStock).length}</p>
+                                            <p className="text-xs text-gray-600">Selected range: {startDate} to {endDate}</p>
+                                            <p className="text-xs text-gray-600">
+                                                Matching records: {historyData.filter((r: any) => {
+                                                    if (!r.hasClosingStock) return false;
+                                                    const parseDate = (dateStr: string) => {
+                                                        if (!dateStr) return null;
+                                                        if (dateStr.includes('/')) {
+                                                            const parts = dateStr.split('/');
+                                                            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                                                        }
+                                                        return dateStr;
+                                                    };
+                                                    const sheetStart = parseDate(r.sheetFromDate);
+                                                    const sheetEnd = parseDate(r.sheetToDate);
+                                                    if (!sheetStart || !sheetEnd) return false;
+                                                    return sheetStart <= endDate && sheetEnd >= startDate;
+                                                }).length}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            {historyData.filter(record => record.hasClosingStock).length === 0 ? (
-                                <p className="text-center text-gray-500 py-8">No closing stock history found</p>
+                            {historyData.length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">No history records found</p>
+                            ) : historyData.filter(record => record.hasClosingStock).length === 0 ? (
+                                <div className="text-center py-8">
+                                    <p className="text-gray-500 mb-2">No closing stock history found</p>
+                                    <p className="text-xs text-gray-400">Found {historyData.length} total records, but none have closing stock data</p>
+                                </div>
                             ) : (
                                 <div className="space-y-2">
                                     {historyData
