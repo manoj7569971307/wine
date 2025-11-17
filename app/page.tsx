@@ -1717,25 +1717,25 @@ export default function Home() {
                                         <tr className="font-bold">
                                             <td className="px-2 sm:px-4 py-3 text-sm text-gray-800">TOTAL</td>
                                             <td className="px-2 sm:px-4 py-3 text-center">-</td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.openingStock, 0)}
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-blue-600">
                                                 {filterData.reduce((sum, item) => sum + item.receipts, 0)}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.tranIn, 0)}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.tranOut, 0)}
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-purple-600">
                                                 {filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.closingStock, 0)}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.sales, 0)}
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 text-center">-</td>
@@ -2005,7 +2005,7 @@ export default function Home() {
                                         type="month"
                                         value={selectedMonth}
                                         onChange={(e) => setSelectedMonth(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
                                     />
                                 </div>
                                 <div className="border-t pt-4">
