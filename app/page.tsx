@@ -726,11 +726,12 @@ export default function Home() {
     const downloadPDF = () => {
         if (filterData.length === 0) return;
 
-        const printWindow = window.open('', '', 'height=800,width=1000');
-        if (!printWindow) return;
-
         const date = new Date().toLocaleDateString();
-        printWindow.document.write(`
+        const filename = sheetFromDate && sheetToDate ? 
+            `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}` :
+            `wine-invoice-${username}-${date.replace(/\//g, '-')}`;
+
+        const htmlContent = `
             <!DOCTYPE html>
             <html>
             <head>
@@ -893,7 +894,12 @@ export default function Home() {
                 </script>
             </body>
             </html>
-        `);
+        `;
+
+        const printWindow = window.open('', '', 'height=800,width=1000');
+        if (!printWindow) return;
+        
+        printWindow.document.write(htmlContent);
         printWindow.document.close();
     };
 
@@ -1090,11 +1096,14 @@ export default function Home() {
         XLSX.writeFile(workbook, filename);
     };
 
+    // Mobile detection utility
+    const isMobile = () => {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+               window.innerWidth <= 768;
+    };
+
     const downloadHistoryPDF = (historyItem: any) => {
         if (!historyItem.items || historyItem.items.length === 0) return;
-
-        const printWindow = window.open('', '', 'height=800,width=1000');
-        if (!printWindow) return;
 
         const title = consolidatedData ? 
             `Consolidated Report: ${consolidatedData.startDate} to ${consolidatedData.endDate}` :
@@ -1102,14 +1111,19 @@ export default function Home() {
         const subtitle = consolidatedData ? 
             `${consolidatedData.recordCount} sheets consolidated` :
             new Date(historyItem.savedAt).toLocaleTimeString();
+        const filename = consolidatedData ? 
+            `consolidated-${username}-${consolidatedData.startDate}-to-${consolidatedData.endDate}` :
+            `history-${username}-${new Date(historyItem.savedAt).toLocaleDateString().replace(/\//g, '-')}`;
 
-        printWindow.document.write(`
+        const htmlContent = `
             <!DOCTYPE html>
             <html>
             <head>
                 <title>${title}</title>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
                     h1 { color: #2563eb; text-align: center; margin-bottom: 10px; }
                     .date { text-align: center; color: #666; margin-bottom: 20px; }
                     .user-info { text-align: center; color: #666; margin-bottom: 20px; font-weight: bold; }
@@ -1120,12 +1134,24 @@ export default function Home() {
                     .text-center { text-align: center; }
                     .text-right { text-align: right; }
                     @media print { body { padding: 10px; } }
+                    @media (max-width: 768px) {
+                        body { padding: 10px; }
+                        table { font-size: 12px; }
+                        th, td { padding: 6px; }
+                    }
                 </style>
             </head>
             <body>
                 <h1>${consolidatedData ? 'Consolidated Report' : 'Wine Invoice History'}</h1>
                 <div class="user-info">${userRole}: ${username}</div>
                 <div class="date">${subtitle}</div>
+                ${(historyItem.sheetFromDate || historyItem.sheetToDate) ? `
+                    <div style="margin-bottom: 20px; padding: 15px; background-color: #f0f9ff; border-left: 4px solid #2563eb;">
+                        <h3 style="color: #2563eb; margin: 0 0 10px 0;">Sheet Period</h3>
+                        <p style="margin: 5px 0;"><strong>From:</strong> ${historyItem.sheetFromDate || 'Not specified'}</p>
+                        <p style="margin: 5px 0;"><strong>To:</strong> ${historyItem.sheetToDate || 'Not specified'}</p>
+                    </div>
+                ` : ''}
                 <table>
                     <thead>
                         <tr>
@@ -1183,41 +1209,39 @@ export default function Home() {
                     </tbody>
                 </table>
                 
-                ${(historyItem.field1 || historyItem.field2 || historyItem.field3 || historyItem.field4 || historyItem.field5 || historyItem.field6) ? `
-                    <div style="margin-top: 30px;">
-                        <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total Sale</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field1 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Opening Balance</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field2 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field3 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Jama</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field4 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field5 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Expenses</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field6 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Closing Balance</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field7 || '0'}</td>
-                            </tr>
-                        </table>
-                    </div>
-                ` : ''}
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total Sale</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field1 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Opening Balance</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field2 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field3 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Jama</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field4 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field5 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Expenses</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field6 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Closing Balance</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field7 || '0'}</td>
+                        </tr>
+                    </table>
+                </div>
                 
                 <div style="margin-top: 30px;">
                     <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information${consolidatedData ? ` (Consolidated from ${consolidatedData.recordCount} sheets)` : ''}</h3>
@@ -1234,19 +1258,16 @@ export default function Home() {
                         </thead>
                         <tbody>
                             ${historyItem.paymentData && historyItem.paymentData.length > 0 ? 
-                                historyItem.paymentData.map((payment: any) => `
+                                historyItem.paymentData.filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments).map((payment: any) => `
                                     <tr>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.date || '-'}</td>
                                         ${consolidatedData ? `<td style="padding: 10px; border: 1px solid #ddd;">${payment.recordDate || ''}</td>` : ''}
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe}</td>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash}</td>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount}</td>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe || '0'}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash || '0'}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount || '0'}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments || '-'}</td>
                                     </tr>
-                                `).join('') :
-                                `<tr><td colspan="${consolidatedData ? '6' : '5'}" style="padding: 20px; text-align: center; color: #666; border: 1px solid #ddd;">No payment information available</td></tr>`
-                            }
-                            ${historyItem.paymentData && historyItem.paymentData.length > 0 ? `
+                                `).join('') + `
                                 <tr style="background-color: #f3f4f6; font-weight: bold;">
                                     <td style="padding: 10px; border: 1px solid #ddd;">TOTAL</td>
                                     ${consolidatedData ? '<td style="padding: 10px; border: 1px solid #ddd;">-</td>' : ''}
@@ -1254,21 +1275,40 @@ export default function Home() {
                                     <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.cash) || 0), 0)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">-</td>
-                                </tr>
-                            ` : ''}
+                                </tr>` :
+                                `<tr><td colspan="${consolidatedData ? '6' : '5'}" style="padding: 20px; text-align: center; color: #666; border: 1px solid #ddd;">No payment information available</td></tr>`
+                            }
                         </tbody>
                     </table>
                 </div>
-                <script>
-                    window.onload = () => {
-                        window.print();
-                        window.onafterprint = () => window.close();
-                    };
-                </script>
             </body>
             </html>
-        `);
-        printWindow.document.close();
+        `;
+
+        if (isMobile()) {
+            // For mobile devices, create a blob and trigger direct download
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename + '.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } else {
+            // For desktop, use the print window approach
+            const printWindow = window.open('', '', 'height=800,width=1000');
+            if (!printWindow) return;
+            
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            
+            printWindow.onload = () => {
+                printWindow.print();
+                printWindow.onafterprint = () => printWindow.close();
+            };
+        }
     };
 
     const viewHistorySheet = (record: any) => {
