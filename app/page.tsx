@@ -198,6 +198,8 @@ export default function Home() {
 
     // Handle tran out change
     const handleTranOutChange = (index: number, value: string) => {
+        if (!isLatestSheet) return;
+        
         const newValue = parseInt(value) || 0;
         if (newValue < 0) return;
 
@@ -2520,6 +2522,8 @@ export default function Home() {
                                         setShowConfirmModal(false);
                                         setPendingData([]);
                                         setChildData([]);
+                                        setPdfTotal(0);
+                                        setMatchedItemsCount(0);
                                         handlePdfConfirm();
                                     }}
                                     className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
