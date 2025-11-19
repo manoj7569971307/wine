@@ -9,11 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
     "firebase": "^12.5.0",
     "lucide-react": "^0.553.0",
     "next": "16.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-webcam": "^7.2.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
