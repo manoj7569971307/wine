@@ -269,7 +269,7 @@ export default function Home() {
                         tranOut: 0,
                         sales: 0,
                         closingStock: 0,
-                        size: matchedWine['Size'] || '',
+                        size: matchedWine['Size Code'] || '',
                         amount: '₹0',
                         brandNumber: matchedWine['Brand Number'],
                         issuePrice: String(matchedWine['Issue Price']),
