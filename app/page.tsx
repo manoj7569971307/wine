@@ -140,6 +140,9 @@ export default function Home() {
     const field6Value = totalExpenses.toString();
     const field7Value = Math.abs(parseFloat(field5Value) - parseFloat(field6Value)).toString();
 
+    // Check if this is the latest sheet (no saved sheet after current to date)
+    const isLatestSheet = !sheetToDate || !lastSavedToDate || sheetToDate >= lastSavedToDate;
+
     // Handle closing stock change
     const handleClosingStockChange = (index: number, value: string) => {
         const newValue = parseInt(value) || 0;
