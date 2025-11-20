@@ -49,6 +49,9 @@ const removeCommasAndDecimals = (value: string): string =>
 const removeCommas = (value: string): number =>
     parseFloat(value.replace(/,/g, ''));
 
+const calcBalance = (f1?: string, f2?: string, f4?: string, f6?: string): string => 
+    ((+(f1 || '0')) + (+(f2 || '0')) + (+(f4 || '0')) - (+(f6 || '0'))).toString();
+
 export default function Home() {
     const [childData, setChildData] = useState<ChildData>([]);
     const [filterData, setFilterData] = useState<FilteredItem[]>([]);
@@ -89,7 +92,15 @@ export default function Home() {
     const field1Value = totalSaleAmount.toString();
     const field3Value = (parseFloat(field1Value) + parseFloat(field2 || '0')).toString();
     const field5Value = (parseFloat(field3Value) + parseFloat(field4 || '0')).toString();
-    const field7Value = (parseFloat(field5Value) - parseFloat(field6 || '0')).toString();
+    
+    // Calculate payment totals
+    const phonepeTotal = paymentData.reduce((sum, p) => sum + (parseFloat(p.phonepe) || 0), 0);
+    const cashTotal = paymentData.reduce((sum, p) => sum + (parseFloat(p.cash) || 0), 0);
+    const amountTotal = paymentData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    const totalExpenses = phonepeTotal + cashTotal + amountTotal;
+    
+    const field6Value = totalExpenses.toString();
+    const field7Value = (parseFloat(field5Value) - parseFloat(field6Value)).toString();
 
     // Handle closing stock change
     const handleClosingStockChange = (index: number, value: string) => {
@@ -303,7 +314,7 @@ export default function Home() {
                 setField5(data.field5 || '');
                 setField6(data.field6 || '');
                 setField7(data.field7 || '');
-                setPaymentData(data.paymentData || [{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
+                setPaymentData(data.paymentData && data.paymentData.length > 0 ? data.paymentData : [{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
                 setSaveStatus('success');
                 setSaveMessage('Data loaded successfully');
             } else {
@@ -360,12 +371,13 @@ export default function Home() {
                 role: userRole,
                 invoiceName: invoiceName || `Invoice ${new Date().toLocaleDateString()}`,
                 hasClosingStock: hasClosingStock,
-                field1: field1,
+                field1: field1Value,
                 field2: field2,
-                field3: field3,
+                field3: field3Value,
                 field4: field4,
-                field5: field5,
-                field6: field6,
+                field5: field5Value,
+                field6: field6Value,
+                field7: field7Value,
                 paymentData: paymentData
             });
 
@@ -395,12 +407,13 @@ export default function Home() {
                 createdAt: saveDate,
                 user: username,
                 role: userRole,
-                field1: field1,
+                field1: field1Value,
                 field2: field2,
-                field3: field3,
+                field3: field3Value,
                 field4: field4,
-                field5: field5,
-                field6: field6,
+                field5: field5Value,
+                field6: field6Value,
+                field7: field7Value,
                 paymentData: paymentData
             };
 
@@ -420,7 +433,6 @@ export default function Home() {
             const currentClosingBalance = field7Value;
             setField2(currentClosingBalance);
             setField4(''); // Clear Jama
-            setField6(''); // Clear Expenses
         } catch (error) {
             console.error('Error saving to Firebase:', error);
             console.error('Error details:', error);
@@ -435,7 +447,7 @@ export default function Home() {
     const downloadExcel = () => {
         if (filterData.length === 0) return;
 
-        const data = filterData.map(item => ({
+        const data: any[] = filterData.map(item => ({
             'Particulars': item.particulars,
             'Size': item.size,
             'Opening Stock': item.openingStock,
@@ -563,7 +575,7 @@ export default function Home() {
         
         data.push({
             'Particulars': 'Expenses',
-            'Size': field6,
+            'Size': field6Value,
             'Opening Stock': '',
             'Receipts': '',
             'Tran In': '',
@@ -589,7 +601,7 @@ export default function Home() {
             'Amount': '',
             'Brand Number': '',
             'Issue Price': '',
-        });
+        } as any);
         
         data.push({});
         data.push({
@@ -743,7 +755,7 @@ export default function Home() {
                         </tr>
                         <tr>
                             <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Expenses</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field6}</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${field6Value}</td>
                         </tr>
                         <tr>
                             <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Closing Balance</td>
@@ -1071,121 +1083,48 @@ export default function Home() {
 
     const consolidateSheets = () => {
         if (!startDate || !endDate) return;
-
-        const filteredRecords = historyData
-            .filter(record => record.hasClosingStock)
-            .filter(record => {
-                const recordDate = new Date(record.savedAt).toISOString().split('T')[0];
-                return recordDate >= startDate && recordDate <= endDate;
-            })
-            .sort((a, b) => new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime());
-
-        if (filteredRecords.length === 0) return;
-
-        const firstRecord = filteredRecords[0];
-        const lastRecord = filteredRecords[filteredRecords.length - 1];
-
-        // Create consolidated items
-        const itemsMap = new Map();
-
-        // Initialize with all unique items
-        filteredRecords.forEach(record => {
-            record.items.forEach((item: FilteredItem) => {
-                if (!itemsMap.has(item.particulars)) {
-                    itemsMap.set(item.particulars, {
-                        particulars: item.particulars,
-                        size: item.size,
-                        openingStock: 0,
-                        receipts: 0,
-                        tranIn: 0,
-                        tranOut: 0,
-                        sales: 0,
-                        closingStock: 0,
-                        rate: item.rate,
-                        amount: '₹0',
-                        brandNumber: item.brandNumber,
-                        issuePrice: item.issuePrice,
-                        category: item.category,
-                        receiptDate: item.receiptDate
-                    });
-                }
+        const records = historyData.filter((r: any) => r.hasClosingStock && new Date(r.savedAt).toISOString().split('T')[0] >= startDate && new Date(r.savedAt).toISOString().split('T')[0] <= endDate).sort((a: any, b: any) => +new Date(a.savedAt) - +new Date(b.savedAt));
+        if (!records.length) return;
+        
+        const [first, last] = [records[0], records[records.length - 1]];
+        const items = new Map<string, any>();
+        
+        records.forEach((r: any) => r.items.forEach((item: FilteredItem) => {
+            const key = item.particulars;
+            if (!items.has(key)) items.set(key, {...item, openingStock: 0, receipts: 0, tranIn: 0, tranOut: 0, sales: 0, closingStock: 0});
+            const c = items.get(key)!;
+            (['receipts', 'tranIn', 'tranOut', 'sales'] as const).forEach((f: keyof FilteredItem) => {
+                c[f] = (c[f] || 0) + (item[f] || 0);
             });
-        });
-
-        // Set opening stock from first record and closing stock from last record
-        firstRecord.items.forEach((item: FilteredItem) => {
-            if (itemsMap.has(item.particulars)) {
-                itemsMap.get(item.particulars).openingStock = item.openingStock;
+        }));
+        
+        first.items.forEach((item: FilteredItem) => {
+            if (items.has(item.particulars)) {
+                items.get(item.particulars)!.openingStock = item.openingStock;
             }
         });
-
-        lastRecord.items.forEach((item: FilteredItem) => {
-            if (itemsMap.has(item.particulars)) {
-                itemsMap.get(item.particulars).closingStock = item.closingStock;
+        
+        last.items.forEach((item: FilteredItem) => {
+            if (items.has(item.particulars)) {
+                const c = items.get(item.particulars)!;
+                c.closingStock = item.closingStock;
+                c.amount = `₹${(c.sales * c.rate).toFixed(2)}`;
             }
         });
-
-        // Sum all other values from all records
-        filteredRecords.forEach(record => {
-            record.items.forEach((item: FilteredItem) => {
-                if (itemsMap.has(item.particulars)) {
-                    const consolidatedItem = itemsMap.get(item.particulars);
-                    consolidatedItem.receipts += item.receipts || 0;
-                    consolidatedItem.tranIn += item.tranIn || 0;
-                    consolidatedItem.tranOut += item.tranOut || 0;
-                    consolidatedItem.sales += item.sales || 0;
-                }
-            });
-        });
-
-        // Calculate amounts
-        itemsMap.forEach(item => {
-            item.amount = `₹${(item.sales * item.rate).toFixed(2)}`;
-        });
-
-        const consolidatedItems = Array.from(itemsMap.values());
-
-        // Consolidate additional fields
-        const consolidatedFields = {
-            field1: filteredRecords.reduce((sum, record) => sum + parseFloat(record.field1 || '0'), 0).toString(),
-            field2: firstRecord.field2 || '0', // Opening balance from first record
-            field4: filteredRecords.reduce((sum, record) => sum + parseFloat(record.field4 || '0'), 0).toString(), // Sum Jama
-            field6: filteredRecords.reduce((sum, record) => sum + parseFloat(record.field6 || '0'), 0).toString(), // Sum Expenses
+        
+        const sum = (f: string) => records.reduce((s: number, r: any) => s + (+(r[f] || '0')), 0).toString();
+        const f1 = sum('field1'), f2 = first.field2 || '0', f4 = sum('field4'), f6 = sum('field6');
+        const f3 = (+f1 + +f2).toString(), f5 = (+f3 + +f4).toString(), f7 = (+f5 - +f6).toString();
+        
+        const data = {
+            items: Array.from(items.values()),
+            startDate, endDate, recordCount: records.length, savedAt: `${startDate} to ${endDate}`,
+            field1: f1, field2: f2, field3: f3, field4: f4, field5: f5, field6: f6, field7: f7,
+            paymentData: records.flatMap((r: any) => (r.paymentData || []).filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments).map((p: any) => ({...p, recordDate: new Date(r.savedAt).toLocaleDateString()})))
         };
         
-        // Calculate derived fields
-        consolidatedFields.field3 = (parseFloat(consolidatedFields.field1) + parseFloat(consolidatedFields.field2)).toString();
-        consolidatedFields.field5 = (parseFloat(consolidatedFields.field3) + parseFloat(consolidatedFields.field4)).toString();
-        const field7 = (parseFloat(consolidatedFields.field5) - parseFloat(consolidatedFields.field6)).toString();
-
-        // Consolidate payment data
-        const consolidatedPayments: any[] = [];
-        filteredRecords.forEach(record => {
-            if (record.paymentData && record.paymentData.length > 0) {
-                record.paymentData.forEach((payment: any) => {
-                    if (payment.date || payment.phonepe || payment.cash || payment.amount || payment.comments) {
-                        consolidatedPayments.push({
-                            ...payment,
-                            recordDate: new Date(record.savedAt).toLocaleDateString()
-                        });
-                    }
-                });
-            }
-        });
-
-        const consolidatedData = {
-            items: consolidatedItems,
-            startDate,
-            endDate,
-            recordCount: filteredRecords.length,
-            savedAt: `${startDate} to ${endDate}`,
-            ...consolidatedFields,
-            field7,
-            paymentData: consolidatedPayments
-        };
-
-        setConsolidatedData(consolidatedData);
-        setSelectedHistory(consolidatedData);
+        setConsolidatedData(data);
+        setSelectedHistory(data);
     };
 
     const handleLogout = () => {
@@ -1572,9 +1511,9 @@ export default function Home() {
                                             <td className="py-2 px-3">
                                                 <input
                                                     type="text"
-                                                    value={field6}
-                                                    onChange={(e) => setField6(e.target.value)}
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm text-gray-900"
+                                                    value={field6Value}
+                                                    readOnly
+                                                    className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100 text-sm text-gray-900"
                                                 />
                                             </td>
                                         </tr>
@@ -1626,7 +1565,7 @@ export default function Home() {
                                                 </td>
                                                 <td className="px-4 py-3 border border-gray-300">
                                                     <input
-                                                        type="text"
+                                                        type="number"
                                                         value={row.phonepe}
                                                         onChange={(e) => {
                                                             const newData = [...paymentData];
@@ -1639,7 +1578,7 @@ export default function Home() {
                                                 </td>
                                                 <td className="px-4 py-3 border border-gray-300">
                                                     <input
-                                                        type="text"
+                                                        type="number"
                                                         value={row.cash}
                                                         onChange={(e) => {
                                                             const newData = [...paymentData];
@@ -1652,7 +1591,7 @@ export default function Home() {
                                                 </td>
                                                 <td className="px-4 py-3 border border-gray-300">
                                                     <input
-                                                        type="text"
+                                                        type="number"
                                                         value={row.amount}
                                                         onChange={(e) => {
                                                             const newData = [...paymentData];
@@ -1691,6 +1630,14 @@ export default function Home() {
                                                 </td>
                                             </tr>
                                         ))}
+                                        <tr className="bg-gray-100 font-semibold">
+                                            <td className="px-4 py-3 border border-gray-300 text-sm">TOTAL</td>
+                                            <td className="px-4 py-3 border border-gray-300 text-sm">{phonepeTotal}</td>
+                                            <td className="px-4 py-3 border border-gray-300 text-sm">{cashTotal}</td>
+                                            <td className="px-4 py-3 border border-gray-300 text-sm">{amountTotal}</td>
+                                            <td className="px-4 py-3 border border-gray-300 text-sm">-</td>
+                                            <td className="px-4 py-3 border border-gray-300 text-sm">-</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                                 <button
@@ -1752,14 +1699,14 @@ export default function Home() {
                                                 type="date"
                                                 value={startDate}
                                                 onChange={(e) => setStartDate(e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
                                                 placeholder="Start Date"
                                             />
                                             <input
                                                 type="date"
                                                 value={endDate}
                                                 onChange={(e) => setEndDate(e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
                                                 placeholder="End Date"
                                             />
                                             <button
@@ -1879,40 +1826,28 @@ export default function Home() {
                                         <tr className="bg-purple-50 border-b-2 border-purple-200">
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
                                             {consolidatedData ? (
-                                                <>
-                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Size</th>
-                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Opening Stock</th>
-                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Receipts</th>
-                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Tran In</th>
-                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Tran Out</th>
-                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
-                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Sales</th>
-                                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Rate</th>
-                                                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
-                                                </>
+                                                ['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
+                                                    <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
+                                                ))
                                             ) : (
                                                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
                                             )}
                                         </tr>
                                         </thead>
                                         <tbody>
-                                        {selectedHistory.items.map((item: FilteredItem, index: number) => (
-                                            <tr key={index} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
+                                        {selectedHistory.items.map((item: FilteredItem, i: number) => (
+                                            <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
                                                 <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
                                                 {consolidatedData ? (
                                                     <>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
-                                                                {item.size}
-                                                            </span>
-                                                        </td>
+                                                        <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
                                                         <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
                                                         <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
                                                         <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
                                                         <td className="px-4 py-3 text-center text-sm font-semibold text-red-600">{item.tranOut}</td>
                                                         <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
                                                         <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
-                                                        <td className="px-4 py-3 text-center text-sm text-gray-800">₹{item.rate}</td>
+                                                        <td className="px-4 py-3 text-center text-sm">₹{item.rate}</td>
                                                         <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
                                                     </>
                                                 ) : (
@@ -1932,34 +1867,12 @@ export default function Home() {
                                     <div className="overflow-hidden">
                                         <table className="w-full border-collapse border border-gray-300">
                                             <tbody>
-                                                <tr className="border-b border-gray-200">
-                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Total Sale</td>
-                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field1 || '0'}</td>
-                                                </tr>
-                                                <tr className="border-b border-gray-200">
-                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Opening Balance</td>
-                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field2 || '0'}</td>
-                                                </tr>
-                                                <tr className="border-b border-gray-200">
-                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Total</td>
-                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field3 || '0'}</td>
-                                                </tr>
-                                                <tr className="border-b border-gray-200">
-                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Jama</td>
-                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field4 || '0'}</td>
-                                                </tr>
-                                                <tr className="border-b border-gray-200">
-                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Total</td>
-                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field5 || '0'}</td>
-                                                </tr>
-                                                <tr className="border-b border-gray-200">
-                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Expenses</td>
-                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field6 || '0'}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">Closing Balance</td>
-                                                    <td className="py-2 px-3 text-sm">{selectedHistory.field7 || ((parseFloat(selectedHistory.field1 || '0') + parseFloat(selectedHistory.field2 || '0') + parseFloat(selectedHistory.field4 || '0')) - parseFloat(selectedHistory.field6 || '0')).toString()}</td>
-                                                </tr>
+                                                {([['Total Sale', selectedHistory.field1], ['Opening Balance', selectedHistory.field2], ['Total', selectedHistory.field3], ['Jama', selectedHistory.field4], ['Total', selectedHistory.field5], ['Expenses', selectedHistory.field6], ['Closing Balance', selectedHistory.field7 || calcBalance(selectedHistory.field1, selectedHistory.field2, selectedHistory.field4, selectedHistory.field6)]] as [string, string | undefined][]).map(([label, value]) => (
+                                                    <tr key={label} className="border-b border-gray-200">
+                                                        <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">{label as string}</td>
+                                                        <td className="py-2 px-3 text-sm text-gray-900">{value || '0'}</td>
+                                                    </tr>
+                                                ))}
                                             </tbody>
                                         </table>
                                     </div>
@@ -1967,35 +1880,38 @@ export default function Home() {
                             )}
                             
                             {/* Payment Information in History */}
-                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && selectedHistory.paymentData.some((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments) && (
+                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && (
                                 <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Information</h3>
                                     <div className="overflow-x-auto">
                                         <table className="w-full border-collapse border border-gray-300">
                                             <thead>
                                                 <tr className="bg-purple-50">
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Date</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">PhonePe</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Cash</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Amount</th>
-                                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Comments</th>
+                                                    {['Date', 'PhonePe', 'Cash', 'Amount', 'Comments'].map(h => (
+                                                        <th key={h} className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">{h}</th>
+                                                    ))}
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {selectedHistory.paymentData.map((payment: any, index: number) => (
-                                                    <tr key={index} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 border border-gray-300 text-sm">
-                                                            {payment.date}
-                                                            {consolidatedData && payment.recordDate && (
-                                                                <div className="text-xs text-gray-500">({payment.recordDate})</div>
-                                                            )}
+                                                {selectedHistory.paymentData.map((p: any, i: number) => (
+                                                    <tr key={i} className="hover:bg-gray-50">
+                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">
+                                                            {p.date}
+                                                            {consolidatedData && p.recordDate && <div className="text-xs text-gray-500">({p.recordDate})</div>}
                                                         </td>
-                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.phonepe}</td>
-                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.cash}</td>
-                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.amount}</td>
-                                                        <td className="px-4 py-3 border border-gray-300 text-sm">{payment.comments}</td>
+                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.phonepe}</td>
+                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.cash}</td>
+                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.amount}</td>
+                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.comments}</td>
                                                     </tr>
                                                 ))}
+                                                <tr className="bg-gray-100 font-semibold">
+                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">TOTAL</td>
+                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.phonepe) || 0), 0) || 0}</td>
+                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.cash) || 0), 0) || 0}</td>
+                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0) || 0}</td>
+                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">-</td>
+                                                </tr>
                                             </tbody>
                                         </table>
                                     </div>
