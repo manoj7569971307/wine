@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
-import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut } from 'lucide-react';
+import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where, doc, updateDoc } from 'firebase/firestore';
+import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
@@ -49,7 +49,7 @@ const removeCommasAndDecimals = (value: string): string =>
 const removeCommas = (value: string): number =>
     parseFloat(value.replace(/,/g, ''));
 
-const calcBalance = (f1?: string, f2?: string, f4?: string, f6?: string): string => 
+const calcBalance = (f1?: string, f2?: string, f4?: string, f6?: string): string =>
     ((+(f1 || '0')) + (+(f2 || '0')) + (+(f4 || '0')) - (+(f6 || '0'))).toString();
 
 // Date format helpers
@@ -120,6 +120,8 @@ export default function Home() {
     const [sheetFromDate, setSheetFromDate] = useState('');
     const [sheetToDate, setSheetToDate] = useState('');
     const [lastSavedToDate, setLastSavedToDate] = useState('');
+    const [editingHistory, setEditingHistory] = useState<any>(null);
+    const [editedHistoryData, setEditedHistoryData] = useState<FilteredItem[]>([]);
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -130,13 +132,13 @@ export default function Home() {
     const field1Value = totalSaleAmount.toString();
     const field3Value = (parseFloat(field1Value) + parseFloat(field2 || '0')).toString();
     const field5Value = (parseFloat(field3Value) + parseFloat(field4 || '0')).toString();
-    
+
     // Calculate payment totals
     const phonepeTotal = paymentData.reduce((sum, p) => sum + (parseFloat(p.phonepe) || 0), 0);
     const cashTotal = paymentData.reduce((sum, p) => sum + (parseFloat(p.cash) || 0), 0);
     const amountTotal = paymentData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
     const totalExpenses = phonepeTotal + cashTotal + amountTotal;
-    
+
     const field6Value = totalExpenses.toString();
     const field7Value = Math.abs(parseFloat(field5Value) - parseFloat(field6Value)).toString();
 
@@ -202,7 +204,7 @@ export default function Home() {
     // Handle tran out change
     const handleTranOutChange = (index: number, value: string) => {
         if (!isLatestSheet) return;
-        
+
         const newValue = parseInt(value) || 0;
         if (newValue < 0) return;
 
@@ -308,7 +310,7 @@ export default function Home() {
                     Math.abs(issuePrice - sampleIssuePrice) < 1) {
 
                     matchedCount++;
-                    
+
                     const calculatedQuantity = firstIndex
                         ? (Number(firstIndex) * quantity) + Number(row[7])
                         : quantity;
@@ -516,13 +518,13 @@ export default function Home() {
             setSaveMessage(`Successfully saved ${filterData.length} items`);
             setSaveAllowed(false);
             setInvoiceName(''); // Reset invoice name
-            
+
             // Store closing balance as opening balance for next day
             const currentClosingBalance = field7Value;
             setField2(currentClosingBalance);
             setField4(''); // Clear Jama
             setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]); // Clear payment data
-            
+
             // Auto-set next sheet's from date to day after current to date
             if (sheetToDate) {
                 const parts = sheetToDate.split('/');
@@ -561,7 +563,7 @@ export default function Home() {
             'Rate': item.rate,
             'Amount': item.amount,
         }));
-        
+
         data.push({
             'Particulars': 'TOTAL',
             'Size': '-',
@@ -578,7 +580,7 @@ export default function Home() {
                 return sum + amount;
             }, 0).toLocaleString()}`,
         });
-        
+
         data.push({
             'Particulars': 'CLOSING STOCK TOTAL AMOUNT',
             'Size': '',
@@ -591,7 +593,7 @@ export default function Home() {
             'Rate': '',
             'Amount': `₹${filterData.reduce((sum, item) => sum + (item.closingStock * item.rate), 0).toLocaleString()}`,
         });
-        
+
         data.push({});
         data.push({
             'Particulars': 'Total Sale',
@@ -605,7 +607,7 @@ export default function Home() {
             'Rate': '',
             'Amount': '',
         });
-        
+
         data.push({
             'Particulars': 'Opening Balance',
             'Size': field2,
@@ -620,7 +622,7 @@ export default function Home() {
             'Brand Number': '',
             'Issue Price': '',
         });
-        
+
         data.push({
             'Particulars': 'Total',
             'Size': field3Value,
@@ -635,7 +637,7 @@ export default function Home() {
             'Brand Number': '',
             'Issue Price': '',
         });
-        
+
         data.push({
             'Particulars': 'Jama',
             'Size': field4,
@@ -650,7 +652,7 @@ export default function Home() {
             'Brand Number': '',
             'Issue Price': '',
         });
-        
+
         data.push({
             'Particulars': 'Total',
             'Size': field5Value,
@@ -665,7 +667,7 @@ export default function Home() {
             'Brand Number': '',
             'Issue Price': '',
         });
-        
+
         data.push({
             'Particulars': 'Expenses',
             'Size': field6Value,
@@ -680,7 +682,7 @@ export default function Home() {
             'Brand Number': '',
             'Issue Price': '',
         });
-        
+
         data.push({
             'Particulars': 'Closing Balance',
             'Size': field7Value,
@@ -695,7 +697,7 @@ export default function Home() {
             'Brand Number': '',
             'Issue Price': '',
         } as any);
-        
+
         data.push({});
         data.push({
             'Particulars': 'PAYMENT INFORMATION',
@@ -711,7 +713,7 @@ export default function Home() {
             'Brand Number': '',
             'Issue Price': '',
         });
-        
+
         paymentData.forEach((payment, index) => {
             data.push({
                 'Particulars': `Payment ${index + 1}`,
@@ -726,7 +728,7 @@ export default function Home() {
                 'Amount': '',
             });
         });
-        
+
         // Add sheet period information if available
         if (sheetFromDate || sheetToDate) {
             data.push({});
@@ -745,12 +747,12 @@ export default function Home() {
                 'Issue Price': '',
             });
         }
-        
+
         const worksheet = XLSX.utils.json_to_sheet(data);
 
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Wine Invoice');
-        const filename = sheetFromDate && sheetToDate ? 
+        const filename = sheetFromDate && sheetToDate ?
             `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}.xlsx` :
             `wine-invoice-${username}-${new Date().toISOString().split('T')[0]}.xlsx`;
         XLSX.writeFile(workbook, filename);
@@ -760,7 +762,7 @@ export default function Home() {
         if (filterData.length === 0) return;
 
         const date = new Date().toLocaleDateString();
-        const filename = sheetFromDate && sheetToDate ? 
+        const filename = sheetFromDate && sheetToDate ?
             `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}` :
             `wine-invoice-${username}-${date.replace(/\//g, '-')}`;
 
@@ -831,15 +833,15 @@ export default function Home() {
                             <td class="text-center">${filterData.reduce((sum, item) => sum + item.sales, 0)}</td>
                             <td class="text-center">-</td>
                             <td class="text-right">₹${filterData.reduce((sum, item) => {
-                                const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
-                                return sum + amount;
-                            }, 0).toLocaleString()}</td>
+            const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
+            return sum + amount;
+        }, 0).toLocaleString()}</td>
                         </tr>
                         <tr style="background-color: #eff6ff; font-weight: bold;">
                             <td colspan="10">CLOSING STOCK TOTAL AMOUNT</td>
                             <td class="text-right">₹${filterData.reduce((sum, item) => {
-                                return sum + (item.closingStock * item.rate);
-                            }, 0).toLocaleString()}</td>
+            return sum + (item.closingStock * item.rate);
+        }, 0).toLocaleString()}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -931,7 +933,7 @@ export default function Home() {
 
         const printWindow = window.open('', '', 'height=800,width=1000');
         if (!printWindow) return;
-        
+
         printWindow.document.write(htmlContent);
         printWindow.document.close();
     };
@@ -941,7 +943,7 @@ export default function Home() {
         setIsLoggedIn(true);
         setUserRole(role);
         setUsername(user);
-        
+
         // Save login data to localStorage with 24-hour expiration
         const expiresAt = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours
         localStorage.setItem('wineAppLogin', JSON.stringify({
@@ -950,7 +952,7 @@ export default function Home() {
             username: user,
             expiresAt
         }));
-        
+
         if (role === 'Admin') {
             loadAvailableShops();
             setShowShopSelection(true);
@@ -961,7 +963,7 @@ export default function Home() {
         try {
             const collections = await getDocs(query(collection(db, 'invoices_admin')));
             const shops = new Set<string>();
-            
+
             // Get all collection names that start with 'invoices_'
             const allCollections = [
                 'shop1', 'shop2', 'shop3', 'shop4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
@@ -986,7 +988,7 @@ export default function Home() {
         setSelectedShop(shopName);
         setUsername(shopName);
         setShowShopSelection(false);
-        
+
         // Clear all data when switching shops
         setFilterData([]);
         setField1('');
@@ -1000,7 +1002,7 @@ export default function Home() {
         setSheetFromDate('');
         setSheetToDate('');
         setChildData([]);
-        
+
         // Update localStorage with selected shop
         const loginData = JSON.parse(localStorage.getItem('wineAppLogin') || '{}');
         const expiresAt = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours
@@ -1058,7 +1060,7 @@ export default function Home() {
             'Rate': item.rate,
             'Amount': item.amount,
         }));
-        
+
         data.push({
             'Particulars': 'TOTAL',
             'Size': '-',
@@ -1076,7 +1078,7 @@ export default function Home() {
             }, 0).toLocaleString()}`,
 
         });
-        
+
         data.push({
             'Particulars': 'CLOSING STOCK TOTAL AMOUNT',
             'Size': '',
@@ -1107,7 +1109,7 @@ export default function Home() {
         data.push({ 'Particulars': 'Total', 'Size': historyItem.field5 || '0' });
         data.push({ 'Particulars': 'Expenses', 'Size': historyItem.field6 || '0' });
         data.push({ 'Particulars': 'Closing Balance', 'Size': historyItem.field7 || '0' });
-        
+
         data.push({});
         data.push({ 'Particulars': 'PAYMENT INFORMATION' });
         if (historyItem.paymentData && historyItem.paymentData.length > 0) {
@@ -1147,7 +1149,7 @@ export default function Home() {
         const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'History');
-        const filename = consolidatedData ? 
+        const filename = consolidatedData ?
             `consolidated-${username}-${consolidatedData.startDate}-to-${consolidatedData.endDate}.xlsx` :
             `history-${username}-${new Date(historyItem.savedAt).toLocaleDateString().replace(/\//g, '-')}.xlsx`;
         XLSX.writeFile(workbook, filename);
@@ -1155,20 +1157,20 @@ export default function Home() {
 
     // Mobile detection utility
     const isMobile = () => {
-        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-               window.innerWidth <= 768;
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+            window.innerWidth <= 768;
     };
 
     const downloadHistoryPDF = (historyItem: any) => {
         if (!historyItem.items || historyItem.items.length === 0) return;
 
-        const title = consolidatedData ? 
+        const title = consolidatedData ?
             `Consolidated Report: ${consolidatedData.startDate} to ${consolidatedData.endDate}` :
             `History - ${new Date(historyItem.savedAt).toLocaleDateString()}`;
-        const subtitle = consolidatedData ? 
+        const subtitle = consolidatedData ?
             `${consolidatedData.recordCount} sheets consolidated` :
             new Date(historyItem.savedAt).toLocaleTimeString();
-        const filename = consolidatedData ? 
+        const filename = consolidatedData ?
             `consolidated-${username}-${consolidatedData.startDate}-to-${consolidatedData.endDate}` :
             `history-${username}-${new Date(historyItem.savedAt).toLocaleDateString().replace(/\//g, '-')}`;
 
@@ -1253,15 +1255,15 @@ export default function Home() {
                             <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.sales || 0), 0)}</td>
                             <td class="text-center">-</td>
                             <td class="text-right">₹${historyItem.items.reduce((sum: number, item: FilteredItem) => {
-                                const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
-                                return sum + amount;
-                            }, 0).toLocaleString()}</td>
+            const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
+            return sum + amount;
+        }, 0).toLocaleString()}</td>
                         </tr>
                         <tr style="background-color: #eff6ff; font-weight: bold;">
                             <td colspan="10">CLOSING STOCK TOTAL AMOUNT</td>
                             <td class="text-right">₹${historyItem.items.reduce((sum: number, item: FilteredItem) => {
-                                return sum + ((item.closingStock || 0) * (item.rate || 0));
-                            }, 0).toLocaleString()}</td>
+            return sum + ((item.closingStock || 0) * (item.rate || 0));
+        }, 0).toLocaleString()}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1314,8 +1316,8 @@ export default function Home() {
                             </tr>
                         </thead>
                         <tbody>
-                            ${historyItem.paymentData && historyItem.paymentData.length > 0 ? 
-                                historyItem.paymentData.filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments).map((payment: any) => `
+                            ${historyItem.paymentData && historyItem.paymentData.length > 0 ?
+                historyItem.paymentData.filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments).map((payment: any) => `
                                     <tr>
                                         <td style="padding: 10px; border: 1px solid #ddd;">${payment.date || '-'}</td>
                                         ${consolidatedData ? `<td style="padding: 10px; border: 1px solid #ddd;">${payment.recordDate || ''}</td>` : ''}
@@ -1333,8 +1335,8 @@ export default function Home() {
                                     <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">-</td>
                                 </tr>` :
-                                `<tr><td colspan="${consolidatedData ? '6' : '5'}" style="padding: 20px; text-align: center; color: #666; border: 1px solid #ddd;">No payment information available</td></tr>`
-                            }
+                `<tr><td colspan="${consolidatedData ? '6' : '5'}" style="padding: 20px; text-align: center; color: #666; border: 1px solid #ddd;">No payment information available</td></tr>`
+            }
                         </tbody>
                     </table>
                 </div>
@@ -1357,10 +1359,10 @@ export default function Home() {
             // For desktop, use the print window approach
             const printWindow = window.open('', '', 'height=800,width=1000');
             if (!printWindow) return;
-            
+
             printWindow.document.write(htmlContent);
             printWindow.document.close();
-            
+
             printWindow.onload = () => {
                 printWindow.print();
                 printWindow.onafterprint = () => printWindow.close();
@@ -1375,7 +1377,95 @@ export default function Home() {
     const closeHistorySheet = () => {
         setSelectedHistory(null);
         setConsolidatedData(null);
+        setEditingHistory(null);
+        setEditedHistoryData([]);
     };
+
+    const startEditHistory = (record: any) => {
+        setEditingHistory(record);
+        // Deep copy the items to avoid mutating the original
+        setEditedHistoryData(JSON.parse(JSON.stringify(record.items || [])));
+    };
+
+    const handleHistoryFieldChange = (itemIndex: number, field: string, value: string) => {
+        const updatedData = [...editedHistoryData];
+        const item = updatedData[itemIndex];
+
+        if (field === 'closingStock') {
+            item.closingStock = parseInt(value) || 0;
+        } else if (field === 'tranIn') {
+            item.tranIn = parseInt(value) || 0;
+        } else if (field === 'tranOut') {
+            item.tranOut = parseInt(value) || 0;
+        }
+
+        // Recalculate sales: Sales = (Opening Stock + Receipts + Tran In) - Closing Stock - Tran Out
+        const total = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0);
+        item.sales = total - (item.closingStock || 0) - (item.tranOut || 0);
+
+        // Recalculate amount based on closing stock
+        const amount = (item.closingStock || 0) * (item.rate || 0);
+        item.amount = `₹${amount.toLocaleString()}`;
+
+        setEditedHistoryData(updatedData);
+    };
+
+    const saveHistoryEdits = async () => {
+        if (!editingHistory || !username) return;
+
+        setIsSaving(true);
+        try {
+            const historyCollectionName = getHistoryCollectionName();
+            const historyDocRef = doc(db, historyCollectionName, editingHistory.id);
+
+            // Update the history document with edited items
+            await updateDoc(historyDocRef, {
+                items: editedHistoryData,
+                lastEditedAt: serverTimestamp()
+            });
+
+            // Update the main sheet's filterData with new opening stock from closing stock
+            const updatedFilterData = filterData.map((item, index) => {
+                const editedItem = editedHistoryData.find(
+                    (edited) => edited.particulars === item.particulars && edited.size === item.size
+                );
+
+                if (editedItem) {
+                    return {
+                        ...item,
+                        openingStock: editedItem.closingStock || 0
+                    };
+                }
+                return item;
+            });
+
+            setFilterData(updatedFilterData);
+
+            // Reload history to reflect changes
+            await loadHistory();
+
+            setSaveStatus('success');
+            setSaveMessage('History updated successfully!');
+
+            // Close edit mode
+            setEditingHistory(null);
+            setEditedHistoryData([]);
+            setSelectedHistory(null);
+        } catch (error) {
+            console.error('Error saving history edits:', error);
+            setSaveStatus('error');
+            setSaveMessage('Failed to save history edits');
+        } finally {
+            setIsSaving(false);
+            setTimeout(() => setSaveStatus('idle'), 3000);
+        }
+    };
+
+    const cancelHistoryEdit = () => {
+        setEditingHistory(null);
+        setEditedHistoryData([]);
+    };
+
 
     const consolidateSheets = async () => {
         if (!startDate || !endDate || !username) return;
@@ -1394,12 +1484,12 @@ export default function Home() {
             // Filter records that have closing stock and overlap with the selected date range
             const matchingRecords = historyData.filter((record: any) => {
                 if (!record.hasClosingStock) return false;
-                
+
                 const sheetStart = parseDate(record.sheetFromDate);
                 const sheetEnd = parseDate(record.sheetToDate);
-                
+
                 if (!sheetStart || !sheetEnd) return false;
-                
+
                 // Check if the sheet period overlaps with the selected range
                 return sheetStart <= endDate && sheetEnd >= startDate;
             });
@@ -1415,14 +1505,14 @@ export default function Home() {
                 const dateB = parseDate(b.sheetToDate) || '0';
                 return dateA.localeCompare(dateB);
             });
-            
+
             const firstSheet = sortedRecords[0];
             const lastSheet = sortedRecords[sortedRecords.length - 1];
-            
+
             // Get particulars from the last sheet
             const consolidatedItems: { [key: string]: FilteredItem } = {};
             const allPaymentData: any[] = [];
-            
+
             // Initialize with particulars from last sheet
             if (lastSheet.items && Array.isArray(lastSheet.items)) {
                 lastSheet.items.forEach((item: FilteredItem) => {
@@ -1438,7 +1528,7 @@ export default function Home() {
                     };
                 });
             }
-            
+
             // Set opening stock from first sheet
             if (firstSheet.items && Array.isArray(firstSheet.items)) {
                 firstSheet.items.forEach((item: FilteredItem) => {
@@ -1448,20 +1538,20 @@ export default function Home() {
                     }
                 });
             }
-            
+
             // Sum receipts, tranIn, tranOut, and sales from all sheets
             sortedRecords.forEach((record: any) => {
                 if (record.items && Array.isArray(record.items)) {
                     record.items.forEach((item: FilteredItem) => {
                         const key = `${item.particulars}_${item.rate}`;
-                        
+
                         if (consolidatedItems[key]) {
                             // Sum these values from all sheets
                             consolidatedItems[key].receipts += item.receipts || 0;
                             consolidatedItems[key].tranIn += item.tranIn || 0;
                             consolidatedItems[key].tranOut += item.tranOut || 0;
                             consolidatedItems[key].sales += item.sales || 0;
-                            
+
                             // Recalculate amount based on total sales
                             const totalSales = consolidatedItems[key].sales;
                             consolidatedItems[key].amount = `₹${(totalSales * consolidatedItems[key].rate).toFixed(2)}`;
@@ -1482,7 +1572,7 @@ export default function Home() {
                     });
                 }
             });
-            
+
             // Sum field values from all sheets, but use opening balance from first sheet
             let totalField1 = 0;
             let totalField2 = parseFloat(firstSheet.field2 || '0'); // Opening balance from first sheet
@@ -1538,7 +1628,7 @@ export default function Home() {
         }
     };
 
-    
+
 
     const handleLogout = () => {
         setIsLoggedIn(false);
@@ -1581,7 +1671,7 @@ export default function Home() {
             setSheetFromDate('');
             setSheetToDate('');
             setChildData([]);
-            
+
             loadFromFirebase();
         }
     }, [isLoggedIn, username]);
@@ -1672,10 +1762,10 @@ export default function Home() {
                             })}
                         </h2>
                     </div>
-                    <PDFToExcelConverter 
+                    <PDFToExcelConverter
                         ref={pdfConverterRef}
-                        sendDataToParent={handleDataFromChild} 
-                        saveAllowed={saveAllowed} 
+                        sendDataToParent={handleDataFromChild}
+                        saveAllowed={saveAllowed}
                         onReset={handlePdfReset}
                     />
                 </div>
@@ -1724,11 +1814,10 @@ export default function Home() {
                                             setSaveAllowed(true);
                                         }}
                                         disabled={isSaving}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
-                                            isSaving
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'
-                                        }`}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${isSaving
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'
+                                            }`}
                                     >
                                         <Save className="w-4 h-4" />
                                         {isSaving ? 'Saving...' : 'Save'}
@@ -1737,11 +1826,10 @@ export default function Home() {
                                     <button
                                         onClick={loadFromFirebase}
                                         disabled={isLoading}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
-                                            isLoading
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
-                                        }`}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${isLoading
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
+                                            }`}
                                     >
                                         <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                         {isLoading ? 'Loading...' : 'Load'}
@@ -1751,11 +1839,10 @@ export default function Home() {
                                         <button
                                             onClick={loadHistory}
                                             disabled={isLoading}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
-                                                isLoading
-                                                    ? 'bg-gray-400 cursor-not-allowed'
-                                                    : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg'
-                                            }`}
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${isLoading
+                                                ? 'bg-gray-400 cursor-not-allowed'
+                                                : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg'
+                                                }`}
                                         >
                                             <Download className="w-4 h-4" />
                                             History
@@ -1805,78 +1892,75 @@ export default function Home() {
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[800px]">
                                     <thead>
-                                    <tr className="bg-purple-50 border-b-2 border-purple-200">
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">Particulars</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Size</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Opening Stock</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Receipts</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran In</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran Out</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Total</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Sales</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">Amount</th>
-                                    </tr>
+                                        <tr className="bg-purple-50 border-b-2 border-purple-200">
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">Particulars</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Size</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Opening Stock</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Receipts</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran In</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran Out</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Total</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Sales</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">Amount</th>
+                                        </tr>
                                     </thead>
                                     <tbody>
-                                    {filterData.map((item, index) => (
-                                        <tr key={index} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-800">{item.particulars}</td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
-                                                    {item.size}
-                                                </span>
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-900">
-                                                <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    value={item.tranIn}
-                                                    onChange={(e) => handleTranInChange(index, e.target.value)}
-                                                    disabled={userRole === 'Admin'}
-                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${
-                                                        userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                                                    }`}
-                                                />
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    value={item.tranOut}
-                                                    onChange={(e) => handleTranOutChange(index, e.target.value)}
-                                                    disabled={userRole === 'Admin'}
-                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${
-                                                        userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                                                    }`}
-                                                />
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <span className="text-purple-600 font-semibold text-xs sm:text-sm">
-                                                    {(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
-                                                </span>
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    value={item.closingStock}
-                                                    onChange={(e) => handleClosingStockChange(index, e.target.value)}
-                                                    disabled={userRole === 'Admin'}
-                                                    className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${
-                                                        userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                                                    }`}
-                                                />
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <span className="text-blue-600 font-semibold text-xs sm:text-sm">{item.sales}</span>
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">₹{item.rate}</td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-green-600">{item.amount}</td>
-                                        </tr>
-                                    ))}
+                                        {filterData.map((item, index) => (
+                                            <tr key={index} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-800">{item.particulars}</td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
+                                                        {item.size}
+                                                    </span>
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-900">
+                                                    <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <input
+                                                        type="number"
+                                                        value={item.tranIn}
+                                                        onChange={(e) => handleTranInChange(index, e.target.value)}
+                                                        disabled={userRole === 'Admin'}
+                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                                            }`}
+                                                    />
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <input
+                                                        type="number"
+                                                        value={item.tranOut}
+                                                        onChange={(e) => handleTranOutChange(index, e.target.value)}
+                                                        disabled={userRole === 'Admin'}
+                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                                            }`}
+                                                    />
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <span className="text-purple-600 font-semibold text-xs sm:text-sm">
+                                                        {(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <input
+                                                        type="number"
+                                                        value={item.closingStock}
+                                                        onChange={(e) => handleClosingStockChange(index, e.target.value)}
+                                                        disabled={userRole === 'Admin'}
+                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                                            }`}
+                                                    />
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <span className="text-blue-600 font-semibold text-xs sm:text-sm">{item.sales}</span>
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">₹{item.rate}</td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-green-600">{item.amount}</td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                     <tfoot className="bg-gray-100 border-t-2 border-gray-300">
                                         <tr className="font-bold">
@@ -1926,7 +2010,7 @@ export default function Home() {
                                 ← Scroll horizontally to see all columns →
                             </div>
                         </div>
-                        
+
                         {/* Additional Fields Table */}
                         <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                             <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
@@ -2014,7 +2098,7 @@ export default function Home() {
                                 </table>
                             </div>
                         </div>
-                        
+
                         {/* Payment Sheet */}
                         <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                             <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Information</h3>
@@ -2198,21 +2282,21 @@ export default function Home() {
                                             </div>
                                         </div>
                                         <div className="flex justify-center">
-                                        <button
-                                            onClick={consolidateSheets}
-                                            disabled={!startDate || !endDate}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm transition-colors"
-                                            title={!startDate || !endDate ? 'Please select both start and end dates' : 'Consolidate sheets in date range'}
-                                        >
-                                            Consolidate
-                                        </button>
+                                            <button
+                                                onClick={consolidateSheets}
+                                                disabled={!startDate || !endDate}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm transition-colors"
+                                                title={!startDate || !endDate ? 'Please select both start and end dates' : 'Consolidate sheets in date range'}
+                                            >
+                                                Consolidate
+                                            </button>
                                         </div>
                                         {startDate && endDate && startDate > endDate && (
                                             <p className="text-xs text-red-600 mt-1">End date must be after start date</p>
                                         )}
                                     </div>
                                     <p className="text-xs text-gray-600 mt-2">Consolidates all sheets with closing stock data that overlap with the selected date range</p>
-                                    
+
                                     {/* Debug Information */}
                                     {startDate && endDate && (
                                         <div className="mt-3 p-3 bg-gray-50 rounded-lg">
@@ -2258,7 +2342,7 @@ export default function Home() {
                                             const recordMonth = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
                                             return recordMonth === selectedMonth;
                                         })
-                                        .map((record) => {
+                                        .map((record, index) => {
                                             // Check if this record matches the selected date range
                                             const isMatched = startDate && endDate && (() => {
                                                 const parseDate = (dateStr: string) => {
@@ -2274,38 +2358,58 @@ export default function Home() {
                                                 if (!sheetStart || !sheetEnd) return false;
                                                 return sheetStart <= endDate && sheetEnd >= startDate;
                                             })();
-                                            
+
+                                            const isLatest = index === 0;
+                                            const canEdit = isLatest && userRole === 'Shop Owner';
+
                                             return (
-                                        <button
-                                            key={record.id}
-                                            onClick={() => viewHistorySheet(record)}
-                                            className={`w-full text-left px-4 py-3 border rounded-lg transition ${
-                                                isMatched 
-                                                    ? 'border-green-400 bg-green-50 hover:bg-green-100' 
-                                                    : 'border-gray-200 hover:bg-blue-50 hover:border-blue-300'
-                                            }`}
-                                        >
-                                            <p className="font-semibold text-blue-600 hover:text-blue-700">
-                                                {/*{record.invoiceName || new Date(record.savedAt).toLocaleDateString('en-US', {*/}
-                                                {/*    year: 'numeric',*/}
-                                                {/*    month: 'long',*/}
-                                                {/*    day: 'numeric',*/}
-                                                {/*    hour: '2-digit',*/}
-                                                {/*    minute: '2-digit'*/}
-                                                {/*})}*/}
-                                                Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}
-                                            </p>
-                                            {/*{(record.sheetFromDate || record.sheetToDate) && (*/}
-                                            {/*    <p className="text-xs text-gray-600 mt-1">*/}
-                                            {/*        Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}*/}
-                                            {/*    </p>*/}
-                                            {/*)}*/}
-                                            {record.hasClosingStock && (
-                                                <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
-                                                    Closing Stock Entered
-                                                </span>
-                                            )}
-                                        </button>
+                                                <div key={record.id} className="relative">
+                                                    <button
+                                                        onClick={() => viewHistorySheet(record)}
+                                                        className={`w-full text-left px-4 py-3 border rounded-lg transition ${isMatched
+                                                            ? 'border-green-400 bg-green-50 hover:bg-green-100'
+                                                            : 'border-gray-200 hover:bg-blue-50 hover:border-blue-300'
+                                                            }`}
+                                                    >
+                                                        <div className="flex justify-between items-start">
+                                                            <div className="flex-1">
+                                                                <p className="font-semibold text-blue-600 hover:text-blue-700">
+                                                                    {/*{record.invoiceName || new Date(record.savedAt).toLocaleDateString('en-US', {*/}
+                                                                    {/*    year: 'numeric',*/}
+                                                                    {/*    month: 'long',*/}
+                                                                    {/*    day: 'numeric',*/}
+                                                                    {/*    hour: '2-digit',*/}
+                                                                    {/*    minute: '2-digit'*/}
+                                                                    {/*})}*/}
+                                                                    Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}
+                                                                </p>
+                                                                {/*{(record.sheetFromDate || record.sheetToDate) && (*/}
+                                                                {/*    <p className="text-xs text-gray-600 mt-1">*/}
+                                                                {/*        Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}*/}
+                                                                {/*    </p>*/}
+                                                                {/*)}*/}
+                                                                {record.hasClosingStock && (
+                                                                    <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+                                                                        Closing Stock Entered
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {canEdit && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        startEditHistory(record);
+                                                                        viewHistorySheet(record);
+                                                                    }}
+                                                                    className="ml-2 p-2 text-purple-600 hover:bg-purple-100 rounded-lg transition-colors"
+                                                                    title="Edit this entry"
+                                                                >
+                                                                    <Pencil size={18} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </button>
+                                                </div>
                                             );
                                         })}
                                     {historyData
@@ -2316,8 +2420,8 @@ export default function Home() {
                                             const recordMonth = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
                                             return recordMonth === selectedMonth;
                                         }).length === 0 && selectedMonth && (
-                                        <p className="text-center text-gray-500 py-8">No closing stock records found for selected month</p>
-                                    )}
+                                            <p className="text-center text-gray-500 py-8">No closing stock records found for selected month</p>
+                                        )}
                                 </div>
                             )}
                         </div>
@@ -2329,10 +2433,11 @@ export default function Home() {
             {selectedHistory && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                        <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+                        <div className={`${editingHistory ? 'bg-purple-600' : 'bg-blue-600'} text-white p-4 flex justify-between items-center`}>
                             <div>
                                 <h2 className="text-xl font-bold">
-                                    {consolidatedData ? 
+                                    {editingHistory && <span className="mr-2">✏️ Editing:</span>}
+                                    {consolidatedData ?
                                         `Consolidated: ${consolidatedData.startDate} to ${consolidatedData.endDate}` :
                                         new Date(selectedHistory.savedAt).toLocaleDateString('en-US', {
                                             year: 'numeric',
@@ -2342,27 +2447,51 @@ export default function Home() {
                                     }
                                 </h2>
                                 <p className="text-sm text-blue-100 mt-1">
-                                    {consolidatedData ? 
-                                        `${consolidatedData.recordCount} sheets consolidated` :
-                                        new Date(selectedHistory.savedAt).toLocaleTimeString()
+                                    {editingHistory ?
+                                        'Edit closing stock, tran in, and tran out values' :
+                                        consolidatedData ?
+                                            `${consolidatedData.recordCount} sheets consolidated` :
+                                            new Date(selectedHistory.savedAt).toLocaleTimeString()
                                     }
                                 </p>
                             </div>
                             <div className="flex gap-2">
-                                <button
-                                    onClick={() => downloadHistoryExcel(selectedHistory)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
-                                >
-                                    <FileSpreadsheet className="w-4 h-4" />
-                                    Excel
-                                </button>
-                                <button
-                                    onClick={() => downloadHistoryPDF(selectedHistory)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition"
-                                >
-                                    <FileText className="w-4 h-4" />
-                                    PDF
-                                </button>
+                                {editingHistory ? (
+                                    <>
+                                        <button
+                                            onClick={saveHistoryEdits}
+                                            disabled={isSaving}
+                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400"
+                                        >
+                                            <Save className="w-4 h-4" />
+                                            {isSaving ? 'Saving...' : 'Save'}
+                                        </button>
+                                        <button
+                                            onClick={cancelHistoryEdit}
+                                            disabled={isSaving}
+                                            className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => downloadHistoryExcel(selectedHistory)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                                        >
+                                            <FileSpreadsheet className="w-4 h-4" />
+                                            Excel
+                                        </button>
+                                        <button
+                                            onClick={() => downloadHistoryPDF(selectedHistory)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition"
+                                        >
+                                            <FileText className="w-4 h-4" />
+                                            PDF
+                                        </button>
+                                    </>
+                                )}
                                 <button
                                     onClick={closeHistorySheet}
                                     className="text-white hover:bg-blue-700 rounded-full p-2 transition"
@@ -2377,33 +2506,73 @@ export default function Home() {
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead>
-                                        <tr className="bg-purple-50 border-b-2 border-purple-200">
-                                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
-                                            {['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
-                                                <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
-                                            ))}
-                                        </tr>
+                                            <tr className="bg-purple-50 border-b-2 border-purple-200">
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
+                                                {['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
+                                                    <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
+                                                ))}
+                                            </tr>
                                         </thead>
                                         <tbody>
-                                        {selectedHistory.items.map((item: FilteredItem, i: number) => (
-                                            <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
-                                                <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
-                                                <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
-                                                <td className="px-4 py-3 text-center text-sm text-gray-900">{item.openingStock}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">{item.tranOut}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
-                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
-                                                <td className="px-4 py-3 text-center text-sm text-gray-900">₹{item.rate}</td>
-                                                <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
-                                            </tr>
-                                        ))}
+                                            {(editingHistory ? editedHistoryData : selectedHistory.items).map((item: FilteredItem, i: number) => (
+                                                <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
+                                                    <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
+                                                    <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
+                                                    <td className="px-4 py-3 text-center text-sm text-gray-900">{item.openingStock}</td>
+                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
+
+                                                    {/* Tran In - Editable in edit mode */}
+                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
+                                                        {editingHistory ? (
+                                                            <input
+                                                                type="number"
+                                                                value={item.tranIn || 0}
+                                                                onChange={(e) => handleHistoryFieldChange(i, 'tranIn', e.target.value)}
+                                                                className="w-20 px-2 py-1 border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                            />
+                                                        ) : (
+                                                            item.tranIn
+                                                        )}
+                                                    </td>
+
+                                                    {/* Tran Out - Editable in edit mode */}
+                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">
+                                                        {editingHistory ? (
+                                                            <input
+                                                                type="number"
+                                                                value={item.tranOut || 0}
+                                                                onChange={(e) => handleHistoryFieldChange(i, 'tranOut', e.target.value)}
+                                                                className="w-20 px-2 py-1 border border-purple-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                            />
+                                                        ) : (
+                                                            item.tranOut
+                                                        )}
+                                                    </td>
+
+                                                    {/* Closing Stock - Editable in edit mode */}
+                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">
+                                                        {editingHistory ? (
+                                                            <input
+                                                                type="number"
+                                                                value={item.closingStock || 0}
+                                                                onChange={(e) => handleHistoryFieldChange(i, 'closingStock', e.target.value)}
+                                                                className="w-20 px-2 py-1 border border-green-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                            />
+                                                        ) : (
+                                                            item.closingStock
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
+                                                    <td className="px-4 py-3 text-center text-sm text-gray-900">₹{item.rate}</td>
+                                                    <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
+                                                </tr>
+                                            ))}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
-                            
+
                             {/* Sheet Period Information in History */}
                             {(selectedHistory.sheetFromDate || selectedHistory.sheetToDate) && (
                                 <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
@@ -2424,7 +2593,7 @@ export default function Home() {
                                     </div>
                                 </div>
                             )}
-                            
+
                             {/* Additional Information in History */}
                             {(selectedHistory.field1 || selectedHistory.field2 || selectedHistory.field3 || selectedHistory.field4 || selectedHistory.field5 || selectedHistory.field6 || consolidatedData) && (
                                 <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
@@ -2443,7 +2612,7 @@ export default function Home() {
                                     </div>
                                 </div>
                             )}
-                            
+
                             {/* Payment Information in History - Always show */}
                             <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                                 <h3 className="text-lg font-semibold text-gray-800 mb-4">
