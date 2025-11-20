@@ -2,60 +2,60 @@
 
 import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter from "@/app/invoice-pdf";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-// Function to remove commas and decimals
-function removeCommasAndDecimals(value) {
-    let cleanedValue = value.replace(/,/g, '');
-    cleanedValue = cleanedValue.split('.')[0];
-    return cleanedValue;
+interface WineData {
+    'Brand Number': string | number;
+    'Product Name': string;
+    'Issue Price': number;
+    'MRP': number;
 }
-function removeCommas(value) {
-    let cleanedValue = value.replace(/,/g, '');
+
+interface FilteredItem {
+    particulars: string;
+    category: string;
+    rate: number;
+    receiptDate: string;
+    openingStock: number;
+    receipts: number;
+    sales: number;
+    closingStock: number;
+    size: string;
+    amount: string;
+    brandNumber: string | number;
+    issuePrice: string;
+}
+
+type ChildDataRow = string[];
+type ChildData = ChildDataRow[];
+
+const removeCommasAndDecimals = (value: string): string => {
+    const cleanedValue = value.replace(/,/g, '');
+    return cleanedValue.split('.')[0];
+};
+
+const removeCommas = (value: string): number => {
+    const cleanedValue = value.replace(/,/g, '');
     return parseFloat(cleanedValue);
-}
-//
-//
-// function getFirstIndexValue(childDataRow: string[]): string {
-//     if (!childDataRow[5] || !childDataRow[5].includes('/')) return '0';
-//     return childDataRow[5].split('/')[0].trim();
-// }
-//
-// function getSecondIndexValue(childDataRow: string[]): string {
-//     if (!childDataRow[5] || !childDataRow[5].includes('/')) return '';
-//     return childDataRow[5].split('/')[1].trim();
-// }
+};
 
 export default function Home() {
-    const [childData, setChildData] = useState([]);
-    const [filterData, setFilterData] = useState([]);
+    const [childData, setChildData] = useState<ChildData>([]);
+    const [filterData, setFilterData] = useState<FilteredItem[]>([]);
 
-    // Callback function to receive data from the child
-    const handleDataFromChild = (data) => {
+    const handleDataFromChild = useCallback((data: ChildData): void => {
         setChildData(data);
-    };
+    }, []);
 
-    // Function to filter wine data - FIXED VERSION (No Duplicates)
-    const filterWineData = () => {
-        let filtered = [...filterData]; // Start with existing filtered data
-        let unmatched = [];
+    const filterWineData = useCallback((): void => {
+        const filtered: FilteredItem[] = [...filterData];
 
-        // Debug logging
-        console.log('Starting filter with:', {
-            sampleWinesCount: sampleWinesData.length,
-            childDataCount: childData.length - 1 // Excluding header
-        });
-
-        // Process each row from childData (invoice data)
         for (let j = 1; j < childData.length; j++) {
             try {
-                // Add safety checks for childData
                 if (!childData[j] || !childData[j][8] || !childData[j][6] || !childData[j][1]) {
-                    console.warn(`Missing critical data at row ${j}:`, childData[j]);
                     continue;
                 }
 
-                // Calculate issue price with proper error handling
                 const quantity = Number(childData[j][6]);
                 const quantitySize = String(childData[j][5] || '');
                 const [firstIndex, secondIndex] = quantitySize.includes('/')
@@ -63,193 +63,202 @@ export default function Home() {
                     : ['0', ''];
 
                 if (quantity === 0 || isNaN(quantity)) {
-                    console.warn(`Invalid quantity at row ${j}:`, childData[j][6]);
                     continue;
                 }
-                let issuePrice;
+
+                let issuePrice: number;
                 let rawPrice = removeCommasAndDecimals(String(childData[j][8]));
-                if(Number(childData[j][7]) === 0){
+
+                if (Number(childData[j][7]) === 0) {
                     issuePrice = Number(rawPrice) / quantity;
-                }else {
-                    issuePrice = Math.ceil((Number(rawPrice)/((quantity * Number(firstIndex)) + Number(childData[j][7]))) * Number(firstIndex));
-                    rawPrice = removeCommas(String(childData[j][8]));
+                } else {
+                    issuePrice = Math.ceil(
+                        (Number(rawPrice) / ((quantity * Number(firstIndex)) + Number(childData[j][7]))) *
+                        Number(firstIndex)
+                    );
+                    rawPrice = String(removeCommas(String(childData[j][8])));
                 }
 
                 if (isNaN(issuePrice)) {
-                    console.warn(`Invalid issue price calculation at row ${j}`);
                     continue;
                 }
 
-                // Convert brand number to string for comparison
                 const brandNumberFromChild = String(childData[j][1]).trim();
 
-                console.log(`Row ${j}: Brand="${brandNumberFromChild}", IssuePrice=${issuePrice.toFixed(2)}, Qty=${quantity}`);
-
-                // Find the matching wine in sampleWinesData
-                let matchFound = false;
-                let potentialMatches = [];
-
                 for (let i = 0; i < sampleWinesData.length; i++) {
-                    const brandNumberFromSample = String(sampleWinesData[i]['Brand Number']).trim();
-                    const sampleIssuePrice = Number(sampleWinesData[i]['Issue Price']);
+                    const wine = sampleWinesData[i] as WineData;
+                    const brandNumberFromSample = String(wine['Brand Number']).trim();
+                    const sampleIssuePrice = Number(wine['Issue Price']);
 
-                    // Check brand number match first
                     if (brandNumberFromChild === brandNumberFromSample) {
                         const priceDiff = Math.abs(issuePrice - sampleIssuePrice);
-                        potentialMatches.push({
-                            index: i,
-                            mrp: sampleWinesData[i]['MRP'],
-                            issuePrice: sampleIssuePrice,
-                            priceDiff: priceDiff
-                        });
 
-                        // Match on brand number AND issue price (with tolerance)
                         if (priceDiff < 1) {
-                            console.log(`✓ Match found for row ${j}: Brand=${brandNumberFromChild}, MRP=${sampleWinesData[i]['MRP']}, IssuePrice=${sampleIssuePrice}`);
+                            const calculatedQuantity = firstIndex
+                                ? (Number(firstIndex) * quantity) + Number(childData[j][7])
+                                : quantity;
 
-                            const calculatedQuantity = firstIndex ? (Number(firstIndex) * quantity) + Number(childData[j][7]) : quantity;
-
-                            // Check if this item already exists in filtered data
                             const existingItemIndex = filtered.findIndex(
-                                item => item.brandNumber === sampleWinesData[i]['Brand Number'] &&
+                                item => item.brandNumber === wine['Brand Number'] &&
                                     Math.abs(Number(item.issuePrice) - issuePrice) < 1
                             );
 
                             if (existingItemIndex !== -1) {
-                                // Item exists, just add to quantity
-                                filtered[existingItemIndex].quantity += calculatedQuantity;
-                                console.log(`✓ Updated quantity for Brand ${brandNumberFromChild}: +${calculatedQuantity} = ${filtered[existingItemIndex].quantity}`);
+                                filtered[existingItemIndex].receipts += calculatedQuantity;
                             } else {
-                                // New item, add to filtered array
                                 filtered.push({
-                                    brandNumber: sampleWinesData[i]['Brand Number'],
-                                    Mrp: sampleWinesData[i]['MRP'],
-                                    description: sampleWinesData[i]['Product Name'],
-                                    unit: childData[j][3] || '',
-                                    group: childData[j][4] || '',
-                                    quantity: calculatedQuantity,
-                                    size: secondIndex || '',
-                                    someField2: childData[j][7] || '',
-                                    totalPrice: childData[j][8] || '',
+                                    particulars: wine['Product Name'],
+                                    category: childData[j][3] || '',
+                                    rate: wine['MRP'],
+                                    receiptDate: new Date().toISOString().split('T')[0],
+                                    openingStock: 0,
+                                    receipts: calculatedQuantity,
+                                    sales: 0,
+                                    closingStock: 0,
+                                    size: secondIndex,
+                                    amount: '₹0',
+                                    brandNumber: wine['Brand Number'],
                                     issuePrice: issuePrice.toFixed(2),
-                                    extraField1: childData[j][9] || '',
-                                    extraField2: childData[j][10] || '',
-                                    invoiceRow: j,// Track which invoice row this came from
                                 });
                             }
-
-                            matchFound = true;
-                            break; // Stop after first match to avoid duplicates
+                            break;
                         }
                     }
                 }
             } catch (error) {
-                console.error(`Error processing row ${j}:`, error, childData[j]);
+                // Silent error handling - continue processing other rows
+                continue;
             }
         }
 
-        console.log(`✓ Matched: ${filtered.length} items`);
-        console.log(`✗ Unmatched: ${unmatched.length} items`);
-        if (unmatched.length > 0) {
-            console.table(unmatched);
-        }
-
-        // Assuming filtered is an array of objects with a 'description' property
         const sortedFiltered = filtered.sort((a, b) => {
-            if (!a.description) return 1; // handle missing descriptions
-            if (!b.description) return -1;
-            return a.description.localeCompare(b.description);
+            if (!a.particulars) return 1;
+            if (!b.particulars) return -1;
+            return a.particulars.localeCompare(b.particulars);
         });
-        setFilterData(sortedFiltered);
-    };
 
-    // Effect hook to filter data when childData changes
+        setFilterData(sortedFiltered);
+    }, [childData, filterData]);
+
     useEffect(() => {
         if (childData.length > 0) {
             filterWineData();
         }
     }, [childData]);
 
-    // Log filtered data (for debugging)
-    useEffect(() => {
-        console.log('Filtered Data:', filterData);
-        if (childData.length > 0) {
-            console.log('Sample brand numbers:', sampleWinesData.slice(0, 5).map(w => w['Brand Number']));
-            console.log('Child brand numbers:', childData.slice(1, 6).map(row => row[1]));
-        }
-    }, [filterData]);
-
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-black text-gray-800 dark:text-white font-sans">
-            <header className="bg-blue-600 p-4 shadow-md">
-                <div className="container mx-auto flex justify-between items-center">
-                    <h1 className="text-white text-3xl font-bold">Wine Invoice Tracker</h1>
-                    <p className="text-white">Your product details and pricing at a glance</p>
+        <div className="min-h-screen bg-gray-50">
+            <header className="bg-blue-600 p-3 sm:p-4 shadow-md">
+                <div className="container mx-auto">
+                    <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold">
+                        Wine Invoice Tracker
+                    </h1>
                 </div>
             </header>
 
-            <main className="container mx-auto p-6">
-                <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-                    <h2 className="text-xl font-semibold text-blue-600 mb-4">Sample Data</h2>
-                    <p className="text-gray-600">Brand Number: {sampleWinesData[0]?.['Brand Number']}</p>
+            <main className="container mx-auto p-2 sm:p-4 md:p-6">
+                <div className="bg-white shadow-lg rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
                     <PDFToExcelConverter sendDataToParent={handleDataFromChild} />
                 </div>
 
                 {filterData.length > 0 && (
-                    <div className="space-y-6">
-                        {filterData.map((item, index) => (
-                            <div key={index} className="bg-white shadow-md rounded-lg p-6">
-                                <h3 className="text-xl font-semibold text-blue-700 mb-4">Brand Number: {item.brandNumber}</h3>
-                                <div className="space-y-3 text-black">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-700 font-medium">MRP:</span>
-                                        <span>{item.Mrp}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-700 font-medium">Description:</span>
-                                        <span>{item.description}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-700 font-medium">Unit:</span>
-                                        <span>{item.unit}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-700 font-medium">Group:</span>
-                                        <span>{item.group}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-700 font-medium">Quantity:</span>
-                                        <span>{item.quantity}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-700 font-medium">Size:</span>
-                                        <span>{item.size}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-700 font-medium">Total Price:</span>
-                                        <span>{item.totalPrice}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-700 font-medium">Issue Price:</span>
-                                        <span>{item.issuePrice}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                    <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[800px]">
+                                <thead>
+                                <tr className="bg-purple-50 border-b-2 border-purple-200">
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
+                                        Particulars
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Size
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Opening Stock
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Receipts
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Closing Stock
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Sales
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
+                                        Rate
+                                    </th>
+                                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">
+                                        Amount
+                                    </th>
+                                </tr>
+                                </thead>
+
+                                <tbody>
+                                {filterData.map((item, index) => (
+                                    <tr
+                                        key={index}
+                                        className="border-b border-gray-200 hover:bg-purple-50 transition-colors"
+                                    >
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-800">
+                                            {item.particulars}
+                                        </td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
+                                                    {item.size}
+                                                </span>
+                                        </td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                            <input
+                                                type="number"
+                                                value={item.openingStock}
+                                                className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                readOnly
+                                            />
+                                        </td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">
+                                            {item.receipts}
+                                        </td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                            <input
+                                                type="number"
+                                                value={item.closingStock}
+                                                className="w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                readOnly
+                                            />
+                                        </td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                <span className="text-blue-600 font-semibold text-xs sm:text-sm">
+                                                    {item.sales}
+                                                </span>
+                                        </td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">
+                                            ₹{item.rate}
+                                        </td>
+                                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-green-600">
+                                            {item.amount}
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="sm:hidden p-2 text-center text-xs text-gray-500 bg-gray-50">
+                            ← Scroll horizontally to see all columns →
+                        </div>
                     </div>
                 )}
 
                 {childData.length > 0 && filterData.length === 0 && (
-                    <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded">
-                        <p className="font-bold">No matches found</p>
-                        <p>Check the console for debugging information about brand numbers and prices.</p>
+                    <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 sm:p-4 rounded">
+                        <p className="font-bold text-sm sm:text-base">No matches found</p>
+                        <p className="text-xs sm:text-sm">
+                            No wine data matched the uploaded invoice.
+                        </p>
                     </div>
                 )}
             </main>
-
-            <footer className="bg-blue-600 p-4 mt-6 text-center text-white">
-                <p>&copy; 2025 Wine Tracker. All Rights Reserved.</p>
-            </footer>
         </div>
     );
 }
