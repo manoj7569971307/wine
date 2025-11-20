@@ -5,7 +5,7 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import {sampleWinesData} from "@/app/sample-data";
+import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter from "@/app/invoice-pdf";
 
 // Firebase configuration
@@ -23,15 +23,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Sample wines data (you'll need to import your actual data)
-
-interface WineData {
-    'Brand Number': string | number;
-    'Product Name': string;
-    'Issue Price': number;
-    'MRP': number;
-}
-
 interface FilteredItem {
     particulars: string;
     category: string;
@@ -47,20 +38,14 @@ interface FilteredItem {
     issuePrice: string;
 }
 
-type ChildDataRow = string[];
-type ChildData = ChildDataRow[];
+type ChildData = string[][];
 
-const removeCommasAndDecimals = (value: string): string => {
-    const cleanedValue = value.replace(/,/g, '');
-    return cleanedValue.split('.')[0];
-};
+const removeCommasAndDecimals = (value: string): string =>
+    value.replace(/,/g, '').split('.')[0];
 
-const removeCommas = (value: string): number => {
-    const cleanedValue = value.replace(/,/g, '');
-    return parseFloat(cleanedValue);
-};
+const removeCommas = (value: string): number =>
+    parseFloat(value.replace(/,/g, ''));
 
-// Simple PDF upload component (replace with your actual PDFToExcelConverter)
 export default function Home() {
     const [childData, setChildData] = useState<ChildData>([]);
     const [filterData, setFilterData] = useState<FilteredItem[]>([]);
@@ -77,98 +62,81 @@ export default function Home() {
     }, []);
 
     const filterWineData = useCallback((): void => {
-        const filtered: FilteredItem[] = [...filterData];
+        const filtered: FilteredItem[] = [];
 
         for (let j = 1; j < childData.length; j++) {
-            try {
-                if (!childData[j] || !childData[j][8] || !childData[j][6] || !childData[j][1]) {
-                    continue;
-                }
+            const row = childData[j];
+            if (!row?.[8] || !row[6] || !row[1]) continue;
 
-                const quantity = Number(childData[j][6]);
-                const quantitySize = String(childData[j][5] || '');
-                const [firstIndex, secondIndex] = quantitySize.includes('/')
-                    ? quantitySize.split('/').map(s => s?.trim() || '')
-                    : ['0', ''];
+            const quantity = Number(row[6]);
+            if (quantity === 0 || isNaN(quantity)) continue;
 
-                if (quantity === 0 || isNaN(quantity)) {
-                    continue;
-                }
+            const quantitySize = String(row[5] || '');
+            const [firstIndex, secondIndex] = quantitySize.includes('/')
+                ? quantitySize.split('/').map(s => s?.trim() || '')
+                : ['0', ''];
 
-                let issuePrice: number;
-                let rawPrice = removeCommasAndDecimals(String(childData[j][8]));
+            let issuePrice: number;
+            let rawPrice = removeCommasAndDecimals(String(row[8]));
 
-                if (Number(childData[j][7]) === 0) {
-                    issuePrice = Number(rawPrice) / quantity;
-                } else {
-                    issuePrice = Math.ceil(
-                        (Number(rawPrice) / ((quantity * Number(firstIndex)) + Number(childData[j][7]))) *
-                        Number(firstIndex)
+            if (Number(row[7]) === 0) {
+                issuePrice = Number(rawPrice) / quantity;
+            } else {
+                issuePrice = Math.ceil(
+                    (Number(rawPrice) / ((quantity * Number(firstIndex)) + Number(row[7]))) *
+                    Number(firstIndex)
+                );
+                rawPrice = String(removeCommas(String(row[8])));
+            }
+
+            if (isNaN(issuePrice)) continue;
+
+            const brandNumberFromChild = String(row[1]).trim();
+
+            for (const wine of sampleWinesData) {
+                const brandNumberFromSample = String(wine['Brand Number']).trim();
+                const sampleIssuePrice = Number(wine['Issue Price']);
+
+                if (brandNumberFromChild === brandNumberFromSample &&
+                    Math.abs(issuePrice - sampleIssuePrice) < 1) {
+
+                    const calculatedQuantity = firstIndex
+                        ? (Number(firstIndex) * quantity) + Number(row[7])
+                        : quantity;
+
+                    const existingItemIndex = filtered.findIndex(
+                        item => item.brandNumber === wine['Brand Number'] &&
+                            Math.abs(Number(item.issuePrice) - issuePrice) < 1
                     );
-                    rawPrice = String(removeCommas(String(childData[j][8])));
-                }
 
-                if (isNaN(issuePrice)) {
-                    continue;
-                }
-
-                const brandNumberFromChild = String(childData[j][1]).trim();
-
-                for (let i = 0; i < sampleWinesData.length; i++) {
-                    const wine = sampleWinesData[i] as WineData;
-                    const brandNumberFromSample = String(wine['Brand Number']).trim();
-                    const sampleIssuePrice = Number(wine['Issue Price']);
-
-                    if (brandNumberFromChild === brandNumberFromSample) {
-                        const priceDiff = Math.abs(issuePrice - sampleIssuePrice);
-
-                        if (priceDiff < 1) {
-                            const calculatedQuantity = firstIndex
-                                ? (Number(firstIndex) * quantity) + Number(childData[j][7])
-                                : quantity;
-
-                            const existingItemIndex = filtered.findIndex(
-                                item => item.brandNumber === wine['Brand Number'] &&
-                                    Math.abs(Number(item.issuePrice) - issuePrice) < 1
-                            );
-
-                            if (existingItemIndex !== -1) {
-                                filtered[existingItemIndex].receipts += calculatedQuantity;
-                            } else {
-                                filtered.push({
-                                    particulars: wine['Product Name'],
-                                    category: childData[j][3] || '',
-                                    rate: wine['MRP'],
-                                    receiptDate: new Date().toISOString().split('T')[0],
-                                    openingStock: 0,
-                                    receipts: calculatedQuantity,
-                                    sales: 0,
-                                    closingStock: 0,
-                                    size: secondIndex,
-                                    amount: '₹0',
-                                    brandNumber: wine['Brand Number'],
-                                    issuePrice: issuePrice.toFixed(2),
-                                });
-                            }
-                            break;
-                        }
+                    if (existingItemIndex !== -1) {
+                        filtered[existingItemIndex].receipts += calculatedQuantity;
+                    } else {
+                        filtered.push({
+                            particulars: wine['Product Name'],
+                            category: row[3] || '',
+                            rate: wine['MRP'],
+                            receiptDate: new Date().toISOString().split('T')[0],
+                            openingStock: 0,
+                            receipts: calculatedQuantity,
+                            sales: 0,
+                            closingStock: 0,
+                            size: secondIndex,
+                            amount: '₹0',
+                            brandNumber: wine['Brand Number'],
+                            issuePrice: issuePrice.toFixed(2),
+                        });
                     }
+                    break;
                 }
-            } catch (error) {
-                continue;
             }
         }
 
-        const sortedFiltered = filtered.sort((a, b) => {
-            if (!a.particulars) return 1;
-            if (!b.particulars) return -1;
-            return a.particulars.localeCompare(b.particulars);
-        });
-
-        setFilterData(sortedFiltered);
+        setFilterData(filtered.sort((a, b) =>
+            a.particulars?.localeCompare(b.particulars || '') || 0
+        ));
     }, [childData]);
 
-    // Load last saved data from Firebase
     const loadFromFirebase = async () => {
         setIsLoading(true);
         try {
@@ -176,24 +144,21 @@ export default function Home() {
             const querySnapshot = await getDocs(q);
 
             if (!querySnapshot.empty) {
-                const lastDoc = querySnapshot.docs[0];
-                const data = lastDoc.data();
+                const data = querySnapshot.docs[0].data();
                 setFilterData(data.items || []);
                 setSaveStatus('success');
                 setSaveMessage('Data loaded successfully');
-                setTimeout(() => setSaveStatus('idle'), 3000);
             } else {
                 setSaveStatus('error');
                 setSaveMessage('No saved data found');
-                setTimeout(() => setSaveStatus('idle'), 3000);
             }
         } catch (error) {
             console.error('Error loading from Firebase:', error);
             setSaveStatus('error');
             setSaveMessage('Failed to load data');
-            setTimeout(() => setSaveStatus('idle'), 3000);
         } finally {
             setIsLoading(false);
+            setTimeout(() => setSaveStatus('idle'), 3000);
         }
     };
 
@@ -218,20 +183,16 @@ export default function Home() {
             setSaveStatus('success');
             setSaveMessage(`Successfully saved ${filterData.length} items`);
             setSaveAllowed(false);
-            setTimeout(() => {
-                setSaveStatus('idle');
-            }, 3000);
-
         } catch (error) {
             console.error('Error saving to Firebase:', error);
             setSaveStatus('error');
             setSaveMessage('Failed to save data. Please try again.');
         } finally {
             setIsSaving(false);
+            setTimeout(() => setSaveStatus('idle'), 3000);
         }
     };
 
-    // Download as Excel
     const downloadExcel = () => {
         if (filterData.length === 0) return;
 
@@ -252,12 +213,9 @@ export default function Home() {
 
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Wine Invoice');
-
-        const date = new Date().toISOString().split('T')[0];
-        XLSX.writeFile(workbook, `wine-invoice-${date}.xlsx`);
+        XLSX.writeFile(workbook, `wine-invoice-${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
-    // Download as PDF
     const downloadPDF = () => {
         if (filterData.length === 0) return;
 
@@ -265,54 +223,22 @@ export default function Home() {
         if (!printWindow) return;
 
         const date = new Date().toLocaleDateString();
-        const htmlContent = `
+        printWindow.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
                 <title>Wine Invoice - ${date}</title>
                 <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                        padding: 20px;
-                    }
-                    h1 {
-                        color: #2563eb;
-                        text-align: center;
-                        margin-bottom: 10px;
-                    }
-                    .date {
-                        text-align: center;
-                        color: #666;
-                        margin-bottom: 20px;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-top: 20px;
-                    }
-                    th {
-                        background-color: #f3e8ff;
-                        padding: 12px;
-                        text-align: left;
-                        border: 1px solid #ddd;
-                        font-weight: bold;
-                    }
-                    td {
-                        padding: 10px;
-                        border: 1px solid #ddd;
-                    }
-                    tr:nth-child(even) {
-                        background-color: #f9f9f9;
-                    }
-                    .text-center {
-                        text-align: center;
-                    }
-                    .text-right {
-                        text-align: right;
-                    }
-                    @media print {
-                        body { padding: 10px; }
-                    }
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    h1 { color: #2563eb; text-align: center; margin-bottom: 10px; }
+                    .date { text-align: center; color: #666; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { background-color: #f3e8ff; padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold; }
+                    td { padding: 10px; border: 1px solid #ddd; }
+                    tr:nth-child(even) { background-color: #f9f9f9; }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    @media print { body { padding: 10px; } }
                 </style>
             </head>
             <body>
@@ -347,30 +273,23 @@ export default function Home() {
                     </tbody>
                 </table>
                 <script>
-                    window.onload = function() {
+                    window.onload = () => {
                         window.print();
-                        window.onafterprint = function() {
-                            window.close();
-                        };
+                        window.onafterprint = () => window.close();
                     };
                 </script>
             </body>
             </html>
-        `;
-
-        printWindow.document.write(htmlContent);
+        `);
         printWindow.document.close();
     };
 
     useEffect(() => {
-        // Load data on mount
         loadFromFirebase();
     }, []);
 
     useEffect(() => {
-        if (childData.length > 0) {
-            filterWineData();
-        }
+        if (childData.length > 0) filterWineData();
     }, [childData, filterWineData]);
 
     return (
@@ -390,14 +309,13 @@ export default function Home() {
 
                 {filterData.length > 0 && (
                     <>
-                        {/* Action Buttons and Status */}
                         <div className="mb-4 bg-white shadow-lg rounded-lg p-4">
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div className="flex flex-wrap items-center gap-3">
                                     <button
-                                        onClick={()=>{
+                                        onClick={() => {
                                             saveToFirebase();
-                                           setSaveAllowed(true)
+                                            setSaveAllowed(true);
                                         }}
                                         disabled={isSaving}
                                         className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
@@ -462,89 +380,47 @@ export default function Home() {
                             </div>
                         </div>
 
-                        {/* Table */}
                         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[800px]">
                                     <thead>
                                     <tr className="bg-purple-50 border-b-2 border-purple-200">
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">
-                                            Particulars
-                                        </th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
-                                            Size
-                                        </th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
-                                            Opening Stock
-                                        </th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
-                                            Receipts
-                                        </th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
-                                            Closing Stock
-                                        </th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
-                                            Sales
-                                        </th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">
-                                            Rate
-                                        </th>
-                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">
-                                            Amount
-                                        </th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">Particulars</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Size</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Opening Stock</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Receipts</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Sales</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
+                                        <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">Amount</th>
                                     </tr>
                                     </thead>
-
                                     <tbody>
                                     {filterData.map((item, index) => (
-                                        <tr
-                                            key={index}
-                                            className="border-b border-gray-200 hover:bg-purple-50 transition-colors"
-                                        >
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-800">
-                                                {item.particulars}
-                                            </td>
+                                        <tr key={index} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-800">{item.particulars}</td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                     <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
                                                         {item.size}
                                                     </span>
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    value={item.openingStock}
-                                                    className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    readOnly
-                                                />
+                                                <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" readOnly />
                                             </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">
-                                                {item.receipts}
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                <input type="number" value={item.closingStock} className="w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" readOnly />
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    value={item.closingStock}
-                                                    className="w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    readOnly
-                                                />
+                                                <span className="text-blue-600 font-semibold text-xs sm:text-sm">{item.sales}</span>
                                             </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                    <span className="text-blue-600 font-semibold text-xs sm:text-sm">
-                                                        {item.sales}
-                                                    </span>
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">
-                                                ₹{item.rate}
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-green-600">
-                                                {item.amount}
-                                            </td>
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">₹{item.rate}</td>
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-green-600">{item.amount}</td>
                                         </tr>
                                     ))}
                                     </tbody>
                                 </table>
                             </div>
-
                             <div className="sm:hidden p-2 text-center text-xs text-gray-500 bg-gray-50">
                                 ← Scroll horizontally to see all columns →
                             </div>
@@ -555,18 +431,14 @@ export default function Home() {
                 {childData.length > 0 && filterData.length === 0 && (
                     <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 sm:p-4 rounded">
                         <p className="font-bold text-sm sm:text-base">No matches found</p>
-                        <p className="text-xs sm:text-sm">
-                            No wine data matched the uploaded invoice.
-                        </p>
+                        <p className="text-xs sm:text-sm">No wine data matched the uploaded invoice.</p>
                     </div>
                 )}
 
                 {!isLoading && filterData.length === 0 && childData.length === 0 && (
                     <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-3 sm:p-4 rounded">
                         <p className="font-bold text-sm sm:text-base">Welcome!</p>
-                        <p className="text-xs sm:text-sm">
-                            Upload a PDF to start, or click "Load" to retrieve your last saved data.
-                        </p>
+                        <p className="text-xs sm:text-sm">Upload a PDF to start, or click "Load" to retrieve your last saved data.</p>
                     </div>
                 )}
             </main>
