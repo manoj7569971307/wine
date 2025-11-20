@@ -1493,22 +1493,76 @@ export default function Home() {
                 lastEditedAt: serverTimestamp()
             });
 
-            // Update the main sheet's filterData with new opening stock from closing stock
-            const updatedFilterData = filterData.map((item, index) => {
-                const editedItem = editedHistoryData.find(
-                    (edited) => edited.particulars === item.particulars && edited.size === item.size
+            // Track which items had their closing stock changed
+            const originalItems = editingHistory.items || [];
+            const changedItems = new Set<string>();
+
+            editedHistoryData.forEach((editedItem: FilteredItem) => {
+                const originalItem = originalItems.find(
+                    (orig: FilteredItem) => orig.particulars === editedItem.particulars && orig.size === editedItem.size
                 );
 
-                if (editedItem) {
-                    return {
-                        ...item,
-                        openingStock: editedItem.closingStock || 0
-                    };
+                if (originalItem) {
+                    const originalClosing = originalItem.closingStock || 0;
+                    const editedClosing = editedItem.closingStock || 0;
+
+                    // If closing stock changed, mark this item
+                    if (originalClosing !== editedClosing) {
+                        const itemKey = `${editedItem.particulars}_${editedItem.size}`;
+                        changedItems.add(itemKey);
+                    }
                 }
+            });
+
+
+            // Update the main sheet's filterData - ONLY for items with changed closing stock
+            const updatedFilterData = filterData.map((item) => {
+                const itemKey = `${item.particulars}_${item.size}`;
+
+                // Only update if this item's closing stock was changed
+                if (changedItems.has(itemKey)) {
+                    const editedItem = editedHistoryData.find(
+                        (edited) => edited.particulars === item.particulars && edited.size === item.size
+                    );
+
+                    if (editedItem) {
+                        return {
+                            ...item,
+                            openingStock: editedItem.closingStock || 0
+                        };
+                    }
+                }
+
+                // Return unchanged for items that weren't edited
                 return item;
             });
 
             setFilterData(updatedFilterData);
+
+            // Update the main collection with new opening stock values - ONLY for changed items
+            try {
+                const collectionName = getCollectionName();
+                const mainQuery = query(
+                    collection(db, collectionName),
+                    orderBy('createdAt', 'desc'),
+                    limit(1)
+                );
+                const mainSnapshot = await getDocs(mainQuery);
+
+                if (!mainSnapshot.empty) {
+                    const latestDoc = mainSnapshot.docs[0];
+                    const latestDocRef = doc(db, collectionName, latestDoc.id);
+
+                    // Update only the items field with new opening stock
+                    await updateDoc(latestDocRef, {
+                        items: updatedFilterData
+                    });
+                }
+            } catch (mainCollectionError) {
+                console.error('Error updating main collection:', mainCollectionError);
+                // Don't fail the entire operation if main collection update fails
+                setSaveMessage('History updated, but main collection update failed. Please reload and save again.');
+            }
 
             // Reload history to reflect changes
             await loadHistory();
