@@ -122,6 +122,9 @@ export default function Home() {
     const [lastSavedToDate, setLastSavedToDate] = useState('');
     const [editingHistory, setEditingHistory] = useState<any>(null);
     const [editedHistoryData, setEditedHistoryData] = useState<FilteredItem[]>([]);
+    const [editedPaymentData, setEditedPaymentData] = useState<any[]>([]);
+    const [editedAdditionalInfo, setEditedAdditionalInfo] = useState<any>({});
+    const [editedDates, setEditedDates] = useState({ from: '', to: '' });
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -1385,6 +1388,23 @@ export default function Home() {
         setEditingHistory(record);
         // Deep copy the items to avoid mutating the original
         setEditedHistoryData(JSON.parse(JSON.stringify(record.items || [])));
+        // Initialize edited payment data
+        setEditedPaymentData(JSON.parse(JSON.stringify(record.paymentData || [])));
+        // Initialize edited additional info
+        setEditedAdditionalInfo({
+            field1: record.field1 || '',
+            field2: record.field2 || '',
+            field3: record.field3 || '',
+            field4: record.field4 || '',
+            field5: record.field5 || '',
+            field6: record.field6 || '',
+            field7: record.field7 || '',
+        });
+        // Initialize edited dates
+        setEditedDates({
+            from: formatDateForInput(record.sheetFromDate || ''),
+            to: formatDateForInput(record.sheetToDate || '')
+        });
     };
 
     const handleHistoryFieldChange = (itemIndex: number, field: string, value: string) => {
@@ -1397,6 +1417,10 @@ export default function Home() {
             item.tranIn = parseInt(value) || 0;
         } else if (field === 'tranOut') {
             item.tranOut = parseInt(value) || 0;
+        } else if (field === 'openingStock') {
+            item.openingStock = parseInt(value) || 0;
+        } else if (field === 'receipts') {
+            item.receipts = parseInt(value) || 0;
         }
 
         // Recalculate sales: Sales = (Opening Stock + Receipts + Tran In) - Closing Stock - Tran Out
@@ -1410,8 +1434,49 @@ export default function Home() {
         setEditedHistoryData(updatedData);
     };
 
+    const handleEditedPaymentChange = (index: number, field: string, value: string) => {
+        const updatedPaymentData = [...editedPaymentData];
+        updatedPaymentData[index] = {
+            ...updatedPaymentData[index],
+            [field]: value
+        };
+        setEditedPaymentData(updatedPaymentData);
+    };
+
+    const handleEditedAdditionalInfoChange = (field: string, value: string) => {
+        setEditedAdditionalInfo((prev: any) => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+
+    const handleEditedDateChange = (field: 'from' | 'to', value: string) => {
+        // Value from input type="date" is already in yyyy-mm-dd format
+        setEditedDates((prev) => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+
     const saveHistoryEdits = async () => {
         if (!editingHistory || !username) return;
+
+        // Validation: Check if From Date is empty
+        if (!editedDates.from) {
+            alert('From Date cannot be empty.');
+            return;
+        }
+
+        // Validation: Check for duplicate From Date
+        const duplicateDate = historyData.find(record =>
+            record.id !== editingHistory.id &&
+            record.sheetFromDate === editedDates.from
+        );
+
+        if (duplicateDate) {
+            alert(`A sheet with From Date ${editedDates.from} already exists. Please choose a different date.`);
+            return;
+        }
 
         setIsSaving(true);
         try {
@@ -1421,6 +1486,10 @@ export default function Home() {
             // Update the history document with edited items
             await updateDoc(historyDocRef, {
                 items: editedHistoryData,
+                paymentData: editedPaymentData,
+                ...editedAdditionalInfo,
+                sheetFromDate: formatDateFromInput(editedDates.from),
+                sheetToDate: formatDateFromInput(editedDates.to),
                 lastEditedAt: serverTimestamp()
             });
 
@@ -1464,6 +1533,9 @@ export default function Home() {
     const cancelHistoryEdit = () => {
         setEditingHistory(null);
         setEditedHistoryData([]);
+        setEditedPaymentData([]);
+        setEditedAdditionalInfo({});
+        setEditedDates({ from: '', to: '' });
     };
 
 
@@ -2518,8 +2590,30 @@ export default function Home() {
                                                 <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
                                                     <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
                                                     <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
-                                                    <td className="px-4 py-3 text-center text-sm text-gray-900">{item.openingStock}</td>
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                                    <td className="px-4 py-3 text-center text-sm text-gray-900">
+                                                        {editingHistory ? (
+                                                            <input
+                                                                type="number"
+                                                                value={item.openingStock || 0}
+                                                                onChange={(e) => handleHistoryFieldChange(i, 'openingStock', e.target.value)}
+                                                                className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                            />
+                                                        ) : (
+                                                            item.openingStock
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">
+                                                        {editingHistory ? (
+                                                            <input
+                                                                type="number"
+                                                                value={item.receipts || 0}
+                                                                onChange={(e) => handleHistoryFieldChange(i, 'receipts', e.target.value)}
+                                                                className="w-20 px-2 py-1 border border-blue-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                                            />
+                                                        ) : (
+                                                            item.receipts
+                                                        )}
+                                                    </td>
 
                                                     {/* Tran In - Editable in edit mode */}
                                                     <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
@@ -2528,7 +2622,7 @@ export default function Home() {
                                                                 type="number"
                                                                 value={item.tranIn || 0}
                                                                 onChange={(e) => handleHistoryFieldChange(i, 'tranIn', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                                className="w-20 px-2 py-1 border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900"
                                                             />
                                                         ) : (
                                                             item.tranIn
@@ -2542,7 +2636,7 @@ export default function Home() {
                                                                 type="number"
                                                                 value={item.tranOut || 0}
                                                                 onChange={(e) => handleHistoryFieldChange(i, 'tranOut', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-purple-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                                className="w-20 px-2 py-1 border border-purple-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
                                                             />
                                                         ) : (
                                                             item.tranOut
@@ -2556,7 +2650,7 @@ export default function Home() {
                                                                 type="number"
                                                                 value={item.closingStock || 0}
                                                                 onChange={(e) => handleHistoryFieldChange(i, 'closingStock', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-green-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                                className="w-20 px-2 py-1 border border-green-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
                                                             />
                                                         ) : (
                                                             item.closingStock
@@ -2574,7 +2668,7 @@ export default function Home() {
                             </div>
 
                             {/* Sheet Period Information in History */}
-                            {(selectedHistory.sheetFromDate || selectedHistory.sheetToDate) && (
+                            {(selectedHistory.sheetFromDate || selectedHistory.sheetToDate || editingHistory) && (
                                 <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Sheet Period</h3>
                                     <div className="overflow-hidden">
@@ -2582,11 +2676,33 @@ export default function Home() {
                                             <tbody>
                                                 <tr className="border-b border-gray-200">
                                                     <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">From Date</td>
-                                                    <td className="py-2 px-3 text-sm text-gray-900">{selectedHistory.sheetFromDate || 'Not specified'}</td>
+                                                    <td className="py-2 px-3 text-sm text-gray-900">
+                                                        {editingHistory ? (
+                                                            <input
+                                                                type="date"
+                                                                value={editedDates.from}
+                                                                onChange={(e) => handleEditedDateChange('from', e.target.value)}
+                                                                className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                            />
+                                                        ) : (
+                                                            selectedHistory.sheetFromDate || 'Not specified'
+                                                        )}
+                                                    </td>
                                                 </tr>
                                                 <tr className="border-b border-gray-200">
                                                     <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">To Date</td>
-                                                    <td className="py-2 px-3 text-sm text-gray-900">{selectedHistory.sheetToDate || 'Not specified'}</td>
+                                                    <td className="py-2 px-3 text-sm text-gray-900">
+                                                        {editingHistory ? (
+                                                            <input
+                                                                type="date"
+                                                                value={editedDates.to}
+                                                                onChange={(e) => handleEditedDateChange('to', e.target.value)}
+                                                                className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                            />
+                                                        ) : (
+                                                            selectedHistory.sheetToDate || 'Not specified'
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -2595,18 +2711,44 @@ export default function Home() {
                             )}
 
                             {/* Additional Information in History */}
-                            {(selectedHistory.field1 || selectedHistory.field2 || selectedHistory.field3 || selectedHistory.field4 || selectedHistory.field5 || selectedHistory.field6 || consolidatedData) && (
+                            {(selectedHistory.field1 || selectedHistory.field2 || selectedHistory.field3 || selectedHistory.field4 || selectedHistory.field5 || selectedHistory.field6 || consolidatedData || editingHistory) && (
                                 <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h3>
                                     <div className="overflow-hidden">
                                         <table className="w-full border-collapse border border-gray-300">
                                             <tbody>
-                                                {([['Total Sale', selectedHistory.field1], ['Opening Balance', selectedHistory.field2], ['Total', selectedHistory.field3], ['Jama', selectedHistory.field4], ['Total', selectedHistory.field5], ['Expenses', selectedHistory.field6], ['Closing Balance', selectedHistory.field7 || calcBalance(selectedHistory.field1, selectedHistory.field2, selectedHistory.field4, selectedHistory.field6)]] as [string, string | undefined][]).map(([label, value]) => (
-                                                    <tr key={label} className="border-b border-gray-200">
-                                                        <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">{label as string}</td>
-                                                        <td className="py-2 px-3 text-sm text-gray-900">{value || '0'}</td>
-                                                    </tr>
-                                                ))}
+                                                {editingHistory ? (
+                                                    // Edit Mode for Additional Info
+                                                    [
+                                                        ['Total Sale', 'field1'],
+                                                        ['Opening Balance', 'field2'],
+                                                        ['Total', 'field3'],
+                                                        ['Jama', 'field4'],
+                                                        ['Total', 'field5'],
+                                                        ['Expenses', 'field6'],
+                                                        ['Closing Balance', 'field7']
+                                                    ].map(([label, field]) => (
+                                                        <tr key={field} className="border-b border-gray-200">
+                                                            <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">{label}</td>
+                                                            <td className="py-2 px-3">
+                                                                <input
+                                                                    type="text"
+                                                                    value={editedAdditionalInfo[field] || ''}
+                                                                    onChange={(e) => handleEditedAdditionalInfoChange(field, e.target.value)}
+                                                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                                />
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    // View Mode for Additional Info
+                                                    ([['Total Sale', selectedHistory.field1], ['Opening Balance', selectedHistory.field2], ['Total', selectedHistory.field3], ['Jama', selectedHistory.field4], ['Total', selectedHistory.field5], ['Expenses', selectedHistory.field6], ['Closing Balance', selectedHistory.field7 || calcBalance(selectedHistory.field1, selectedHistory.field2, selectedHistory.field4, selectedHistory.field6)]] as [string, string | undefined][]).map(([label, value]) => (
+                                                        <tr key={label} className="border-b border-gray-200">
+                                                            <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">{label as string}</td>
+                                                            <td className="py-2 px-3 text-sm text-gray-900">{value || '0'}</td>
+                                                        </tr>
+                                                    ))
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
@@ -2628,35 +2770,124 @@ export default function Home() {
                                                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Cash</th>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Amount</th>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Comments</th>
+                                                {editingHistory && <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border border-gray-300">Action</th>}
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 ? (
-                                                selectedHistory.paymentData.map((p: any, i: number) => (
+                                            {editingHistory ? (
+                                                // Edit Mode for Payment Info
+                                                editedPaymentData.map((p: any, i: number) => (
                                                     <tr key={i} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.date}</td>
-                                                        {consolidatedData && <td className="px-4 py-3 text-sm border border-gray-300 text-gray-500">{p.recordDate}</td>}
-                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.phonepe}</td>
-                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.cash}</td>
-                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.amount}</td>
-                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.comments}</td>
+                                                        <td className="px-4 py-3 border border-gray-300">
+                                                            <input
+                                                                type="date"
+                                                                value={formatDateForInput(p.date || '')}
+                                                                onChange={(e) => handleEditedPaymentChange(i, 'date', formatDateFromInput(e.target.value))}
+                                                                className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                            />
+                                                        </td>
+                                                        {consolidatedData && <td className="px-4 py-3 border border-gray-300 text-gray-500">-</td>}
+                                                        <td className="px-4 py-3 border border-gray-300">
+                                                            <input
+                                                                type="number"
+                                                                value={p.phonepe || ''}
+                                                                onChange={(e) => handleEditedPaymentChange(i, 'phonepe', e.target.value)}
+                                                                className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                                placeholder="PhonePe"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 border border-gray-300">
+                                                            <input
+                                                                type="number"
+                                                                value={p.cash || ''}
+                                                                onChange={(e) => handleEditedPaymentChange(i, 'cash', e.target.value)}
+                                                                className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                                placeholder="Cash"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 border border-gray-300">
+                                                            <input
+                                                                type="number"
+                                                                value={p.amount || ''}
+                                                                onChange={(e) => handleEditedPaymentChange(i, 'amount', e.target.value)}
+                                                                className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                                placeholder="Amount"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 border border-gray-300">
+                                                            <input
+                                                                type="text"
+                                                                value={p.comments || ''}
+                                                                onChange={(e) => handleEditedPaymentChange(i, 'comments', e.target.value)}
+                                                                className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                                placeholder="Comments"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 border border-gray-300 text-center">
+                                                            <button
+                                                                onClick={() => {
+                                                                    const newData = editedPaymentData.filter((_, idx) => idx !== i);
+                                                                    setEditedPaymentData(newData);
+                                                                }}
+                                                                className="text-red-600 hover:text-red-800 text-sm"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ))
                                             ) : (
+                                                // View Mode for Payment Info
+                                                selectedHistory.paymentData && selectedHistory.paymentData.length > 0 ? (
+                                                    selectedHistory.paymentData.map((p: any, i: number) => (
+                                                        <tr key={i} className="hover:bg-gray-50">
+                                                            <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.date}</td>
+                                                            {consolidatedData && <td className="px-4 py-3 text-sm border border-gray-300 text-gray-500">{p.recordDate}</td>}
+                                                            <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.phonepe}</td>
+                                                            <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.cash}</td>
+                                                            <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.amount}</td>
+                                                            <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.comments}</td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={consolidatedData ? 6 : 5} className="px-4 py-8 text-center text-gray-500 border border-gray-300">
+                                                            No payment information available
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            )}
+
+                                            {/* Add Row Button in Edit Mode */}
+                                            {editingHistory && (
                                                 <tr>
-                                                    <td colSpan={consolidatedData ? 6 : 5} className="px-4 py-8 text-center text-gray-500 border border-gray-300">
-                                                        No payment information available
+                                                    <td colSpan={7} className="px-4 py-2 border border-gray-300">
+                                                        <button
+                                                            onClick={() => setEditedPaymentData([...editedPaymentData, { phonepe: '', cash: '', amount: '', comments: '', date: '' }])}
+                                                            className="text-sm text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-1"
+                                                        >
+                                                            + Add Payment Row
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             )}
-                                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && (
+
+                                            {/* Totals Row */}
+                                            {(editingHistory ? editedPaymentData : selectedHistory.paymentData) && (editingHistory ? editedPaymentData : selectedHistory.paymentData).length > 0 && (
                                                 <tr className="bg-gray-100 font-semibold">
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">TOTAL</td>
                                                     {consolidatedData && <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">-</td>}
-                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.phonepe) || 0), 0) || 0}</td>
-                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.cash) || 0), 0) || 0}</td>
-                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0) || 0}</td>
+                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">
+                                                        {(editingHistory ? editedPaymentData : selectedHistory.paymentData)?.reduce((sum: number, p: any) => sum + (parseFloat(p.phonepe) || 0), 0) || 0}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">
+                                                        {(editingHistory ? editedPaymentData : selectedHistory.paymentData)?.reduce((sum: number, p: any) => sum + (parseFloat(p.cash) || 0), 0) || 0}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">
+                                                        {(editingHistory ? editedPaymentData : selectedHistory.paymentData)?.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0) || 0}
+                                                    </td>
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">-</td>
+                                                    {editingHistory && <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">-</td>}
                                                 </tr>
                                             )}
                                         </tbody>
