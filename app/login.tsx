@@ -38,12 +38,11 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 isValid = true;
             }
         } else if (selectedRole === 'shopowner') {
-            // Shop owner credentials (3 unique shop owners)
-            const shopOwners = [
-                { username: 'shop1', password: 'shop_1' },
-                { username: 'shop2', password: 'shop_2' },
-                { username: 'shop3', password: 'shop_3' }
-            ];
+            // Shop owner credentials (30 shops)
+            const shopOwners = Array.from({ length: 30 }, (_, i) => ({
+                username: `shop${i + 1}`,
+                password: `shop_${i + 1}`
+            }));
 
             isValid = shopOwners.some(
                 owner => owner.username === username && owner.password === password

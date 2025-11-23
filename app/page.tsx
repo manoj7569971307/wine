@@ -262,18 +262,11 @@ export default function Home() {
             const tranIn = Number(item.tranIn) || 0;
             const tranOut = Number(item.tranOut) || 0;
             const rate = Number(item.rate) || 0;
-
-            // Total column = openingStock + receipts + tranIn - tranOut
             const totalColumn = openingStock + receipts + tranIn - tranOut;
             if (newValue > totalColumn) return prevData;
-
-            // Update closing stock
             item.closingStock = newValue;
             item.sales = openingStock + receipts + tranIn - newValue - tranOut;
-            // Calculate amount = sales * rate (not closing stock * rate)
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
-
-            // Auto-save to Firebase after state update
             setTimeout(() => autoSaveToFirebase(newData), 100);
 
             return newData;
@@ -288,18 +281,12 @@ export default function Home() {
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-
-            // Update tran in
             item.tranIn = newValue;
-
-            // Ensure all values are numbers
             const openingStock = Number(item.openingStock) || 0;
             const receipts = Number(item.receipts) || 0;
             const tranOut = Number(item.tranOut) || 0;
             const closingStock = Number(item.closingStock) || 0;
             const rate = Number(item.rate) || 0;
-
-            // Recalculate sales
             item.sales = openingStock + receipts + newValue - closingStock - tranOut;
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
 
@@ -307,7 +294,6 @@ export default function Home() {
         });
     };
 
-    // Handle tran out change
     const handleTranOutChange = (index: number, value: string) => {
         if (!isLatestSheet) return;
 
@@ -317,19 +303,13 @@ export default function Home() {
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-
-            // Ensure all values are numbers
             const openingStock = Number(item.openingStock) || 0;
             const receipts = Number(item.receipts) || 0;
             const tranIn = Number(item.tranIn) || 0;
             const closingStock = Number(item.closingStock) || 0;
             const rate = Number(item.rate) || 0;
-
-            // Don't allow tran out to exceed available stock
             const availableForTranOut = openingStock + receipts + tranIn;
             if (newValue > availableForTranOut) return prevData;
-
-            // Update tran out
             item.tranOut = newValue;
             item.sales = openingStock + receipts + tranIn - closingStock - newValue;
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
@@ -338,7 +318,6 @@ export default function Home() {
         });
     };
 
-    // Get collection name based on user
     const getCollectionName = () => {
         if (userRole === 'Admin') {
             return selectedShop === 'admin' ? 'invoices_admin' : `invoices_${selectedShop}`;
@@ -347,7 +326,6 @@ export default function Home() {
         }
     };
 
-    // Get history collection name
     const getHistoryCollectionName = () => {
         if (userRole === 'Admin') {
             return selectedShop === 'admin' ? 'history_admin' : `history_${selectedShop}`;
@@ -539,11 +517,6 @@ export default function Home() {
             const collectionName = getCollectionName();
             const historyCollectionName = getHistoryCollectionName();
             const saveDate = new Date().toISOString();
-
-            console.log('Saving to collection:', collectionName);
-            console.log('Data to save:', { itemCount: filterData.length, user: username, role: userRole });
-
-            // Always save to history collection with invoice name or closing stock status
             await addDoc(collection(db, historyCollectionName), {
                 items: filterData,
                 timestamp: serverTimestamp(),
@@ -580,7 +553,6 @@ export default function Home() {
                         amount: '₹0',
                     };
                 } else {
-                    // If no closing stock, add receipts to opening stock
                     return {
                         ...item,
                         openingStock: hasClosingStock ? item.openingStock + item.receipts : item.openingStock,
@@ -593,8 +565,6 @@ export default function Home() {
                     };
                 }
             });
-
-            // Save updated data to main collection (latest state) - without payment data
             const docData = {
                 items: updatedData,
                 timestamp: serverTimestamp(),
@@ -614,24 +584,15 @@ export default function Home() {
             };
 
             await addDoc(collection(db, collectionName), docData);
-
-            // Update local state with new data
             setFilterData(updatedData);
-
-            console.log('Document saved successfully');
-
             setSaveStatus('success');
             setSaveMessage(`Successfully saved ${filterData.length} items`);
             setSaveAllowed(false);
-            setInvoiceName(''); // Reset invoice name
-
-            // Store closing balance as opening balance for next day
+            setInvoiceName('');
             const currentClosingBalance = field7Value;
             setField2(currentClosingBalance);
             setField4(''); // Clear Jama
-            setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]); // Clear payment data
-
-            // Auto-set next sheet's from date to day after current to date
+            setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
             if (sheetToDate) {
                 const parts = sheetToDate.split('/');
                 if (parts.length === 3) {
@@ -643,8 +604,6 @@ export default function Home() {
                 setSheetToDate(''); // Clear to date for next sheet
             }
         } catch (error) {
-            console.error('Error saving to Firebase:', error);
-            console.error('Error details:', error);
             setSaveStatus('error');
             setSaveMessage(`Failed to save: ${error}`);
         } finally {
@@ -653,399 +612,7 @@ export default function Home() {
         }
     };
 
-    const downloadExcel = () => {
-        if (filterData.length === 0) return;
-
-        const data: any[] = filterData.map(item => ({
-            'Particulars': item.particulars,
-            'Size': item.size,
-            'Opening Stock': item.openingStock,
-            'Receipts': item.receipts,
-            'Tran In': item.tranIn,
-            'Tran Out': item.tranOut,
-            'Total': (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0),
-            'Closing Stock': item.closingStock,
-            'Sales': item.sales,
-            'Rate': item.rate,
-            'Amount': item.amount,
-        }));
-
-        data.push({
-            'Particulars': 'TOTAL',
-            'Size': '-',
-            'Opening Stock': filterData.reduce((sum, item) => sum + item.openingStock, 0),
-            'Receipts': filterData.reduce((sum, item) => sum + item.receipts, 0),
-            'Tran In': filterData.reduce((sum, item) => sum + item.tranIn, 0),
-            'Tran Out': filterData.reduce((sum, item) => sum + item.tranOut, 0),
-            'Total': filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0),
-            'Closing Stock': filterData.reduce((sum, item) => sum + item.closingStock, 0),
-            'Sales': filterData.reduce((sum, item) => sum + item.sales, 0),
-            'Rate': '-',
-            'Amount': `₹${filterData.reduce((sum, item) => {
-                const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
-                return sum + amount;
-            }, 0).toLocaleString()}`,
-        });
-
-        data.push({
-            'Particulars': 'CLOSING STOCK TOTAL AMOUNT',
-            'Size': '',
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': `₹${filterData.reduce((sum, item) => sum + (item.closingStock * item.rate), 0).toLocaleString()}`,
-        });
-
-        data.push({});
-        data.push({
-            'Particulars': 'Total Sale',
-            'Size': field1Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-        });
-
-        data.push({
-            'Particulars': 'Opening Balance',
-            'Size': field2,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Total',
-            'Size': field3Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Jama',
-            'Size': field4,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Total',
-            'Size': field5Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Expenses',
-            'Size': field6Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Closing Balance',
-            'Size': field7Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        } as any);
-
-        data.push({});
-        data.push({
-            'Particulars': 'PAYMENT INFORMATION',
-            'Size': '',
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        paymentData.forEach((payment, index) => {
-            data.push({
-                'Particulars': `Payment ${index + 1}`,
-                'Size': `Date: ${payment.date}`,
-                'Opening Stock': `PhonePe: ${payment.phonepe}`,
-                'Receipts': `Cash: ${payment.cash}`,
-                'Tran In': `Amount: ${payment.amount}`,
-                'Tran Out': `Comments: ${payment.comments}`,
-                'Closing Stock': '',
-                'Sales': '',
-                'Rate': '',
-                'Amount': '',
-            });
-        });
-
-        // Add sheet period information if available
-        if (sheetFromDate || sheetToDate) {
-            data.push({});
-            data.push({
-                'Particulars': 'SHEET PERIOD',
-                'Size': `From: ${sheetFromDate || 'N/A'} To: ${sheetToDate || 'N/A'}`,
-                'Opening Stock': '',
-                'Receipts': '',
-                'Tran In': '',
-                'Tran Out': '',
-                'Closing Stock': '',
-                'Sales': '',
-                'Rate': '',
-                'Amount': '',
-                'Brand Number': '',
-                'Issue Price': '',
-            });
-        }
-
-        const worksheet = XLSX.utils.json_to_sheet(data);
-
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Wine Invoice');
-        const filename = sheetFromDate && sheetToDate ?
-            `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}.xlsx` :
-            `wine-invoice-${username}-${new Date().toISOString().split('T')[0]}.xlsx`;
-        XLSX.writeFile(workbook, filename);
-    };
-
-    const downloadPDF = () => {
-        if (filterData.length === 0) return;
-
-        const date = new Date().toLocaleDateString();
-        const filename = sheetFromDate && sheetToDate ?
-            `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}` :
-            `wine-invoice-${username}-${date.replace(/\//g, '-')}`;
-
-        const htmlContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Wine Invoice - ${username} - ${date}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; }
-                    h1 { color: #2563eb; text-align: center; margin-bottom: 10px; }
-                    .date { text-align: center; color: #666; margin-bottom: 20px; }
-                    .user-info { text-align: center; color: #666; margin-bottom: 20px; font-weight: bold; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                    th { background-color: #f3e8ff; padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold; }
-                    td { padding: 10px; border: 1px solid #ddd; }
-                    tr:nth-child(even) { background-color: #f9f9f9; }
-                    .text-center { text-align: center; }
-                    .text-right { text-align: right; }
-                    @media print { body { padding: 10px; } }
-                </style>
-            </head>
-            <body>
-                <h1>Wine Invoice Tracker</h1>
-                <div class="user-info">${userRole}: ${username}</div>
-                <div class="date">Generated on: ${date}</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Particulars</th>
-                            <th class="text-center">Size</th>
-                            <th class="text-center">Opening Stock</th>
-                            <th class="text-center">Receipts</th>
-                            <th class="text-center">Tran In</th>
-                            <th class="text-center">Tran Out</th>
-                            <th class="text-center">Total</th>
-                            <th class="text-center">Closing Stock</th>
-                            <th class="text-center">Sales</th>
-                            <th class="text-center">Rate</th>
-                            <th class="text-right">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${filterData.map(item => `
-                            <tr>
-                                <td>${item.particulars}</td>
-                                <td class="text-center">${item.size}</td>
-                                <td class="text-center">${item.openingStock || 0}</td>
-                                <td class="text-center">${item.receipts || 0}</td>
-                                <td class="text-center">${item.tranIn || 0}</td>
-                                <td class="text-center">${item.tranOut || 0}</td>
-                                <td class="text-center">${(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}</td>
-                                <td class="text-center">${item.closingStock || 0}</td>
-                                <td class="text-center">${item.sales || 0}</td>
-                                <td class="text-center">₹${item.rate}</td>
-                                <td class="text-right">${item.amount}</td>
-                            </tr>
-                        `).join('')}
-                        <tr style="background-color: #f3f4f6; border-top: 2px solid #d1d5db; font-weight: bold;">
-                            <td>TOTAL</td>
-                            <td class="text-center">-</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.openingStock, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.receipts, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.tranIn, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.tranOut, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.closingStock, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.sales, 0)}</td>
-                            <td class="text-center">-</td>
-                            <td class="text-right">₹${filterData.reduce((sum, item) => {
-            const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
-            return sum + amount;
-        }, 0).toLocaleString()}</td>
-                        </tr>
-                        <tr style="background-color: #eff6ff; font-weight: bold;">
-                            <td colspan="10">CLOSING STOCK TOTAL AMOUNT</td>
-                            <td class="text-right">₹${filterData.reduce((sum, item) => {
-            return sum + (item.closingStock * item.rate);
-        }, 0).toLocaleString()}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                
-                ${(sheetFromDate || sheetToDate) ? `
-                    <div style="margin-top: 30px;">
-                        <h3 style="color: #2563eb; margin-bottom: 15px;">Sheet Period</h3>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">From Date</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${sheetFromDate || 'Not specified'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">To Date</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${sheetToDate || 'Not specified'}</td>
-                            </tr>
-                        </table>
-                    </div>
-                ` : ''}
-                
-                <div style="margin-top: 30px;">
-                    <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total Sale</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field1Value}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Opening Balance</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field2}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field3Value}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Jama</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field4}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field5Value}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Expenses</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field6Value}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Closing Balance</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field7Value}</td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <div style="margin-top: 30px;">
-                    <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr style="background-color: #f3e8ff;">
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Date</th>
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">PhonePe</th>
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Cash</th>
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Amount</th>
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Comments</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${paymentData.map(payment => `
-                                <tr>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                <script>
-                    window.onload = () => {
-                        window.print();
-                        window.onafterprint = () => window.close();
-                    };
-                </script>
-            </body>
-            </html>
-        `;
-
-        const printWindow = window.open('', '', 'height=800,width=1000');
-        if (!printWindow) return;
-
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-    };
-
     const handleLoginSuccess = (role: string, user: string) => {
-        console.log('Login success - Role:', role, 'User:', user);
         setIsLoggedIn(true);
         setUserRole(role);
         setUsername(user);
@@ -1069,10 +636,8 @@ export default function Home() {
         try {
             const collections = await getDocs(query(collection(db, 'invoices_admin')));
             const shops = new Set<string>();
-
-            // Get all collection names that start with 'invoices_'
             const allCollections = [
-                'shop1', 'shop2', 'shop3', 'shop4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
+                'shop1', 'shop2', 'shop3', 'shop4', 'shop_4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
                 'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
                 'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
                 'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
@@ -1082,7 +647,7 @@ export default function Home() {
             console.error('Error loading shops:', error);
             // Fallback to predefined shops
             setAvailableShops([
-                'shop1', 'shop2', 'shop3', 'shop4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
+                'shop1', 'shop2', 'shop3', 'shop4', 'shop_4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
                 'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
                 'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
                 'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
