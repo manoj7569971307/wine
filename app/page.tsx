@@ -127,6 +127,7 @@ export default function Home() {
     const [editedDates, setEditedDates] = useState({ from: '', to: '' });
     const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+    const [showClosingStockView, setShowClosingStockView] = useState(false);
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -1479,6 +1480,11 @@ export default function Home() {
         setSelectedHistory(record);
     };
 
+    const viewClosingStock = (record: any) => {
+        setSelectedHistory(record);
+        setShowClosingStockView(true);
+    };
+
     const closeHistorySheet = () => {
         // Clear any pending auto-save
         if (autoSaveTimeout) {
@@ -1494,6 +1500,7 @@ export default function Home() {
         setEditedPaymentData([]);
         setEditedAdditionalInfo({});
         setEditedDates({ from: '', to: '' });
+        setShowClosingStockView(false);
     };
 
     const startEditHistory = (record: any) => {
@@ -2688,11 +2695,24 @@ export default function Home() {
                                                                 {/*        Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}*/}
                                                                 {/*    </p>*/}
                                                                 {/*)}*/}
-                                                                {record.hasClosingStock && (
-                                                                    <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
-                                                                        Closing Stock Entered
-                                                                    </span>
-                                                                )}
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    {record.hasClosingStock && (
+                                                                        <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+                                                                            Closing Stock Entered
+                                                                        </span>
+                                                                    )}
+                                                                    {record.hasClosingStock && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                viewClosingStock(record);
+                                                                            }}
+                                                                            className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                                                                        >
+                                                                            Closing Stock
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             {canEdit && (
                                                                 <button
@@ -2733,10 +2753,11 @@ export default function Home() {
             {selectedHistory && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                        <div className={`${editingHistory ? 'bg-purple-600' : 'bg-blue-600'} text-white p-4 flex justify-between items-center`}>
+                        <div className={`${editingHistory ? 'bg-purple-600' : showClosingStockView ? 'bg-green-600' : 'bg-blue-600'} text-white p-4 flex justify-between items-center`}>
                             <div>
                                 <h2 className="text-xl font-bold">
                                     {editingHistory && <span className="mr-2">✏️ Editing:</span>}
+                                    {showClosingStockView && <span className="mr-2">📦 Closing Stock:</span>}
                                     {consolidatedData ?
                                         `Consolidated: ${consolidatedData.startDate} to ${consolidatedData.endDate}` :
                                         new Date(selectedHistory.savedAt).toLocaleDateString('en-US', {
@@ -2824,95 +2845,111 @@ export default function Home() {
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead>
-                                            <tr className="bg-purple-50 border-b-2 border-purple-200">
+                                            <tr className={`${showClosingStockView ? 'bg-green-50 border-b-2 border-green-200' : 'bg-purple-50 border-b-2 border-purple-200'}`}>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
-                                                {['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
-                                                    <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
-                                                ))}
+                                                {showClosingStockView ? 
+                                                    ['Size', 'Closing Stock', 'Rate'].map((h, i) => (
+                                                        <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 2 ? 'text-right' : 'text-center'}`}>{h}</th>
+                                                    )) :
+                                                    ['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
+                                                        <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
+                                                    ))
+                                                }
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {(editingHistory ? editedHistoryData : selectedHistory.items).map((item: FilteredItem, i: number) => (
-                                                <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
+                                                <tr key={i} className={`border-b border-gray-200 ${showClosingStockView ? 'hover:bg-green-50' : 'hover:bg-purple-50'}`}>
                                                     <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
-                                                    <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
-                                                    <td className="px-4 py-3 text-center text-sm text-gray-900">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.openingStock || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'openingStock', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
-                                                                min="0"
-                                                            />
-                                                        ) : (
-                                                            item.openingStock
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.receipts || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'receipts', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-blue-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                                                                min="0"
-                                                            />
-                                                        ) : (
-                                                            item.receipts
-                                                        )}
-                                                    </td>
+                                                    <td className="px-4 py-3 text-center text-sm"><span className={`px-2 py-1 text-xs rounded-full ${showClosingStockView ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>{item.size}</span></td>
+                                                    {showClosingStockView ? (
+                                                        // Closing Stock View - Only show closing stock and rate
+                                                        <>
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
+                                                            <td className="px-4 py-3 text-right text-sm text-gray-900">₹{item.rate}</td>
+                                                        </>
+                                                    ) : (
+                                                        // Full View - Show all columns
+                                                        <>
+                                                            <td className="px-4 py-3 text-center text-sm text-gray-900">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.openingStock || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'openingStock', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                                        min="0"
+                                                                    />
+                                                                ) : (
+                                                                    item.openingStock
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.receipts || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'receipts', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-blue-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                                                        min="0"
+                                                                    />
+                                                                ) : (
+                                                                    item.receipts
+                                                                )}
+                                                            </td>
 
-                                                    {/* Tran In - Editable in edit mode */}
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.tranIn || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'tranIn', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900"
-                                                                min="0"
-                                                            />
-                                                        ) : (
-                                                            item.tranIn
-                                                        )}
-                                                    </td>
+                                                            {/* Tran In - Editable in edit mode */}
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.tranIn || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'tranIn', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900"
+                                                                        min="0"
+                                                                    />
+                                                                ) : (
+                                                                    item.tranIn
+                                                                )}
+                                                            </td>
 
-                                                    {/* Tran Out - Editable in edit mode */}
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.tranOut || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'tranOut', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-purple-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
-                                                                min="0"
-                                                                max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}
-                                                            />
-                                                        ) : (
-                                                            item.tranOut
-                                                        )}
-                                                    </td>
+                                                            {/* Tran Out - Editable in edit mode */}
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.tranOut || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'tranOut', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-purple-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                                        min="0"
+                                                                        max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}
+                                                                    />
+                                                                ) : (
+                                                                    item.tranOut
+                                                                )}
+                                                            </td>
 
-                                                    {/* Closing Stock - Editable in edit mode */}
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.closingStock || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'closingStock', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-green-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
-                                                                min="0"
-                                                                max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
-                                                            />
-                                                        ) : (
-                                                            item.closingStock
-                                                        )}
-                                                    </td>
+                                                            {/* Closing Stock - Editable in edit mode */}
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.closingStock || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'closingStock', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-green-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                                                                        min="0"
+                                                                        max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
+                                                                    />
+                                                                ) : (
+                                                                    item.closingStock
+                                                                )}
+                                                            </td>
 
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
-                                                    <td className="px-4 py-3 text-center text-sm text-gray-900">₹{item.rate}</td>
-                                                    <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
+                                                            <td className="px-4 py-3 text-center text-sm text-gray-900">₹{item.rate}</td>
+                                                            <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
+                                                        </>
+                                                    )}
                                                 </tr>
                                             ))}
                                         </tbody>
