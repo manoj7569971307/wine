@@ -2794,46 +2794,47 @@ export default function Home() {
                                     )}
                                 </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center">
                                 {editingHistory ? (
                                     <>
                                         <button
                                             onClick={saveHistoryEdits}
                                             disabled={isSaving}
-                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400"
+                                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400 text-sm"
                                         >
                                             <Save className="w-4 h-4" />
-                                            {isSaving ? 'Saving...' : 'Save'}
+                                            <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
                                         </button>
                                         <button
                                             onClick={cancelHistoryEdit}
                                             disabled={isSaving}
-                                            className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400"
+                                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400 text-sm"
                                         >
-                                            Cancel
+                                            <span className="hidden sm:inline">Cancel</span>
+                                            <span className="sm:hidden">✕</span>
                                         </button>
                                     </>
                                 ) : (
                                     <>
                                         <button
                                             onClick={() => downloadHistoryExcel(selectedHistory)}
-                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition text-sm"
                                         >
                                             <FileSpreadsheet className="w-4 h-4" />
-                                            Excel
+                                            <span className="hidden sm:inline">Excel</span>
                                         </button>
                                         <button
                                             onClick={() => downloadHistoryPDF(selectedHistory)}
-                                            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition"
+                                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition text-sm"
                                         >
                                             <FileText className="w-4 h-4" />
-                                            PDF
+                                            <span className="hidden sm:inline">PDF</span>
                                         </button>
                                     </>
                                 )}
                                 <button
                                     onClick={closeHistorySheet}
-                                    className="text-white hover:bg-blue-700 rounded-full p-2 transition"
+                                    className="text-white hover:bg-blue-700 hover:bg-opacity-20 rounded-full p-2 transition min-w-[40px] min-h-[40px] flex items-center justify-center"
                                 >
                                     ✕
                                 </button>
