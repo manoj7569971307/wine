@@ -128,6 +128,7 @@ export default function Home() {
     const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [showClosingStockView, setShowClosingStockView] = useState(false);
+    const [originalClosingStocks, setOriginalClosingStocks] = useState<{[key: string]: number}>({});
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -1065,6 +1066,7 @@ export default function Home() {
         setEditedPaymentData([]);
         setEditedAdditionalInfo({});
         setEditedDates({ from: '', to: '' });
+        setOriginalClosingStocks({});
         setShowClosingStockView(false);
     };
 
@@ -1089,6 +1091,15 @@ export default function Home() {
             from: formatDateForInput(record.sheetFromDate || ''),
             to: formatDateForInput(record.sheetToDate || '')
         });
+        // Store original closing stocks for comparison
+        const originalStocks: {[key: string]: number} = {};
+        if (record.items) {
+            record.items.forEach((item: FilteredItem, index: number) => {
+                const key = `${item.particulars}_${item.rate}`;
+                originalStocks[key] = item.closingStock || 0;
+            });
+        }
+        setOriginalClosingStocks(originalStocks);
     };
 
     const handleHistoryFieldChange = (itemIndex: number, field: string, value: string) => {
@@ -1242,13 +1253,7 @@ export default function Home() {
                 lastEditedAt: serverTimestamp()
             });
 
-            // Update the main sheet's opening balance based on closing balance
-            const closingBalance = parseFloat(editedAdditionalInfo.field7 || '0');
-            
-            // Update opening balance (field2) with closing balance from edited sheet
-            setField2(closingBalance.toString());
-
-            // Update the main collection with new opening balance
+            // Update main sheet based on closing stock changes
             try {
                 const collectionName = getCollectionName();
                 const mainQuery = query(
@@ -1261,22 +1266,55 @@ export default function Home() {
                 if (!mainSnapshot.empty) {
                     const latestDoc = mainSnapshot.docs[0];
                     const latestDocRef = doc(db, collectionName, latestDoc.id);
+                    const currentMainData = latestDoc.data();
+                    
+                    // Update main sheet items based on closing stock changes
+                    const updatedMainItems = [...(currentMainData.items || [])];
+                    let hasChanges = false;
 
-                    // Calculate new field values with updated opening balance
-                    const currentField1 = parseFloat(field1Value || '0');
-                    const newField3 = currentField1 + closingBalance;
-                    const currentField4 = parseFloat(field4 || '0');
-                    const newField5 = newField3 + currentField4;
-                    const currentField6 = parseFloat(field6Value || '0');
-                    const newField7 = Math.abs(newField5 - currentField6);
-
-                    // Update opening balance in main sheet
-                    await updateDoc(latestDocRef, {
-                        field2: closingBalance.toString(),
-                        field3: newField3.toString(),
-                        field5: newField5.toString(),
-                        field7: newField7.toString()
+                    editedHistoryData.forEach((editedItem: FilteredItem) => {
+                        const key = `${editedItem.particulars}_${editedItem.rate}`;
+                        const originalClosingStock = originalClosingStocks[key] || 0;
+                        const newClosingStock = editedItem.closingStock || 0;
+                        
+                        // Only update if closing stock actually changed
+                        if (originalClosingStock !== newClosingStock) {
+                            const mainItemIndex = updatedMainItems.findIndex(
+                                (mainItem: FilteredItem) => 
+                                    mainItem.particulars === editedItem.particulars && 
+                                    mainItem.rate === editedItem.rate
+                            );
+                            
+                            if (mainItemIndex !== -1) {
+                                // Update opening stock in main sheet with new closing stock
+                                updatedMainItems[mainItemIndex].openingStock = newClosingStock;
+                                hasChanges = true;
+                            }
+                        }
                     });
+
+                    // Update the main collection with modified items and recalculated balances
+                    if (hasChanges) {
+                        const closingBalance = parseFloat(editedAdditionalInfo.field7 || '0');
+                        const currentField1 = parseFloat(field1Value || '0');
+                        const newField3 = currentField1 + closingBalance;
+                        const currentField4 = parseFloat(field4 || '0');
+                        const newField5 = newField3 + currentField4;
+                        const currentField6 = parseFloat(field6Value || '0');
+                        const newField7 = Math.abs(newField5 - currentField6);
+
+                        await updateDoc(latestDocRef, {
+                            items: updatedMainItems,
+                            field2: closingBalance.toString(),
+                            field3: newField3.toString(),
+                            field5: newField5.toString(),
+                            field7: newField7.toString()
+                        });
+                        
+                        // Update local state
+                        setFilterData(updatedMainItems);
+                        setField2(closingBalance.toString());
+                    }
                 }
             } catch (mainCollectionError) {
                 console.error('Error updating main collection:', mainCollectionError);
@@ -1287,12 +1325,13 @@ export default function Home() {
             await loadHistory();
 
             setSaveStatus('success');
-            setSaveMessage('History updated successfully! Opening balance updated in main sheet.');
+            setSaveMessage('History updated successfully! Main sheet updated with closing stock changes.');
 
             // Close edit mode
             setEditingHistory(null);
             setEditedHistoryData([]);
             setSelectedHistory(null);
+            setOriginalClosingStocks({});
         } catch (error) {
             console.error('Error saving history edits:', error);
             setSaveStatus('error');
@@ -1316,6 +1355,7 @@ export default function Home() {
         setEditedPaymentData([]);
         setEditedAdditionalInfo({});
         setEditedDates({ from: '', to: '' });
+        setOriginalClosingStocks({});
     };
 
 
