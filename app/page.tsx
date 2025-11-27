@@ -127,6 +127,8 @@ export default function Home() {
     const [editedDates, setEditedDates] = useState({ from: '', to: '' });
     const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+    const [showClosingStockView, setShowClosingStockView] = useState(false);
+    const [originalClosingStocks, setOriginalClosingStocks] = useState<{[key: string]: number}>({});
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -261,18 +263,11 @@ export default function Home() {
             const tranIn = Number(item.tranIn) || 0;
             const tranOut = Number(item.tranOut) || 0;
             const rate = Number(item.rate) || 0;
-
-            // Total column = openingStock + receipts + tranIn - tranOut
             const totalColumn = openingStock + receipts + tranIn - tranOut;
             if (newValue > totalColumn) return prevData;
-
-            // Update closing stock
             item.closingStock = newValue;
             item.sales = openingStock + receipts + tranIn - newValue - tranOut;
-            // Calculate amount = sales * rate (not closing stock * rate)
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
-
-            // Auto-save to Firebase after state update
             setTimeout(() => autoSaveToFirebase(newData), 100);
 
             return newData;
@@ -287,18 +282,12 @@ export default function Home() {
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-
-            // Update tran in
             item.tranIn = newValue;
-
-            // Ensure all values are numbers
             const openingStock = Number(item.openingStock) || 0;
             const receipts = Number(item.receipts) || 0;
             const tranOut = Number(item.tranOut) || 0;
             const closingStock = Number(item.closingStock) || 0;
             const rate = Number(item.rate) || 0;
-
-            // Recalculate sales
             item.sales = openingStock + receipts + newValue - closingStock - tranOut;
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
 
@@ -306,7 +295,6 @@ export default function Home() {
         });
     };
 
-    // Handle tran out change
     const handleTranOutChange = (index: number, value: string) => {
         if (!isLatestSheet) return;
 
@@ -316,19 +304,13 @@ export default function Home() {
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-
-            // Ensure all values are numbers
             const openingStock = Number(item.openingStock) || 0;
             const receipts = Number(item.receipts) || 0;
             const tranIn = Number(item.tranIn) || 0;
             const closingStock = Number(item.closingStock) || 0;
             const rate = Number(item.rate) || 0;
-
-            // Don't allow tran out to exceed available stock
             const availableForTranOut = openingStock + receipts + tranIn;
             if (newValue > availableForTranOut) return prevData;
-
-            // Update tran out
             item.tranOut = newValue;
             item.sales = openingStock + receipts + tranIn - closingStock - newValue;
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
@@ -337,7 +319,6 @@ export default function Home() {
         });
     };
 
-    // Get collection name based on user
     const getCollectionName = () => {
         if (userRole === 'Admin') {
             return selectedShop === 'admin' ? 'invoices_admin' : `invoices_${selectedShop}`;
@@ -346,7 +327,6 @@ export default function Home() {
         }
     };
 
-    // Get history collection name
     const getHistoryCollectionName = () => {
         if (userRole === 'Admin') {
             return selectedShop === 'admin' ? 'history_admin' : `history_${selectedShop}`;
@@ -538,11 +518,6 @@ export default function Home() {
             const collectionName = getCollectionName();
             const historyCollectionName = getHistoryCollectionName();
             const saveDate = new Date().toISOString();
-
-            console.log('Saving to collection:', collectionName);
-            console.log('Data to save:', { itemCount: filterData.length, user: username, role: userRole });
-
-            // Always save to history collection with invoice name or closing stock status
             await addDoc(collection(db, historyCollectionName), {
                 items: filterData,
                 timestamp: serverTimestamp(),
@@ -579,7 +554,6 @@ export default function Home() {
                         amount: '₹0',
                     };
                 } else {
-                    // If no closing stock, add receipts to opening stock
                     return {
                         ...item,
                         openingStock: hasClosingStock ? item.openingStock + item.receipts : item.openingStock,
@@ -592,8 +566,6 @@ export default function Home() {
                     };
                 }
             });
-
-            // Save updated data to main collection (latest state) - without payment data
             const docData = {
                 items: updatedData,
                 timestamp: serverTimestamp(),
@@ -613,24 +585,15 @@ export default function Home() {
             };
 
             await addDoc(collection(db, collectionName), docData);
-
-            // Update local state with new data
             setFilterData(updatedData);
-
-            console.log('Document saved successfully');
-
             setSaveStatus('success');
             setSaveMessage(`Successfully saved ${filterData.length} items`);
             setSaveAllowed(false);
-            setInvoiceName(''); // Reset invoice name
-
-            // Store closing balance as opening balance for next day
+            setInvoiceName('');
             const currentClosingBalance = field7Value;
             setField2(currentClosingBalance);
             setField4(''); // Clear Jama
-            setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]); // Clear payment data
-
-            // Auto-set next sheet's from date to day after current to date
+            setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
             if (sheetToDate) {
                 const parts = sheetToDate.split('/');
                 if (parts.length === 3) {
@@ -642,8 +605,6 @@ export default function Home() {
                 setSheetToDate(''); // Clear to date for next sheet
             }
         } catch (error) {
-            console.error('Error saving to Firebase:', error);
-            console.error('Error details:', error);
             setSaveStatus('error');
             setSaveMessage(`Failed to save: ${error}`);
         } finally {
@@ -652,399 +613,7 @@ export default function Home() {
         }
     };
 
-    const downloadExcel = () => {
-        if (filterData.length === 0) return;
-
-        const data: any[] = filterData.map(item => ({
-            'Particulars': item.particulars,
-            'Size': item.size,
-            'Opening Stock': item.openingStock,
-            'Receipts': item.receipts,
-            'Tran In': item.tranIn,
-            'Tran Out': item.tranOut,
-            'Total': (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0),
-            'Closing Stock': item.closingStock,
-            'Sales': item.sales,
-            'Rate': item.rate,
-            'Amount': item.amount,
-        }));
-
-        data.push({
-            'Particulars': 'TOTAL',
-            'Size': '-',
-            'Opening Stock': filterData.reduce((sum, item) => sum + item.openingStock, 0),
-            'Receipts': filterData.reduce((sum, item) => sum + item.receipts, 0),
-            'Tran In': filterData.reduce((sum, item) => sum + item.tranIn, 0),
-            'Tran Out': filterData.reduce((sum, item) => sum + item.tranOut, 0),
-            'Total': filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0),
-            'Closing Stock': filterData.reduce((sum, item) => sum + item.closingStock, 0),
-            'Sales': filterData.reduce((sum, item) => sum + item.sales, 0),
-            'Rate': '-',
-            'Amount': `₹${filterData.reduce((sum, item) => {
-                const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
-                return sum + amount;
-            }, 0).toLocaleString()}`,
-        });
-
-        data.push({
-            'Particulars': 'CLOSING STOCK TOTAL AMOUNT',
-            'Size': '',
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': `₹${filterData.reduce((sum, item) => sum + (item.closingStock * item.rate), 0).toLocaleString()}`,
-        });
-
-        data.push({});
-        data.push({
-            'Particulars': 'Total Sale',
-            'Size': field1Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-        });
-
-        data.push({
-            'Particulars': 'Opening Balance',
-            'Size': field2,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Total',
-            'Size': field3Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Jama',
-            'Size': field4,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Total',
-            'Size': field5Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Expenses',
-            'Size': field6Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        data.push({
-            'Particulars': 'Closing Balance',
-            'Size': field7Value,
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        } as any);
-
-        data.push({});
-        data.push({
-            'Particulars': 'PAYMENT INFORMATION',
-            'Size': '',
-            'Opening Stock': '',
-            'Receipts': '',
-            'Tran In': '',
-            'Tran Out': '',
-            'Closing Stock': '',
-            'Sales': '',
-            'Rate': '',
-            'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
-        });
-
-        paymentData.forEach((payment, index) => {
-            data.push({
-                'Particulars': `Payment ${index + 1}`,
-                'Size': `Date: ${payment.date}`,
-                'Opening Stock': `PhonePe: ${payment.phonepe}`,
-                'Receipts': `Cash: ${payment.cash}`,
-                'Tran In': `Amount: ${payment.amount}`,
-                'Tran Out': `Comments: ${payment.comments}`,
-                'Closing Stock': '',
-                'Sales': '',
-                'Rate': '',
-                'Amount': '',
-            });
-        });
-
-        // Add sheet period information if available
-        if (sheetFromDate || sheetToDate) {
-            data.push({});
-            data.push({
-                'Particulars': 'SHEET PERIOD',
-                'Size': `From: ${sheetFromDate || 'N/A'} To: ${sheetToDate || 'N/A'}`,
-                'Opening Stock': '',
-                'Receipts': '',
-                'Tran In': '',
-                'Tran Out': '',
-                'Closing Stock': '',
-                'Sales': '',
-                'Rate': '',
-                'Amount': '',
-                'Brand Number': '',
-                'Issue Price': '',
-            });
-        }
-
-        const worksheet = XLSX.utils.json_to_sheet(data);
-
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Wine Invoice');
-        const filename = sheetFromDate && sheetToDate ?
-            `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}.xlsx` :
-            `wine-invoice-${username}-${new Date().toISOString().split('T')[0]}.xlsx`;
-        XLSX.writeFile(workbook, filename);
-    };
-
-    const downloadPDF = () => {
-        if (filterData.length === 0) return;
-
-        const date = new Date().toLocaleDateString();
-        const filename = sheetFromDate && sheetToDate ?
-            `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}` :
-            `wine-invoice-${username}-${date.replace(/\//g, '-')}`;
-
-        const htmlContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Wine Invoice - ${username} - ${date}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; }
-                    h1 { color: #2563eb; text-align: center; margin-bottom: 10px; }
-                    .date { text-align: center; color: #666; margin-bottom: 20px; }
-                    .user-info { text-align: center; color: #666; margin-bottom: 20px; font-weight: bold; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                    th { background-color: #f3e8ff; padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold; }
-                    td { padding: 10px; border: 1px solid #ddd; }
-                    tr:nth-child(even) { background-color: #f9f9f9; }
-                    .text-center { text-align: center; }
-                    .text-right { text-align: right; }
-                    @media print { body { padding: 10px; } }
-                </style>
-            </head>
-            <body>
-                <h1>Wine Invoice Tracker</h1>
-                <div class="user-info">${userRole}: ${username}</div>
-                <div class="date">Generated on: ${date}</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Particulars</th>
-                            <th class="text-center">Size</th>
-                            <th class="text-center">Opening Stock</th>
-                            <th class="text-center">Receipts</th>
-                            <th class="text-center">Tran In</th>
-                            <th class="text-center">Tran Out</th>
-                            <th class="text-center">Total</th>
-                            <th class="text-center">Closing Stock</th>
-                            <th class="text-center">Sales</th>
-                            <th class="text-center">Rate</th>
-                            <th class="text-right">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${filterData.map(item => `
-                            <tr>
-                                <td>${item.particulars}</td>
-                                <td class="text-center">${item.size}</td>
-                                <td class="text-center">${item.openingStock || 0}</td>
-                                <td class="text-center">${item.receipts || 0}</td>
-                                <td class="text-center">${item.tranIn || 0}</td>
-                                <td class="text-center">${item.tranOut || 0}</td>
-                                <td class="text-center">${(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}</td>
-                                <td class="text-center">${item.closingStock || 0}</td>
-                                <td class="text-center">${item.sales || 0}</td>
-                                <td class="text-center">₹${item.rate}</td>
-                                <td class="text-right">${item.amount}</td>
-                            </tr>
-                        `).join('')}
-                        <tr style="background-color: #f3f4f6; border-top: 2px solid #d1d5db; font-weight: bold;">
-                            <td>TOTAL</td>
-                            <td class="text-center">-</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.openingStock, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.receipts, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.tranIn, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.tranOut, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.closingStock, 0)}</td>
-                            <td class="text-center">${filterData.reduce((sum, item) => sum + item.sales, 0)}</td>
-                            <td class="text-center">-</td>
-                            <td class="text-right">₹${filterData.reduce((sum, item) => {
-            const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
-            return sum + amount;
-        }, 0).toLocaleString()}</td>
-                        </tr>
-                        <tr style="background-color: #eff6ff; font-weight: bold;">
-                            <td colspan="10">CLOSING STOCK TOTAL AMOUNT</td>
-                            <td class="text-right">₹${filterData.reduce((sum, item) => {
-            return sum + (item.closingStock * item.rate);
-        }, 0).toLocaleString()}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                
-                ${(sheetFromDate || sheetToDate) ? `
-                    <div style="margin-top: 30px;">
-                        <h3 style="color: #2563eb; margin-bottom: 15px;">Sheet Period</h3>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">From Date</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${sheetFromDate || 'Not specified'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">To Date</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${sheetToDate || 'Not specified'}</td>
-                            </tr>
-                        </table>
-                    </div>
-                ` : ''}
-                
-                <div style="margin-top: 30px;">
-                    <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total Sale</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field1Value}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Opening Balance</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field2}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field3Value}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Jama</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field4}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field5Value}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Expenses</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field6Value}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Closing Balance</td>
-                            <td style="padding: 10px; border: 1px solid #ddd;">${field7Value}</td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <div style="margin-top: 30px;">
-                    <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr style="background-color: #f3e8ff;">
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Date</th>
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">PhonePe</th>
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Cash</th>
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Amount</th>
-                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Comments</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${paymentData.map(payment => `
-                                <tr>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount}</td>
-                                    <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                <script>
-                    window.onload = () => {
-                        window.print();
-                        window.onafterprint = () => window.close();
-                    };
-                </script>
-            </body>
-            </html>
-        `;
-
-        const printWindow = window.open('', '', 'height=800,width=1000');
-        if (!printWindow) return;
-
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-    };
-
     const handleLoginSuccess = (role: string, user: string) => {
-        console.log('Login success - Role:', role, 'User:', user);
         setIsLoggedIn(true);
         setUserRole(role);
         setUsername(user);
@@ -1068,10 +637,8 @@ export default function Home() {
         try {
             const collections = await getDocs(query(collection(db, 'invoices_admin')));
             const shops = new Set<string>();
-
-            // Get all collection names that start with 'invoices_'
             const allCollections = [
-                'shop1', 'shop2', 'shop3', 'shop4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
+                'shop1', 'shop2', 'shop3', 'shop4', 'shop_4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
                 'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
                 'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
                 'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
@@ -1081,7 +648,7 @@ export default function Home() {
             console.error('Error loading shops:', error);
             // Fallback to predefined shops
             setAvailableShops([
-                'shop1', 'shop2', 'shop3', 'shop4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
+                'shop1', 'shop2', 'shop3', 'shop4', 'shop_4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
                 'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
                 'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
                 'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
@@ -1479,6 +1046,11 @@ export default function Home() {
         setSelectedHistory(record);
     };
 
+    const viewClosingStock = (record: any) => {
+        setSelectedHistory(record);
+        setShowClosingStockView(true);
+    };
+
     const closeHistorySheet = () => {
         // Clear any pending auto-save
         if (autoSaveTimeout) {
@@ -1494,6 +1066,8 @@ export default function Home() {
         setEditedPaymentData([]);
         setEditedAdditionalInfo({});
         setEditedDates({ from: '', to: '' });
+        setOriginalClosingStocks({});
+        setShowClosingStockView(false);
     };
 
     const startEditHistory = (record: any) => {
@@ -1517,6 +1091,15 @@ export default function Home() {
             from: formatDateForInput(record.sheetFromDate || ''),
             to: formatDateForInput(record.sheetToDate || '')
         });
+        // Store original closing stocks for comparison
+        const originalStocks: {[key: string]: number} = {};
+        if (record.items) {
+            record.items.forEach((item: FilteredItem, index: number) => {
+                const key = `${item.particulars}_${item.rate}`;
+                originalStocks[key] = item.closingStock || 0;
+            });
+        }
+        setOriginalClosingStocks(originalStocks);
     };
 
     const handleHistoryFieldChange = (itemIndex: number, field: string, value: string) => {
@@ -1670,13 +1253,7 @@ export default function Home() {
                 lastEditedAt: serverTimestamp()
             });
 
-            // Update the main sheet's opening balance based on closing balance
-            const closingBalance = parseFloat(editedAdditionalInfo.field7 || '0');
-            
-            // Update opening balance (field2) with closing balance from edited sheet
-            setField2(closingBalance.toString());
-
-            // Update the main collection with new opening balance
+            // Update main sheet based on closing stock changes
             try {
                 const collectionName = getCollectionName();
                 const mainQuery = query(
@@ -1689,22 +1266,55 @@ export default function Home() {
                 if (!mainSnapshot.empty) {
                     const latestDoc = mainSnapshot.docs[0];
                     const latestDocRef = doc(db, collectionName, latestDoc.id);
+                    const currentMainData = latestDoc.data();
+                    
+                    // Update main sheet items based on closing stock changes
+                    const updatedMainItems = [...(currentMainData.items || [])];
+                    let hasChanges = false;
 
-                    // Calculate new field values with updated opening balance
-                    const currentField1 = parseFloat(field1Value || '0');
-                    const newField3 = currentField1 + closingBalance;
-                    const currentField4 = parseFloat(field4 || '0');
-                    const newField5 = newField3 + currentField4;
-                    const currentField6 = parseFloat(field6Value || '0');
-                    const newField7 = Math.abs(newField5 - currentField6);
-
-                    // Update opening balance in main sheet
-                    await updateDoc(latestDocRef, {
-                        field2: closingBalance.toString(),
-                        field3: newField3.toString(),
-                        field5: newField5.toString(),
-                        field7: newField7.toString()
+                    editedHistoryData.forEach((editedItem: FilteredItem) => {
+                        const key = `${editedItem.particulars}_${editedItem.rate}`;
+                        const originalClosingStock = originalClosingStocks[key] || 0;
+                        const newClosingStock = editedItem.closingStock || 0;
+                        
+                        // Only update if closing stock actually changed
+                        if (originalClosingStock !== newClosingStock) {
+                            const mainItemIndex = updatedMainItems.findIndex(
+                                (mainItem: FilteredItem) => 
+                                    mainItem.particulars === editedItem.particulars && 
+                                    mainItem.rate === editedItem.rate
+                            );
+                            
+                            if (mainItemIndex !== -1) {
+                                // Update opening stock in main sheet with new closing stock
+                                updatedMainItems[mainItemIndex].openingStock = newClosingStock;
+                                hasChanges = true;
+                            }
+                        }
                     });
+
+                    // Update the main collection with modified items and recalculated balances
+                    if (hasChanges) {
+                        const closingBalance = parseFloat(editedAdditionalInfo.field7 || '0');
+                        const currentField1 = parseFloat(field1Value || '0');
+                        const newField3 = currentField1 + closingBalance;
+                        const currentField4 = parseFloat(field4 || '0');
+                        const newField5 = newField3 + currentField4;
+                        const currentField6 = parseFloat(field6Value || '0');
+                        const newField7 = Math.abs(newField5 - currentField6);
+
+                        await updateDoc(latestDocRef, {
+                            items: updatedMainItems,
+                            field2: closingBalance.toString(),
+                            field3: newField3.toString(),
+                            field5: newField5.toString(),
+                            field7: newField7.toString()
+                        });
+                        
+                        // Update local state
+                        setFilterData(updatedMainItems);
+                        setField2(closingBalance.toString());
+                    }
                 }
             } catch (mainCollectionError) {
                 console.error('Error updating main collection:', mainCollectionError);
@@ -1715,12 +1325,13 @@ export default function Home() {
             await loadHistory();
 
             setSaveStatus('success');
-            setSaveMessage('History updated successfully! Opening balance updated in main sheet.');
+            setSaveMessage('History updated successfully! Main sheet updated with closing stock changes.');
 
             // Close edit mode
             setEditingHistory(null);
             setEditedHistoryData([]);
             setSelectedHistory(null);
+            setOriginalClosingStocks({});
         } catch (error) {
             console.error('Error saving history edits:', error);
             setSaveStatus('error');
@@ -1744,6 +1355,7 @@ export default function Home() {
         setEditedPaymentData([]);
         setEditedAdditionalInfo({});
         setEditedDates({ from: '', to: '' });
+        setOriginalClosingStocks({});
     };
 
 
@@ -2688,11 +2300,24 @@ export default function Home() {
                                                                 {/*        Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}*/}
                                                                 {/*    </p>*/}
                                                                 {/*)}*/}
-                                                                {record.hasClosingStock && (
-                                                                    <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
-                                                                        Closing Stock Entered
-                                                                    </span>
-                                                                )}
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    {record.hasClosingStock && (
+                                                                        <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+                                                                            Closing Stock Entered
+                                                                        </span>
+                                                                    )}
+                                                                    {record.hasClosingStock && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                viewClosingStock(record);
+                                                                            }}
+                                                                            className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                                                                        >
+                                                                            Closing Stock
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             {canEdit && (
                                                                 <button
@@ -2733,10 +2358,11 @@ export default function Home() {
             {selectedHistory && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                        <div className={`${editingHistory ? 'bg-purple-600' : 'bg-blue-600'} text-white p-4 flex justify-between items-center`}>
+                        <div className={`${editingHistory ? 'bg-purple-600' : showClosingStockView ? 'bg-green-600' : 'bg-blue-600'} text-white p-4 flex justify-between items-center`}>
                             <div>
                                 <h2 className="text-xl font-bold">
                                     {editingHistory && <span className="mr-2">✏️ Editing:</span>}
+                                    {showClosingStockView && <span className="mr-2">📦 Closing Stock:</span>}
                                     {consolidatedData ?
                                         `Consolidated: ${consolidatedData.startDate} to ${consolidatedData.endDate}` :
                                         new Date(selectedHistory.savedAt).toLocaleDateString('en-US', {
@@ -2773,46 +2399,47 @@ export default function Home() {
                                     )}
                                 </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center">
                                 {editingHistory ? (
                                     <>
                                         <button
                                             onClick={saveHistoryEdits}
                                             disabled={isSaving}
-                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400"
+                                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400 text-sm"
                                         >
                                             <Save className="w-4 h-4" />
-                                            {isSaving ? 'Saving...' : 'Save'}
+                                            <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
                                         </button>
                                         <button
                                             onClick={cancelHistoryEdit}
                                             disabled={isSaving}
-                                            className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400"
+                                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition disabled:bg-gray-400 text-sm"
                                         >
-                                            Cancel
+                                            <span className="hidden sm:inline">Cancel</span>
+                                            <span className="sm:hidden">✕</span>
                                         </button>
                                     </>
                                 ) : (
                                     <>
                                         <button
                                             onClick={() => downloadHistoryExcel(selectedHistory)}
-                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition text-sm"
                                         >
                                             <FileSpreadsheet className="w-4 h-4" />
-                                            Excel
+                                            <span className="hidden sm:inline">Excel</span>
                                         </button>
                                         <button
                                             onClick={() => downloadHistoryPDF(selectedHistory)}
-                                            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition"
+                                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition text-sm"
                                         >
                                             <FileText className="w-4 h-4" />
-                                            PDF
+                                            <span className="hidden sm:inline">PDF</span>
                                         </button>
                                     </>
                                 )}
                                 <button
                                     onClick={closeHistorySheet}
-                                    className="text-white hover:bg-blue-700 rounded-full p-2 transition"
+                                    className="text-white hover:bg-blue-700 hover:bg-opacity-20 rounded-full p-2 transition min-w-[40px] min-h-[40px] flex items-center justify-center"
                                 >
                                     ✕
                                 </button>
@@ -2824,95 +2451,111 @@ export default function Home() {
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead>
-                                            <tr className="bg-purple-50 border-b-2 border-purple-200">
+                                            <tr className={`${showClosingStockView ? 'bg-green-50 border-b-2 border-green-200' : 'bg-purple-50 border-b-2 border-purple-200'}`}>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
-                                                {['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
-                                                    <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
-                                                ))}
+                                                {showClosingStockView ? 
+                                                    ['Size', 'Closing Stock', 'Rate'].map((h, i) => (
+                                                        <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 2 ? 'text-right' : 'text-center'}`}>{h}</th>
+                                                    )) :
+                                                    ['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
+                                                        <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
+                                                    ))
+                                                }
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {(editingHistory ? editedHistoryData : selectedHistory.items).map((item: FilteredItem, i: number) => (
-                                                <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
+                                                <tr key={i} className={`border-b border-gray-200 ${showClosingStockView ? 'hover:bg-green-50' : 'hover:bg-purple-50'}`}>
                                                     <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
-                                                    <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
-                                                    <td className="px-4 py-3 text-center text-sm text-gray-900">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.openingStock || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'openingStock', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
-                                                                min="0"
-                                                            />
-                                                        ) : (
-                                                            item.openingStock
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.receipts || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'receipts', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-blue-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                                                                min="0"
-                                                            />
-                                                        ) : (
-                                                            item.receipts
-                                                        )}
-                                                    </td>
+                                                    <td className="px-4 py-3 text-center text-sm"><span className={`px-2 py-1 text-xs rounded-full ${showClosingStockView ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>{item.size}</span></td>
+                                                    {showClosingStockView ? (
+                                                        // Closing Stock View - Only show closing stock and rate
+                                                        <>
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
+                                                            <td className="px-4 py-3 text-right text-sm text-gray-900">₹{item.rate}</td>
+                                                        </>
+                                                    ) : (
+                                                        // Full View - Show all columns
+                                                        <>
+                                                            <td className="px-4 py-3 text-center text-sm text-gray-900">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.openingStock || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'openingStock', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                                        min="0"
+                                                                    />
+                                                                ) : (
+                                                                    item.openingStock
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.receipts || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'receipts', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-blue-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                                                        min="0"
+                                                                    />
+                                                                ) : (
+                                                                    item.receipts
+                                                                )}
+                                                            </td>
 
-                                                    {/* Tran In - Editable in edit mode */}
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.tranIn || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'tranIn', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900"
-                                                                min="0"
-                                                            />
-                                                        ) : (
-                                                            item.tranIn
-                                                        )}
-                                                    </td>
+                                                            {/* Tran In - Editable in edit mode */}
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.tranIn || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'tranIn', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900"
+                                                                        min="0"
+                                                                    />
+                                                                ) : (
+                                                                    item.tranIn
+                                                                )}
+                                                            </td>
 
-                                                    {/* Tran Out - Editable in edit mode */}
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.tranOut || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'tranOut', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-purple-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
-                                                                min="0"
-                                                                max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}
-                                                            />
-                                                        ) : (
-                                                            item.tranOut
-                                                        )}
-                                                    </td>
+                                                            {/* Tran Out - Editable in edit mode */}
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.tranOut || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'tranOut', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-purple-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                                        min="0"
+                                                                        max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}
+                                                                    />
+                                                                ) : (
+                                                                    item.tranOut
+                                                                )}
+                                                            </td>
 
-                                                    {/* Closing Stock - Editable in edit mode */}
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">
-                                                        {editingHistory ? (
-                                                            <input
-                                                                type="number"
-                                                                value={item.closingStock || 0}
-                                                                onChange={(e) => handleHistoryFieldChange(i, 'closingStock', e.target.value)}
-                                                                className="w-20 px-2 py-1 border border-green-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
-                                                                min="0"
-                                                                max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
-                                                            />
-                                                        ) : (
-                                                            item.closingStock
-                                                        )}
-                                                    </td>
+                                                            {/* Closing Stock - Editable in edit mode */}
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.closingStock || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'closingStock', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-green-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                                                                        min="0"
+                                                                        max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
+                                                                    />
+                                                                ) : (
+                                                                    item.closingStock
+                                                                )}
+                                                            </td>
 
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
-                                                    <td className="px-4 py-3 text-center text-sm text-gray-900">₹{item.rate}</td>
-                                                    <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
+                                                            <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
+                                                            <td className="px-4 py-3 text-center text-sm text-gray-900">₹{item.rate}</td>
+                                                            <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
+                                                        </>
+                                                    )}
                                                 </tr>
                                             ))}
                                         </tbody>
