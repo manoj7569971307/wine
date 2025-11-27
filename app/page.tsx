@@ -1468,21 +1468,20 @@ export default function Home() {
             // Sum field values from all sheets, but use opening balance from first sheet
             let totalField1 = 0;
             let totalField2 = parseFloat(firstSheet.field2 || '0'); // Opening balance from first sheet
-            let totalField3 = 0;
             let totalField4 = 0;
-            let totalField5 = 0;
             let totalField6 = 0;
-            let totalField7 = 0;
 
             sortedRecords.forEach((record: any) => {
                 totalField1 += parseFloat(record.field1 || '0');
                 // Skip field2 - already set from first sheet
-                totalField3 += parseFloat(record.field3 || '0');
                 totalField4 += parseFloat(record.field4 || '0');
-                totalField5 += parseFloat(record.field5 || '0');
                 totalField6 += parseFloat(record.field6 || '0');
-                totalField7 += parseFloat(record.field7 || '0');
             });
+
+            // Calculate derived fields correctly
+            const totalField3 = totalField1 + totalField2; // Total = Total Sale + Opening Balance
+            const totalField5 = totalField3 + totalField4; // Total = field3 + Jama
+            const totalField7 = totalField5 - totalField6; // Closing Balance = field5 - Expenses
 
             // Convert consolidated items back to array
             const consolidatedItemsArray = Object.values(consolidatedItems);
