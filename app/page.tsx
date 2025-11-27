@@ -125,6 +125,8 @@ export default function Home() {
     const [editedPaymentData, setEditedPaymentData] = useState<any[]>([]);
     const [editedAdditionalInfo, setEditedAdditionalInfo] = useState<any>({});
     const [editedDates, setEditedDates] = useState({ from: '', to: '' });
+    const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+    const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -148,8 +150,104 @@ export default function Home() {
     // Check if this is the latest sheet (no saved sheet after current to date)
     const isLatestSheet = !sheetToDate || !lastSavedToDate || sheetToDate >= lastSavedToDate;
 
-    // Handle closing stock change
-    const handleClosingStockChange = (index: number, value: string) => {
+    // Auto-save function for real-time updates
+    const autoSaveToFirebase = async (updatedData: FilteredItem[]) => {
+        if (!username || updatedData.length === 0) return;
+
+        try {
+            const collectionName = getCollectionName();
+            const historyCollectionName = getHistoryCollectionName();
+            const saveDate = new Date().toISOString();
+
+            // Calculate updated totals
+            const newTotalSale = updatedData.reduce((sum, item) => {
+                const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
+                return sum + amount;
+            }, 0);
+
+            // Update main collection
+            await addDoc(collection(db, collectionName), {
+                items: updatedData,
+                timestamp: serverTimestamp(),
+                totalItems: updatedData.length,
+                createdAt: saveDate,
+                user: username,
+                role: userRole,
+                field1: newTotalSale.toString(),
+                field2: field2,
+                field3: (newTotalSale + parseFloat(field2 || '0')).toString(),
+                field4: field4,
+                field5: (newTotalSale + parseFloat(field2 || '0') + parseFloat(field4 || '0')).toString(),
+                field6: field6Value,
+                field7: Math.abs((newTotalSale + parseFloat(field2 || '0') + parseFloat(field4 || '0')) - parseFloat(field6Value || '0')).toString(),
+                sheetFromDate: sheetFromDate,
+                sheetToDate: sheetToDate,
+                autoSave: true
+            });
+
+            console.log('Auto-saved to Firebase');
+        } catch (error) {
+            console.error('Auto-save failed:', error);
+        }
+    };
+
+    // Debounced auto-save function for history edits
+    const debouncedAutoSaveHistoryEdits = useCallback((updatedItems?: FilteredItem[], updatedAdditionalInfo?: any, updatedPaymentData?: any[]) => {
+        if (autoSaveTimeout) {
+            clearTimeout(autoSaveTimeout);
+        }
+
+        setAutoSaveStatus('saving');
+
+        const timeout = setTimeout(async () => {
+            if (!editingHistory || !username) {
+                setAutoSaveStatus('idle');
+                return;
+            }
+
+            try {
+                const historyCollectionName = getHistoryCollectionName();
+                const historyDocRef = doc(db, historyCollectionName, editingHistory.id);
+
+                const updateData: any = {
+                    lastAutoSavedAt: serverTimestamp()
+                };
+
+                if (updatedItems) {
+                    updateData.items = updatedItems;
+                }
+
+                if (updatedAdditionalInfo) {
+                    updateData.field1 = updatedAdditionalInfo.field1;
+                    updateData.field2 = updatedAdditionalInfo.field2;
+                    updateData.field3 = updatedAdditionalInfo.field3;
+                    updateData.field4 = updatedAdditionalInfo.field4;
+                    updateData.field5 = updatedAdditionalInfo.field5;
+                    updateData.field6 = updatedAdditionalInfo.field6;
+                    updateData.field7 = updatedAdditionalInfo.field7;
+                }
+
+                if (updatedPaymentData) {
+                    updateData.paymentData = updatedPaymentData;
+                }
+
+                await updateDoc(historyDocRef, updateData);
+                console.log('History auto-saved to Firebase');
+                setAutoSaveStatus('saved');
+                
+                // Reset status after showing saved state
+                setTimeout(() => setAutoSaveStatus('idle'), 2000);
+            } catch (error) {
+                console.error('History auto-save failed:', error);
+                setAutoSaveStatus('idle');
+            }
+        }, 1000); // 1 second debounce
+
+        setAutoSaveTimeout(timeout);
+    }, [autoSaveTimeout, editingHistory, username]);
+
+    // Handle closing stock change with auto-save
+    const handleClosingStockChange = async (index: number, value: string) => {
         const newValue = parseInt(value) || 0;
         if (newValue < 0) return;
 
@@ -171,7 +269,11 @@ export default function Home() {
             // Update closing stock
             item.closingStock = newValue;
             item.sales = openingStock + receipts + tranIn - newValue - tranOut;
+            // Calculate amount = sales * rate (not closing stock * rate)
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
+
+            // Auto-save to Firebase after state update
+            setTimeout(() => autoSaveToFirebase(newData), 100);
 
             return newData;
         });
@@ -1378,10 +1480,20 @@ export default function Home() {
     };
 
     const closeHistorySheet = () => {
+        // Clear any pending auto-save
+        if (autoSaveTimeout) {
+            clearTimeout(autoSaveTimeout);
+            setAutoSaveTimeout(null);
+        }
+        
+        setAutoSaveStatus('idle');
         setSelectedHistory(null);
         setConsolidatedData(null);
         setEditingHistory(null);
         setEditedHistoryData([]);
+        setEditedPaymentData([]);
+        setEditedAdditionalInfo({});
+        setEditedDates({ from: '', to: '' });
     };
 
     const startEditHistory = (record: any) => {
@@ -1410,28 +1522,54 @@ export default function Home() {
     const handleHistoryFieldChange = (itemIndex: number, field: string, value: string) => {
         const updatedData = [...editedHistoryData];
         const item = updatedData[itemIndex];
+        
+        // Parse and validate input (ensure non-negative values)
+        const numValue = Math.max(0, parseInt(value) || 0);
 
         if (field === 'closingStock') {
-            item.closingStock = parseInt(value) || 0;
+            // Validate closing stock doesn't exceed available stock
+            const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
+            item.closingStock = Math.min(numValue, availableStock);
         } else if (field === 'tranIn') {
-            item.tranIn = parseInt(value) || 0;
+            item.tranIn = numValue;
         } else if (field === 'tranOut') {
-            item.tranOut = parseInt(value) || 0;
+            // Validate tran out doesn't exceed available stock
+            const availableForTranOut = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0);
+            item.tranOut = Math.min(numValue, availableForTranOut);
         } else if (field === 'openingStock') {
-            item.openingStock = parseInt(value) || 0;
+            item.openingStock = numValue;
         } else if (field === 'receipts') {
-            item.receipts = parseInt(value) || 0;
+            item.receipts = numValue;
         }
 
         // Recalculate sales: Sales = (Opening Stock + Receipts + Tran In) - Closing Stock - Tran Out
         const total = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0);
-        item.sales = total - (item.closingStock || 0) - (item.tranOut || 0);
+        item.sales = Math.max(0, total - (item.closingStock || 0) - (item.tranOut || 0));
 
-        // Recalculate amount based on closing stock
-        const amount = (item.closingStock || 0) * (item.rate || 0);
-        item.amount = `₹${amount.toLocaleString()}`;
+        // Calculate amount = sales * rate (not closing stock * rate)
+        const amount = (item.sales || 0) * (item.rate || 0);
+        item.amount = `₹${amount.toFixed(2)}`;
 
         setEditedHistoryData(updatedData);
+
+        // Recalculate total sale amount in additional info
+        const newTotalSale = updatedData.reduce((sum, dataItem) => {
+            const itemAmount = parseFloat(dataItem.amount.replace('₹', '').replace(',', '')) || 0;
+            return sum + itemAmount;
+        }, 0);
+
+        const updatedAdditionalInfo = {
+            ...editedAdditionalInfo,
+            field1: newTotalSale.toString(),
+            field3: (newTotalSale + parseFloat(editedAdditionalInfo.field2 || '0')).toString(),
+            field5: (newTotalSale + parseFloat(editedAdditionalInfo.field2 || '0') + parseFloat(editedAdditionalInfo.field4 || '0')).toString(),
+            field7: Math.abs((newTotalSale + parseFloat(editedAdditionalInfo.field2 || '0') + parseFloat(editedAdditionalInfo.field4 || '0')) - parseFloat(editedAdditionalInfo.field6 || '0')).toString()
+        };
+        
+        setEditedAdditionalInfo(updatedAdditionalInfo);
+
+        // Auto-save to Firebase with debounce
+        debouncedAutoSaveHistoryEdits(updatedData, updatedAdditionalInfo);
     };
 
     const handleEditedPaymentChange = (index: number, field: string, value: string) => {
@@ -1441,13 +1579,52 @@ export default function Home() {
             [field]: value
         };
         setEditedPaymentData(updatedPaymentData);
+        
+        // Recalculate total expenses in additional info
+        const phonepeTotal = updatedPaymentData.reduce((sum, p) => sum + (parseFloat(p.phonepe) || 0), 0);
+        const cashTotal = updatedPaymentData.reduce((sum, p) => sum + (parseFloat(p.cash) || 0), 0);
+        const amountTotal = updatedPaymentData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        const totalExpenses = phonepeTotal + cashTotal + amountTotal;
+        
+        const updatedInfo = {
+            ...editedAdditionalInfo,
+            field6: totalExpenses.toString()
+        };
+        
+        // Recalculate field7 (closing balance)
+        const field1Val = parseFloat(updatedInfo.field1 || '0');
+        const field2Val = parseFloat(updatedInfo.field2 || '0');
+        const field4Val = parseFloat(updatedInfo.field4 || '0');
+        updatedInfo.field7 = Math.abs((field1Val + field2Val + field4Val) - totalExpenses).toString();
+        
+        setEditedAdditionalInfo(updatedInfo);
+        
+        // Auto-save to Firebase with debounce
+        debouncedAutoSaveHistoryEdits(editedHistoryData, updatedInfo, updatedPaymentData);
     };
 
     const handleEditedAdditionalInfoChange = (field: string, value: string) => {
-        setEditedAdditionalInfo((prev: any) => ({
-            ...prev,
+        const updatedInfo = {
+            ...editedAdditionalInfo,
             [field]: value
-        }));
+        };
+        
+        // Recalculate dependent fields
+        if (field === 'field2' || field === 'field4' || field === 'field6') {
+            const field1Val = parseFloat(updatedInfo.field1 || '0');
+            const field2Val = parseFloat(updatedInfo.field2 || '0');
+            const field4Val = parseFloat(updatedInfo.field4 || '0');
+            const field6Val = parseFloat(updatedInfo.field6 || '0');
+            
+            updatedInfo.field3 = (field1Val + field2Val).toString();
+            updatedInfo.field5 = (field1Val + field2Val + field4Val).toString();
+            updatedInfo.field7 = Math.abs((field1Val + field2Val + field4Val) - field6Val).toString();
+        }
+        
+        setEditedAdditionalInfo(updatedInfo);
+        
+        // Auto-save to Firebase with debounce
+        debouncedAutoSaveHistoryEdits(editedHistoryData, updatedInfo);
     };
 
     const handleEditedDateChange = (field: 'from' | 'to', value: string) => {
@@ -1470,11 +1647,11 @@ export default function Home() {
         // Validation: Check for duplicate From Date
         const duplicateDate = historyData.find(record =>
             record.id !== editingHistory.id &&
-            record.sheetFromDate === editedDates.from
+            record.sheetFromDate === formatDateFromInput(editedDates.from)
         );
 
         if (duplicateDate) {
-            alert(`A sheet with From Date ${editedDates.from} already exists. Please choose a different date.`);
+            alert(`A sheet with From Date ${formatDateFromInput(editedDates.from)} already exists. Please choose a different date.`);
             return;
         }
 
@@ -1493,53 +1670,13 @@ export default function Home() {
                 lastEditedAt: serverTimestamp()
             });
 
-            // Track which items had their closing stock changed
-            const originalItems = editingHistory.items || [];
-            const changedItems = new Set<string>();
+            // Update the main sheet's opening balance based on closing balance
+            const closingBalance = parseFloat(editedAdditionalInfo.field7 || '0');
+            
+            // Update opening balance (field2) with closing balance from edited sheet
+            setField2(closingBalance.toString());
 
-            editedHistoryData.forEach((editedItem: FilteredItem) => {
-                const originalItem = originalItems.find(
-                    (orig: FilteredItem) => orig.particulars === editedItem.particulars && orig.size === editedItem.size
-                );
-
-                if (originalItem) {
-                    const originalClosing = originalItem.closingStock || 0;
-                    const editedClosing = editedItem.closingStock || 0;
-
-                    // If closing stock changed, mark this item
-                    if (originalClosing !== editedClosing) {
-                        const itemKey = `${editedItem.particulars}_${editedItem.size}`;
-                        changedItems.add(itemKey);
-                    }
-                }
-            });
-
-
-            // Update the main sheet's filterData - ONLY for items with changed closing stock
-            const updatedFilterData = filterData.map((item) => {
-                const itemKey = `${item.particulars}_${item.size}`;
-
-                // Only update if this item's closing stock was changed
-                if (changedItems.has(itemKey)) {
-                    const editedItem = editedHistoryData.find(
-                        (edited) => edited.particulars === item.particulars && edited.size === item.size
-                    );
-
-                    if (editedItem) {
-                        return {
-                            ...item,
-                            openingStock: editedItem.closingStock || 0
-                        };
-                    }
-                }
-
-                // Return unchanged for items that weren't edited
-                return item;
-            });
-
-            setFilterData(updatedFilterData);
-
-            // Update the main collection with new opening stock values - ONLY for changed items
+            // Update the main collection with new opening balance
             try {
                 const collectionName = getCollectionName();
                 const mainQuery = query(
@@ -1553,14 +1690,24 @@ export default function Home() {
                     const latestDoc = mainSnapshot.docs[0];
                     const latestDocRef = doc(db, collectionName, latestDoc.id);
 
-                    // Update only the items field with new opening stock
+                    // Calculate new field values with updated opening balance
+                    const currentField1 = parseFloat(field1Value || '0');
+                    const newField3 = currentField1 + closingBalance;
+                    const currentField4 = parseFloat(field4 || '0');
+                    const newField5 = newField3 + currentField4;
+                    const currentField6 = parseFloat(field6Value || '0');
+                    const newField7 = Math.abs(newField5 - currentField6);
+
+                    // Update opening balance in main sheet
                     await updateDoc(latestDocRef, {
-                        items: updatedFilterData
+                        field2: closingBalance.toString(),
+                        field3: newField3.toString(),
+                        field5: newField5.toString(),
+                        field7: newField7.toString()
                     });
                 }
             } catch (mainCollectionError) {
                 console.error('Error updating main collection:', mainCollectionError);
-                // Don't fail the entire operation if main collection update fails
                 setSaveMessage('History updated, but main collection update failed. Please reload and save again.');
             }
 
@@ -1568,7 +1715,7 @@ export default function Home() {
             await loadHistory();
 
             setSaveStatus('success');
-            setSaveMessage('History updated successfully!');
+            setSaveMessage('History updated successfully! Opening balance updated in main sheet.');
 
             // Close edit mode
             setEditingHistory(null);
@@ -1585,6 +1732,13 @@ export default function Home() {
     };
 
     const cancelHistoryEdit = () => {
+        // Clear any pending auto-save
+        if (autoSaveTimeout) {
+            clearTimeout(autoSaveTimeout);
+            setAutoSaveTimeout(null);
+        }
+        
+        setAutoSaveStatus('idle');
         setEditingHistory(null);
         setEditedHistoryData([]);
         setEditedPaymentData([]);
@@ -1806,6 +1960,26 @@ export default function Home() {
         if (childData.length > 0) filterWineData();
     }, [childData, filterWineData]);
 
+    // Update field1 when filterData changes (for real-time total sale calculation)
+    useEffect(() => {
+        if (filterData.length > 0) {
+            const newTotalSale = filterData.reduce((sum, item) => {
+                const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
+                return sum + amount;
+            }, 0);
+            setField1(newTotalSale.toString());
+        }
+    }, [filterData]);
+
+    // Cleanup auto-save timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimeout) {
+                clearTimeout(autoSaveTimeout);
+            }
+        };
+    }, [autoSaveTimeout]);
+
     if (!isLoggedIn) {
         return <LoginForm onLoginSuccess={handleLoginSuccess} />;
     }
@@ -1977,21 +2151,21 @@ export default function Home() {
 
                                     <div className="h-6 w-px bg-gray-300"></div>
 
-                                    <button
-                                        onClick={downloadExcel}
-                                        className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all"
-                                    >
-                                        <FileSpreadsheet className="w-4 h-4" />
-                                        Excel
-                                    </button>
+                                    {/*<button*/}
+                                    {/*    onClick={downloadExcel}*/}
+                                    {/*    className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all"*/}
+                                    {/*>*/}
+                                    {/*    <FileSpreadsheet className="w-4 h-4" />*/}
+                                    {/*    Excel*/}
+                                    {/*</button>*/}
 
-                                    <button
-                                        onClick={downloadPDF}
-                                        className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg transition-all"
-                                    >
-                                        <FileText className="w-4 h-4" />
-                                        PDF
-                                    </button>
+                                    {/*<button*/}
+                                    {/*    onClick={downloadPDF}*/}
+                                    {/*    className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg transition-all"*/}
+                                    {/*>*/}
+                                    {/*    <FileText className="w-4 h-4" />*/}
+                                    {/*    PDF*/}
+                                    {/*</button>*/}
 
                                     {saveStatus === 'success' && (
                                         <div className="flex items-center gap-2 text-green-600">
@@ -2572,14 +2746,32 @@ export default function Home() {
                                         })
                                     }
                                 </h2>
-                                <p className="text-sm text-blue-100 mt-1">
-                                    {editingHistory ?
-                                        'Edit closing stock, tran in, and tran out values' :
-                                        consolidatedData ?
-                                            `${consolidatedData.recordCount} sheets consolidated` :
-                                            new Date(selectedHistory.savedAt).toLocaleTimeString()
-                                    }
-                                </p>
+                                <div className="flex items-center gap-3 mt-1">
+                                    <p className="text-sm text-blue-100">
+                                        {editingHistory ?
+                                            'Edit closing stock, tran in, and tran out values' :
+                                            consolidatedData ?
+                                                `${consolidatedData.recordCount} sheets consolidated` :
+                                                new Date(selectedHistory.savedAt).toLocaleTimeString()
+                                        }
+                                    </p>
+                                    {editingHistory && (
+                                        <div className="flex items-center gap-2">
+                                            {autoSaveStatus === 'saving' && (
+                                                <div className="flex items-center gap-1 text-xs text-yellow-200">
+                                                    <div className="w-3 h-3 border-2 border-yellow-200 border-t-transparent rounded-full animate-spin"></div>
+                                                    <span>Saving...</span>
+                                                </div>
+                                            )}
+                                            {autoSaveStatus === 'saved' && (
+                                                <div className="flex items-center gap-1 text-xs text-green-200">
+                                                    <CheckCircle className="w-3 h-3" />
+                                                    <span>Auto-saved</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex gap-2">
                                 {editingHistory ? (
@@ -2651,6 +2843,7 @@ export default function Home() {
                                                                 value={item.openingStock || 0}
                                                                 onChange={(e) => handleHistoryFieldChange(i, 'openingStock', e.target.value)}
                                                                 className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                                min="0"
                                                             />
                                                         ) : (
                                                             item.openingStock
@@ -2663,6 +2856,7 @@ export default function Home() {
                                                                 value={item.receipts || 0}
                                                                 onChange={(e) => handleHistoryFieldChange(i, 'receipts', e.target.value)}
                                                                 className="w-20 px-2 py-1 border border-blue-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                                                min="0"
                                                             />
                                                         ) : (
                                                             item.receipts
@@ -2677,6 +2871,7 @@ export default function Home() {
                                                                 value={item.tranIn || 0}
                                                                 onChange={(e) => handleHistoryFieldChange(i, 'tranIn', e.target.value)}
                                                                 className="w-20 px-2 py-1 border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900"
+                                                                min="0"
                                                             />
                                                         ) : (
                                                             item.tranIn
@@ -2691,6 +2886,8 @@ export default function Home() {
                                                                 value={item.tranOut || 0}
                                                                 onChange={(e) => handleHistoryFieldChange(i, 'tranOut', e.target.value)}
                                                                 className="w-20 px-2 py-1 border border-purple-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                                min="0"
+                                                                max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}
                                                             />
                                                         ) : (
                                                             item.tranOut
@@ -2705,6 +2902,8 @@ export default function Home() {
                                                                 value={item.closingStock || 0}
                                                                 onChange={(e) => handleHistoryFieldChange(i, 'closingStock', e.target.value)}
                                                                 className="w-20 px-2 py-1 border border-green-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                                                                min="0"
+                                                                max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
                                                             />
                                                         ) : (
                                                             item.closingStock
