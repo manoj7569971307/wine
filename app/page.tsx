@@ -52,6 +52,36 @@ const removeCommas = (value: string): number =>
 const calcBalance = (f1?: string, f2?: string, f4?: string, f6?: string): string => 
     ((+(f1 || '0')) + (+(f2 || '0')) + (+(f4 || '0')) - (+(f6 || '0'))).toString();
 
+// Date format helpers
+const formatDateForDisplay = (dateStr: string): string => {
+    if (!dateStr) return '';
+    if (dateStr.includes('/')) return dateStr; // Already in dd/mm/yyyy format
+    const date = new Date(dateStr);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
+const formatDateForInput = (dateStr: string): string => {
+    if (!dateStr) return '';
+    if (dateStr.includes('-')) return dateStr; // Already in yyyy-mm-dd format
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`; // yyyy-mm-dd
+    }
+    return dateStr;
+};
+
+const formatDateFromInput = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
 export default function Home() {
     const [childData, setChildData] = useState<ChildData>([]);
     const [filterData, setFilterData] = useState<FilteredItem[]>([]);
@@ -82,6 +112,12 @@ export default function Home() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [consolidatedData, setConsolidatedData] = useState<any>(null);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [pendingData, setPendingData] = useState<FilteredItem[]>([]);
+    const [pdfTotal, setPdfTotal] = useState(0);
+    const [matchedItemsCount, setMatchedItemsCount] = useState(0);
+    const [sheetFromDate, setSheetFromDate] = useState('');
+    const [sheetToDate, setSheetToDate] = useState('');
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -100,18 +136,16 @@ export default function Home() {
     const totalExpenses = phonepeTotal + cashTotal + amountTotal;
     
     const field6Value = totalExpenses.toString();
-    const field7Value = (parseFloat(field5Value) - parseFloat(field6Value)).toString();
+    const field7Value = Math.abs(parseFloat(field5Value) - parseFloat(field6Value)).toString();
 
     // Handle closing stock change
     const handleClosingStockChange = (index: number, value: string) => {
         const newValue = parseInt(value) || 0;
+        if (newValue < 0) return;
 
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-
-            // Update closing stock
-            item.closingStock = newValue;
 
             // Ensure all values are numbers
             const openingStock = Number(item.openingStock) || 0;
@@ -120,11 +154,13 @@ export default function Home() {
             const tranOut = Number(item.tranOut) || 0;
             const rate = Number(item.rate) || 0;
 
-            // Calculate: opening stock + receipts + tran in = closing stock + sales + tran out
-            // So: sales = opening stock + receipts + tran in - closing stock - tran out
-            item.sales = openingStock + receipts + tranIn - newValue - tranOut;
+            // Total column = openingStock + receipts + tranIn - tranOut
+            const totalColumn = openingStock + receipts + tranIn - tranOut;
+            if (newValue > totalColumn) return prevData;
 
-            // Calculate amount: sales * rate
+            // Update closing stock
+            item.closingStock = newValue;
+            item.sales = openingStock + receipts + tranIn - newValue - tranOut;
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
 
             return newData;
@@ -134,6 +170,7 @@ export default function Home() {
     // Handle tran in change
     const handleTranInChange = (index: number, value: string) => {
         const newValue = parseInt(value) || 0;
+        if (newValue < 0) return;
 
         setFilterData(prevData => {
             const newData = [...prevData];
@@ -160,13 +197,11 @@ export default function Home() {
     // Handle tran out change
     const handleTranOutChange = (index: number, value: string) => {
         const newValue = parseInt(value) || 0;
+        if (newValue < 0) return;
 
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-
-            // Update tran out
-            item.tranOut = newValue;
 
             // Ensure all values are numbers
             const openingStock = Number(item.openingStock) || 0;
@@ -175,7 +210,12 @@ export default function Home() {
             const closingStock = Number(item.closingStock) || 0;
             const rate = Number(item.rate) || 0;
 
-            // Recalculate sales
+            // Don't allow tran out to exceed available stock
+            const availableForTranOut = openingStock + receipts + tranIn;
+            if (newValue > availableForTranOut) return prevData;
+
+            // Update tran out
+            item.tranOut = newValue;
             item.sales = openingStock + receipts + tranIn - closingStock - newValue;
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
 
@@ -209,6 +249,8 @@ export default function Home() {
 
     const filterWineData = useCallback((): void => {
         const filtered: FilteredItem[] = [...filterData];
+        let totalAmount = 0;
+        let matchedCount = 0;
 
         for (let j = 1; j < childData.length; j++) {
             const row = childData[j];
@@ -246,9 +288,14 @@ export default function Home() {
                 if (brandNumberFromChild === brandNumberFromSample &&
                     Math.abs(issuePrice - sampleIssuePrice) < 1) {
 
+                    matchedCount++;
+                    
                     const calculatedQuantity = firstIndex
                         ? (Number(firstIndex) * quantity) + Number(row[7])
                         : quantity;
+
+                    const itemTotal = (issuePrice / Number(firstIndex)) * calculatedQuantity;
+                    totalAmount += itemTotal;
 
                     const existingItemIndex = filtered.findIndex(
                         item => item.brandNumber === wine['Brand Number'] &&
@@ -280,10 +327,12 @@ export default function Home() {
             }
         }
 
-        setFilterData(filtered.sort((a, b) =>
-            a.particulars?.localeCompare(b.particulars || '') || 0
-        ));
-    }, [childData]);
+        console.log('Total PDF Amount:', totalAmount);
+        setPdfTotal(totalAmount);
+        setMatchedItemsCount(matchedCount);
+        setPendingData(filtered.sort((a, b) => a.particulars?.localeCompare(b.particulars || '') || 0));
+        setShowConfirmModal(true);
+    }, [childData, filterData]);
 
     const loadFromFirebase = async () => {
         if (!username) {
@@ -314,7 +363,11 @@ export default function Home() {
                 setField5(data.field5 || '');
                 setField6(data.field6 || '');
                 setField7(data.field7 || '');
-                setPaymentData(data.paymentData && data.paymentData.length > 0 ? data.paymentData : [{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
+                // Only load dates if they exist, otherwise keep current auto-generated dates
+                if (data.sheetFromDate) setSheetFromDate(data.sheetFromDate);
+                if (data.sheetToDate) setSheetToDate(data.sheetToDate);
+                // Don't load payment data - always start fresh
+                setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
                 setSaveStatus('success');
                 setSaveMessage('Data loaded successfully');
             } else {
@@ -378,7 +431,9 @@ export default function Home() {
                 field5: field5Value,
                 field6: field6Value,
                 field7: field7Value,
-                paymentData: paymentData
+                paymentData: paymentData,
+                sheetFromDate: sheetFromDate,
+                sheetToDate: sheetToDate
             });
 
             // If closing stock is entered, update opening stock
@@ -399,7 +454,7 @@ export default function Home() {
                 updatedData = filterData;
             }
 
-            // Save updated data to main collection (latest state)
+            // Save updated data to main collection (latest state) - without payment data
             const docData = {
                 items: updatedData,
                 timestamp: serverTimestamp(),
@@ -414,7 +469,8 @@ export default function Home() {
                 field5: field5Value,
                 field6: field6Value,
                 field7: field7Value,
-                paymentData: paymentData
+                sheetFromDate: sheetFromDate,
+                sheetToDate: sheetToDate
             };
 
             await addDoc(collection(db, collectionName), docData);
@@ -433,6 +489,18 @@ export default function Home() {
             const currentClosingBalance = field7Value;
             setField2(currentClosingBalance);
             setField4(''); // Clear Jama
+            setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]); // Clear payment data
+            
+            // Auto-set next sheet's from date to day after current to date
+            // if (sheetToDate) {
+            //     const parts = sheetToDate.split('/');
+            //     if (parts.length === 3) {
+            //         const nextDay = new Date(parts[2], parts[1] - 1, parts[0]);
+            //         nextDay.setDate(nextDay.getDate() + 1);
+            //         setSheetFromDate(formatDateForDisplay(nextDay.toISOString()));
+            //     }
+            //     setSheetToDate(''); // Clear to date for next sheet
+            // }
         } catch (error) {
             console.error('Error saving to Firebase:', error);
             console.error('Error details:', error);
@@ -459,8 +527,6 @@ export default function Home() {
             'Sales': item.sales,
             'Rate': item.rate,
             'Amount': item.amount,
-            'Brand Number': item.brandNumber,
-            'Issue Price': item.issuePrice,
         }));
         
         data.push({
@@ -478,8 +544,6 @@ export default function Home() {
                 const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
                 return sum + amount;
             }, 0).toLocaleString()}`,
-            'Brand Number': '-',
-            'Issue Price': '-',
         });
         
         data.push({
@@ -493,8 +557,6 @@ export default function Home() {
             'Sales': '',
             'Rate': '',
             'Amount': `₹${filterData.reduce((sum, item) => sum + (item.closingStock * item.rate), 0).toLocaleString()}`,
-            'Brand Number': '',
-            'Issue Price': '',
         });
         
         data.push({});
@@ -509,8 +571,6 @@ export default function Home() {
             'Sales': '',
             'Rate': '',
             'Amount': '',
-            'Brand Number': '',
-            'Issue Price': '',
         });
         
         data.push({
@@ -631,16 +691,36 @@ export default function Home() {
                 'Sales': '',
                 'Rate': '',
                 'Amount': '',
+            });
+        });
+        
+        // Add sheet period information if available
+        if (sheetFromDate || sheetToDate) {
+            data.push({});
+            data.push({
+                'Particulars': 'SHEET PERIOD',
+                'Size': `From: ${sheetFromDate || 'N/A'} To: ${sheetToDate || 'N/A'}`,
+                'Opening Stock': '',
+                'Receipts': '',
+                'Tran In': '',
+                'Tran Out': '',
+                'Closing Stock': '',
+                'Sales': '',
+                'Rate': '',
+                'Amount': '',
                 'Brand Number': '',
                 'Issue Price': '',
             });
-        });
+        }
         
         const worksheet = XLSX.utils.json_to_sheet(data);
 
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Wine Invoice');
-        XLSX.writeFile(workbook, `wine-invoice-${username}-${new Date().toISOString().split('T')[0]}.xlsx`);
+        const filename = sheetFromDate && sheetToDate ? 
+            `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}.xlsx` :
+            `wine-invoice-${username}-${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, filename);
     };
 
     const downloadPDF = () => {
@@ -730,6 +810,22 @@ export default function Home() {
                     </tbody>
                 </table>
                 
+                ${(sheetFromDate || sheetToDate) ? `
+                    <div style="margin-top: 30px;">
+                        <h3 style="color: #2563eb; margin-bottom: 15px;">Sheet Period</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">From Date</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${sheetFromDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">To Date</td>
+                                <td style="padding: 10px; border: 1px solid #ddd;">${sheetToDate || 'Not specified'}</td>
+                            </tr>
+                        </table>
+                    </div>
+                ` : ''}
+                
                 <div style="margin-top: 30px;">
                     <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
                     <table style="width: 100%; border-collapse: collapse;">
@@ -806,6 +902,16 @@ export default function Home() {
         setIsLoggedIn(true);
         setUserRole(role);
         setUsername(user);
+        
+        // Save login data to localStorage with 24-hour expiration
+        const expiresAt = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours
+        localStorage.setItem('wineAppLogin', JSON.stringify({
+            isLoggedIn: true,
+            userRole: role,
+            username: user,
+            expiresAt
+        }));
+        
         if (role === 'Admin') {
             loadAvailableShops();
             setShowShopSelection(true);
@@ -831,6 +937,15 @@ export default function Home() {
         setSelectedShop(shopName);
         setUsername(shopName);
         setShowShopSelection(false);
+        
+        // Update localStorage with selected shop
+        const loginData = JSON.parse(localStorage.getItem('wineAppLogin') || '{}');
+        const expiresAt = new Date().getTime() + (24 * 60 * 60 * 1000); // 24 hours
+        localStorage.setItem('wineAppLogin', JSON.stringify({
+            ...loginData,
+            selectedShop: shopName,
+            expiresAt
+        }));
     };
 
     const loadHistory = async () => {
@@ -867,49 +982,103 @@ export default function Home() {
     const downloadHistoryExcel = (historyItem: any) => {
         if (!historyItem.items || historyItem.items.length === 0) return;
 
-        const data = consolidatedData ? 
-            historyItem.items.map((item: FilteredItem) => ({
-                'Particulars': item.particulars,
-                'Size': item.size,
-                'Opening Stock': item.openingStock,
-                'Receipts': item.receipts,
-                'Tran In': item.tranIn,
-                'Tran Out': item.tranOut,
-                'Closing Stock': item.closingStock,
-                'Sales': item.sales,
-                'Rate': item.rate,
-                'Amount': item.amount,
-            })) :
-            historyItem.items.map((item: FilteredItem) => ({
-                'Particulars': item.particulars,
-                'Closing Stock': item.closingStock,
-            }));
+        const data = historyItem.items.map((item: FilteredItem) => ({
+            'Particulars': item.particulars,
+            'Size': item.size,
+            'Opening Stock': item.openingStock,
+            'Receipts': item.receipts,
+            'Tran In': item.tranIn,
+            'Tran Out': item.tranOut,
+            'Total': (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0),
+            'Closing Stock': item.closingStock,
+            'Sales': item.sales,
+            'Rate': item.rate,
+            'Amount': item.amount,
+        }));
+        
+        data.push({
+            'Particulars': 'TOTAL',
+            'Size': '-',
+            'Opening Stock': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.openingStock || 0), 0),
+            'Receipts': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.receipts || 0), 0),
+            'Tran In': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.tranIn || 0), 0),
+            'Tran Out': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.tranOut || 0), 0),
+            'Total': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0),
+            'Closing Stock': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.closingStock || 0), 0),
+            'Sales': historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.sales || 0), 0),
+            'Rate': '-',
+            'Amount': `₹${historyItem.items.reduce((sum: number, item: FilteredItem) => {
+                const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
+                return sum + amount;
+            }, 0).toLocaleString()}`,
 
-        if (consolidatedData) {
+        });
+        
+        data.push({
+            'Particulars': 'CLOSING STOCK TOTAL AMOUNT',
+            'Size': '',
+            'Opening Stock': '',
+            'Receipts': '',
+            'Tran In': '',
+            'Tran Out': '',
+            'Closing Stock': '',
+            'Sales': '',
+            'Rate': '',
+            'Amount': `₹${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + ((item.closingStock || 0) * (item.rate || 0)), 0).toLocaleString()}`,
+            'Brand Number': '',
+            'Issue Price': '',
+        });
+
+        data.push({});
+        if (historyItem.sheetFromDate || historyItem.sheetToDate) {
+            data.push({ 'Particulars': 'SHEET PERIOD' });
+            data.push({ 'Particulars': 'From Date', 'Size': historyItem.sheetFromDate || 'Not specified' });
+            data.push({ 'Particulars': 'To Date', 'Size': historyItem.sheetToDate || 'Not specified' });
             data.push({});
-            data.push({ 'Particulars': 'ADDITIONAL INFORMATION' });
-            data.push({ 'Particulars': 'Total Sale', 'Size': historyItem.field1 || '0' });
-            data.push({ 'Particulars': 'Opening Balance', 'Size': historyItem.field2 || '0' });
-            data.push({ 'Particulars': 'Total', 'Size': historyItem.field3 || '0' });
-            data.push({ 'Particulars': 'Jama', 'Size': historyItem.field4 || '0' });
-            data.push({ 'Particulars': 'Total', 'Size': historyItem.field5 || '0' });
-            data.push({ 'Particulars': 'Expenses', 'Size': historyItem.field6 || '0' });
-            data.push({ 'Particulars': 'Closing Balance', 'Size': historyItem.field7 || '0' });
-            
-            if (historyItem.paymentData && historyItem.paymentData.length > 0) {
-                data.push({});
-                data.push({ 'Particulars': 'PAYMENT INFORMATION' });
-                historyItem.paymentData.forEach((payment: any, index: number) => {
-                    data.push({
-                        'Particulars': `Payment ${index + 1}`,
-                        'Size': payment.date + (payment.recordDate ? ` (${payment.recordDate})` : ''),
-                        'Opening Stock': payment.phonepe,
-                        'Receipts': payment.cash,
-                        'Tran In': payment.amount,
-                        'Tran Out': payment.comments
-                    });
+        }
+        data.push({ 'Particulars': 'ADDITIONAL INFORMATION' });
+        data.push({ 'Particulars': 'Total Sale', 'Size': historyItem.field1 || '0' });
+        data.push({ 'Particulars': 'Opening Balance', 'Size': historyItem.field2 || '0' });
+        data.push({ 'Particulars': 'Total', 'Size': historyItem.field3 || '0' });
+        data.push({ 'Particulars': 'Jama', 'Size': historyItem.field4 || '0' });
+        data.push({ 'Particulars': 'Total', 'Size': historyItem.field5 || '0' });
+        data.push({ 'Particulars': 'Expenses', 'Size': historyItem.field6 || '0' });
+        data.push({ 'Particulars': 'Closing Balance', 'Size': historyItem.field7 || '0' });
+        
+        data.push({});
+        data.push({ 'Particulars': 'PAYMENT INFORMATION' });
+        if (historyItem.paymentData && historyItem.paymentData.length > 0) {
+            historyItem.paymentData.forEach((payment: any, index: number) => {
+                data.push({
+                    'Particulars': `Payment ${index + 1}`,
+                    'Size': `Date: ${payment.date}${payment.recordDate ? ` (${payment.recordDate})` : ''}`,
+                    'Opening Stock': `PhonePe: ${payment.phonepe}`,
+                    'Receipts': `Cash: ${payment.cash}`,
+                    'Tran In': `Amount: ${payment.amount}`,
+                    'Tran Out': `Comments: ${payment.comments}`,
+                    'Closing Stock': '',
+                    'Sales': '',
+                    'Rate': '',
+                    'Amount': '',
+                    'Brand Number': '',
+                    'Issue Price': '',
                 });
-            }
+            });
+        } else {
+            data.push({
+                'Particulars': 'No payment information available',
+                'Size': '',
+                'Opening Stock': '',
+                'Receipts': '',
+                'Tran In': '',
+                'Tran Out': '',
+                'Closing Stock': '',
+                'Sales': '',
+                'Rate': '',
+                'Amount': '',
+                'Brand Number': '',
+                'Issue Price': '',
+            });
         }
 
         const worksheet = XLSX.utils.json_to_sheet(data);
@@ -949,55 +1118,72 @@ export default function Home() {
                     td { padding: 10px; border: 1px solid #ddd; }
                     tr:nth-child(even) { background-color: #f9f9f9; }
                     .text-center { text-align: center; }
+                    .text-right { text-align: right; }
                     @media print { body { padding: 10px; } }
                 </style>
             </head>
             <body>
-                <h1>${consolidatedData ? 'Consolidated Closing Stock Report' : 'Closing Stock History'}</h1>
+                <h1>${consolidatedData ? 'Consolidated Report' : 'Wine Invoice History'}</h1>
                 <div class="user-info">${userRole}: ${username}</div>
                 <div class="date">${subtitle}</div>
                 <table>
                     <thead>
                         <tr>
                             <th>Particulars</th>
-                            ${consolidatedData ? `
-                                <th class="text-center">Size</th>
-                                <th class="text-center">Opening Stock</th>
-                                <th class="text-center">Receipts</th>
-                                <th class="text-center">Tran In</th>
-                                <th class="text-center">Tran Out</th>
-                                <th class="text-center">Closing Stock</th>
-                                <th class="text-center">Sales</th>
-                                <th class="text-center">Rate</th>
-                                <th class="text-center">Amount</th>
-                            ` : `
-                                <th class="text-center">Closing Stock</th>
-                            `}
+                            <th class="text-center">Size</th>
+                            <th class="text-center">Opening Stock</th>
+                            <th class="text-center">Receipts</th>
+                            <th class="text-center">Tran In</th>
+                            <th class="text-center">Tran Out</th>
+                            <th class="text-center">Total</th>
+                            <th class="text-center">Closing Stock</th>
+                            <th class="text-center">Sales</th>
+                            <th class="text-center">Rate</th>
+                            <th class="text-right">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${historyItem.items.map((item: FilteredItem) => `
                             <tr>
                                 <td>${item.particulars}</td>
-                                ${consolidatedData ? `
-                                    <td class="text-center">${item.size}</td>
-                                    <td class="text-center">${item.openingStock || 0}</td>
-                                    <td class="text-center">${item.receipts || 0}</td>
-                                    <td class="text-center">${item.tranIn || 0}</td>
-                                    <td class="text-center">${item.tranOut || 0}</td>
-                                    <td class="text-center">${item.closingStock || 0}</td>
-                                    <td class="text-center">${item.sales || 0}</td>
-                                    <td class="text-center">₹${item.rate}</td>
-                                    <td class="text-center">${item.amount}</td>
-                                ` : `
-                                    <td class="text-center">${item.closingStock || 0}</td>
-                                `}
+                                <td class="text-center">${item.size}</td>
+                                <td class="text-center">${item.openingStock || 0}</td>
+                                <td class="text-center">${item.receipts || 0}</td>
+                                <td class="text-center">${item.tranIn || 0}</td>
+                                <td class="text-center">${item.tranOut || 0}</td>
+                                <td class="text-center">${(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}</td>
+                                <td class="text-center">${item.closingStock || 0}</td>
+                                <td class="text-center">${item.sales || 0}</td>
+                                <td class="text-center">₹${item.rate}</td>
+                                <td class="text-right">${item.amount}</td>
                             </tr>
                         `).join('')}
+                        <tr style="background-color: #f3f4f6; border-top: 2px solid #d1d5db; font-weight: bold;">
+                            <td>TOTAL</td>
+                            <td class="text-center">-</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.openingStock || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.receipts || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.tranIn || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.tranOut || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.closingStock || 0), 0)}</td>
+                            <td class="text-center">${historyItem.items.reduce((sum: number, item: FilteredItem) => sum + (item.sales || 0), 0)}</td>
+                            <td class="text-center">-</td>
+                            <td class="text-right">₹${historyItem.items.reduce((sum: number, item: FilteredItem) => {
+                                const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
+                                return sum + amount;
+                            }, 0).toLocaleString()}</td>
+                        </tr>
+                        <tr style="background-color: #eff6ff; font-weight: bold;">
+                            <td colspan="10">CLOSING STOCK TOTAL AMOUNT</td>
+                            <td class="text-right">₹${historyItem.items.reduce((sum: number, item: FilteredItem) => {
+                                return sum + ((item.closingStock || 0) * (item.rate || 0));
+                            }, 0).toLocaleString()}</td>
+                        </tr>
                     </tbody>
                 </table>
                 
-                ${consolidatedData && (historyItem.field1 || historyItem.field2 || historyItem.field3 || historyItem.field4 || historyItem.field5 || historyItem.field6) ? `
+                ${(historyItem.field1 || historyItem.field2 || historyItem.field3 || historyItem.field4 || historyItem.field5 || historyItem.field6) ? `
                     <div style="margin-top: 30px;">
                         <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
                         <table style="width: 100%; border-collapse: collapse;">
@@ -1033,33 +1219,46 @@ export default function Home() {
                     </div>
                 ` : ''}
                 
-                ${consolidatedData && historyItem.paymentData && historyItem.paymentData.length > 0 ? `
-                    <div style="margin-top: 30px;">
-                        <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information</h3>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <thead>
-                                <tr style="background-color: #f3e8ff;">
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Date</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">PhonePe</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Cash</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Amount</th>
-                                    <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Comments</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${historyItem.paymentData.map((payment: any) => `
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information${consolidatedData ? ` (Consolidated from ${consolidatedData.recordCount} sheets)` : ''}</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background-color: #f3e8ff;">
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Date</th>
+                                ${consolidatedData ? '<th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Sheet Date</th>' : ''}
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">PhonePe</th>
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Cash</th>
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Amount</th>
+                                <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Comments</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${historyItem.paymentData && historyItem.paymentData.length > 0 ? 
+                                historyItem.paymentData.map((payment: any) => `
                                     <tr>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}${payment.recordDate ? ` (${payment.recordDate})` : ''}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}</td>
+                                        ${consolidatedData ? `<td style="padding: 10px; border: 1px solid #ddd;">${payment.recordDate || ''}</td>` : ''}
                                         <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe}</td>
                                         <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash}</td>
                                         <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount}</td>
                                         <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments}</td>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                ` : ''}
+                                `).join('') :
+                                `<tr><td colspan="${consolidatedData ? '6' : '5'}" style="padding: 20px; text-align: center; color: #666; border: 1px solid #ddd;">No payment information available</td></tr>`
+                            }
+                            ${historyItem.paymentData && historyItem.paymentData.length > 0 ? `
+                                <tr style="background-color: #f3f4f6; font-weight: bold;">
+                                    <td style="padding: 10px; border: 1px solid #ddd;">TOTAL</td>
+                                    ${consolidatedData ? '<td style="padding: 10px; border: 1px solid #ddd;">-</td>' : ''}
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.phonepe) || 0), 0)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.cash) || 0), 0)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0)}</td>
+                                    <td style="padding: 10px; border: 1px solid #ddd;">-</td>
+                                </tr>
+                            ` : ''}
+                        </tbody>
+                    </table>
+                </div>
                 <script>
                     window.onload = () => {
                         window.print();
@@ -1083,7 +1282,13 @@ export default function Home() {
 
     const consolidateSheets = () => {
         if (!startDate || !endDate) return;
-        const records = historyData.filter((r: any) => r.hasClosingStock && new Date(r.savedAt).toISOString().split('T')[0] >= startDate && new Date(r.savedAt).toISOString().split('T')[0] <= endDate).sort((a: any, b: any) => +new Date(a.savedAt) - +new Date(b.savedAt));
+        const records = historyData.filter((r: any) => {
+            if (!r.hasClosingStock) return false;
+            const sheetStart = r.sheetFromDate;
+            const sheetEnd = r.sheetToDate;
+            if (!sheetStart || !sheetEnd) return false;
+            return sheetStart <= endDate && sheetEnd >= startDate;
+        }).sort((a: any, b: any) => new Date(a.sheetFromDate).getTime() - new Date(b.sheetFromDate).getTime());
         if (!records.length) return;
         
         const [first, last] = [records[0], records[records.length - 1]];
@@ -1091,7 +1296,7 @@ export default function Home() {
         
         records.forEach((r: any) => r.items.forEach((item: FilteredItem) => {
             const key = item.particulars;
-            if (!items.has(key)) items.set(key, {...item, openingStock: 0, receipts: 0, tranIn: 0, tranOut: 0, sales: 0, closingStock: 0});
+            if (!items.has(key)) items.set(key, {...item, openingStock: 0, receipts: 0, tranIn: 0, tranOut: 0, sales: 0});
             const c = items.get(key)!;
             (['receipts', 'tranIn', 'tranOut', 'sales'] as const).forEach((f: keyof FilteredItem) => {
                 c[f] = (c[f] || 0) + (item[f] || 0);
@@ -1106,21 +1311,43 @@ export default function Home() {
         
         last.items.forEach((item: FilteredItem) => {
             if (items.has(item.particulars)) {
-                const c = items.get(item.particulars)!;
-                c.closingStock = item.closingStock;
-                c.amount = `₹${(c.sales * c.rate).toFixed(2)}`;
+                items.get(item.particulars)!.closingStock = item.closingStock;
             }
         });
         
-        const sum = (f: string) => records.reduce((s: number, r: any) => s + (+(r[f] || '0')), 0).toString();
-        const f1 = sum('field1'), f2 = first.field2 || '0', f4 = sum('field4'), f6 = sum('field6');
-        const f3 = (+f1 + +f2).toString(), f5 = (+f3 + +f4).toString(), f7 = (+f5 - +f6).toString();
+        // Recalculate amounts for all items after consolidation
+        Array.from(items.values()).forEach(item => {
+            if (item.sales >= 0) {
+                item.amount = `₹${(item.sales * item.rate).toFixed(2)}`;
+            }
+        });
+        
+        // Calculate total sale amount from consolidated items
+        const totalSaleFromItems = Array.from(items.values()).reduce((sum, item) => {
+            const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
+            return sum + amount;
+        }, 0);
+        const f1 = totalSaleFromItems.toFixed(2);
+        const f2 = (parseFloat(first.field2) || 0).toFixed(2);
+        const f4 = records.reduce((s: number, r: any) => s + (parseFloat(r.field4) || 0), 0).toFixed(2);
+        const f6 = records.reduce((s: number, r: any) => s + (parseFloat(r.field6) || 0), 0).toFixed(2);
+        const f3 = (parseFloat(f1) + parseFloat(f2)).toFixed(2);
+        const f5 = (parseFloat(f3) + parseFloat(f4)).toFixed(2);
+        const f7 = (parseFloat(f5) - parseFloat(f6)).toFixed(2);
+        
+        // Collect all payment data with record dates
+        const allPayments = records.flatMap((r: any) => 
+            (r.paymentData || []).filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments)
+                .map((p: any) => ({...p, recordDate: `${r.sheetFromDate} to ${r.sheetToDate}`}))
+        );
         
         const data = {
             items: Array.from(items.values()),
             startDate, endDate, recordCount: records.length, savedAt: `${startDate} to ${endDate}`,
             field1: f1, field2: f2, field3: f3, field4: f4, field5: f5, field6: f6, field7: f7,
-            paymentData: records.flatMap((r: any) => (r.paymentData || []).filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments).map((p: any) => ({...p, recordDate: new Date(r.savedAt).toLocaleDateString()})))
+            paymentData: allPayments,
+            sheetFromDate: startDate,
+            sheetToDate: endDate
         };
         
         setConsolidatedData(data);
@@ -1134,7 +1361,24 @@ export default function Home() {
         setFilterData([]);
         setChildData([]);
         setSaveStatus('idle');
+        localStorage.removeItem('wineAppLogin');
     };
+
+    // Check for stored login data on component mount
+    useEffect(() => {
+        const storedLoginData = localStorage.getItem('wineAppLogin');
+        if (storedLoginData) {
+            const { isLoggedIn, userRole, username, selectedShop, expiresAt } = JSON.parse(storedLoginData);
+            if (new Date().getTime() < expiresAt) {
+                setIsLoggedIn(isLoggedIn);
+                setUserRole(userRole);
+                setUsername(username);
+                if (selectedShop) setSelectedShop(selectedShop);
+            } else {
+                localStorage.removeItem('wineAppLogin');
+            }
+        }
+    }, []);
 
     useEffect(() => {
         if (isLoggedIn && username) {
@@ -1218,23 +1462,56 @@ export default function Home() {
 
             <main className="container mx-auto p-2 sm:p-4 md:p-6">
                 <div className="bg-white shadow-lg rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
+                    <div className="text-center mb-4 p-3 bg-blue-50 rounded-lg">
+                        <h2 className="text-lg font-semibold text-blue-800">
+                            {new Date().toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            })}
+                        </h2>
+                    </div>
                     <PDFToExcelConverter sendDataToParent={handleDataFromChild} saveAllowed={saveAllowed} />
                 </div>
 
                 {filterData.length > 0 && (
                     <>
                         <div className="mb-4 bg-white shadow-lg rounded-lg p-4">
+                            {userRole === 'Shop Owner' && (
+                                <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                    <h3 className="text-sm font-semibold text-blue-800 mb-3">Sheet Information</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        {/*<input*/}
+                                        {/*    type="text"*/}
+                                        {/*    placeholder="Invoice Name (optional)"*/}
+                                        {/*    value={invoiceName}*/}
+                                        {/*    onChange={(e) => setInvoiceName(e.target.value)}*/}
+                                        {/*    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"*/}
+                                        {/*/>*/}
+                                        <div className="flex flex-col">
+                                            <label className="text-xs text-gray-600 mb-1">From Date</label>
+                                            <input
+                                                type="date"
+                                                value={formatDateForInput(sheetFromDate)}
+                                                onChange={(e) => setSheetFromDate(formatDateFromInput(e.target.value))}
+                                                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <label className="text-xs text-gray-600 mb-1">To Date</label>
+                                            <input
+                                                type="date"
+                                                value={formatDateForInput(sheetToDate)}
+                                                onChange={(e) => setSheetToDate(formatDateFromInput(e.target.value))}
+                                                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div className="flex flex-wrap items-center gap-3">
-                                    {userRole === 'Shop Owner' && (
-                                        <input
-                                            type="text"
-                                            placeholder="Invoice Name (optional)"
-                                            value={invoiceName}
-                                            onChange={(e) => setInvoiceName(e.target.value)}
-                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    )}
 
                                     <button
                                         onClick={() => {
@@ -1374,7 +1651,7 @@ export default function Home() {
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                 <span className="text-purple-600 font-semibold text-xs sm:text-sm">
-                                                    {(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}
+                                                    {(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
                                                 </span>
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
@@ -1691,34 +1968,33 @@ export default function Home() {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                                     />
                                 </div>
-                                {userRole === 'Admin' && (
-                                    <div className="border-t pt-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Consolidate Date Range</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="date"
-                                                value={startDate}
-                                                onChange={(e) => setStartDate(e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                                placeholder="Start Date"
-                                            />
-                                            <input
-                                                type="date"
-                                                value={endDate}
-                                                onChange={(e) => setEndDate(e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                                placeholder="End Date"
-                                            />
-                                            <button
-                                                onClick={consolidateSheets}
-                                                disabled={!startDate || !endDate}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
-                                            >
-                                                Consolidate
-                                            </button>
-                                        </div>
+                                <div className="border-t pt-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Consolidate Date Range</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="date"
+                                            value={startDate}
+                                            onChange={(e) => setStartDate(e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                            placeholder="Period Start"
+                                        />
+                                        <input
+                                            type="date"
+                                            value={endDate}
+                                            onChange={(e) => setEndDate(e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                            placeholder="Period End"
+                                        />
+                                        <button
+                                            onClick={consolidateSheets}
+                                            disabled={!startDate || !endDate}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                                        >
+                                            Consolidate
+                                        </button>
                                     </div>
-                                )}
+                                    <p className="text-xs text-gray-600 mt-2">Consolidates sheets that overlap with the selected date range</p>
+                                </div>
                             </div>
                             {historyData.filter(record => record.hasClosingStock).length === 0 ? (
                                 <p className="text-center text-gray-500 py-8">No closing stock history found</p>
@@ -1739,14 +2015,20 @@ export default function Home() {
                                             className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition"
                                         >
                                             <p className="font-semibold text-blue-600 hover:text-blue-700">
-                                                {record.invoiceName || new Date(record.savedAt).toLocaleDateString('en-US', {
-                                                    year: 'numeric',
-                                                    month: 'long',
-                                                    day: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
+                                                {/*{record.invoiceName || new Date(record.savedAt).toLocaleDateString('en-US', {*/}
+                                                {/*    year: 'numeric',*/}
+                                                {/*    month: 'long',*/}
+                                                {/*    day: 'numeric',*/}
+                                                {/*    hour: '2-digit',*/}
+                                                {/*    minute: '2-digit'*/}
+                                                {/*})}*/}
+                                                Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}
                                             </p>
+                                            {/*{(record.sheetFromDate || record.sheetToDate) && (*/}
+                                            {/*    <p className="text-xs text-gray-600 mt-1">*/}
+                                            {/*        Period: {record.sheetFromDate || 'N/A'} to {record.sheetToDate || 'N/A'}*/}
+                                            {/*    </p>*/}
+                                            {/*)}*/}
                                             {record.hasClosingStock && (
                                                 <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
                                                     Closing Stock Entered
@@ -1825,40 +2107,51 @@ export default function Home() {
                                         <thead>
                                         <tr className="bg-purple-50 border-b-2 border-purple-200">
                                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
-                                            {consolidatedData ? (
-                                                ['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
-                                                    <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
-                                                ))
-                                            ) : (
-                                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Closing Stock</th>
-                                            )}
+                                            {['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
+                                                <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
+                                            ))}
                                         </tr>
                                         </thead>
                                         <tbody>
                                         {selectedHistory.items.map((item: FilteredItem, i: number) => (
                                             <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
                                                 <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
-                                                {consolidatedData ? (
-                                                    <>
-                                                        <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
-                                                        <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-red-600">{item.tranOut}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
-                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
-                                                        <td className="px-4 py-3 text-center text-sm">₹{item.rate}</td>
-                                                        <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
-                                                    </>
-                                                ) : (
-                                                    <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
-                                                )}
+                                                <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
+                                                <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">{item.tranOut}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
+                                                <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
+                                                <td className="px-4 py-3 text-center text-sm">₹{item.rate}</td>
+                                                <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
                                             </tr>
                                         ))}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
+                            
+                            {/* Sheet Period Information in History */}
+                            {(selectedHistory.sheetFromDate || selectedHistory.sheetToDate) && (
+                                <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Sheet Period</h3>
+                                    <div className="overflow-hidden">
+                                        <table className="w-full border-collapse border border-gray-300">
+                                            <tbody>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">From Date</td>
+                                                    <td className="py-2 px-3 text-sm text-gray-900">{selectedHistory.sheetFromDate || 'Not specified'}</td>
+                                                </tr>
+                                                <tr className="border-b border-gray-200">
+                                                    <td className="py-2 px-3 font-medium text-gray-700 bg-gray-50 border-r border-gray-300 w-32">To Date</td>
+                                                    <td className="py-2 px-3 text-sm text-gray-900">{selectedHistory.sheetToDate || 'Not specified'}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                             
                             {/* Additional Information in History */}
                             {(selectedHistory.field1 || selectedHistory.field2 || selectedHistory.field3 || selectedHistory.field4 || selectedHistory.field5 || selectedHistory.field6 || consolidatedData) && (
@@ -1879,44 +2172,103 @@ export default function Home() {
                                 </div>
                             )}
                             
-                            {/* Payment Information in History */}
-                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && (
-                                <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Information</h3>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full border-collapse border border-gray-300">
-                                            <thead>
-                                                <tr className="bg-purple-50">
-                                                    {['Date', 'PhonePe', 'Cash', 'Amount', 'Comments'].map(h => (
-                                                        <th key={h} className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">{h}</th>
-                                                    ))}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedHistory.paymentData.map((p: any, i: number) => (
+                            {/* Payment Information in History - Always show */}
+                            <div className="bg-white shadow-lg rounded-lg p-4 mt-4">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                    Payment Information {consolidatedData && <span className="text-sm text-gray-600">(Consolidated from {consolidatedData.recordCount} sheets)</span>}
+                                </h3>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse border border-gray-300">
+                                        <thead>
+                                            <tr className="bg-purple-50">
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Date</th>
+                                                {consolidatedData && <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Sheet Date</th>}
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">PhonePe</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Cash</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Amount</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border border-gray-300">Comments</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 ? (
+                                                selectedHistory.paymentData.map((p: any, i: number) => (
                                                     <tr key={i} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">
-                                                            {p.date}
-                                                            {consolidatedData && p.recordDate && <div className="text-xs text-gray-500">({p.recordDate})</div>}
-                                                        </td>
+                                                        <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.date}</td>
+                                                        {consolidatedData && <td className="px-4 py-3 text-sm border border-gray-300 text-gray-500">{p.recordDate}</td>}
                                                         <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.phonepe}</td>
                                                         <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.cash}</td>
                                                         <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.amount}</td>
                                                         <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{p.comments}</td>
                                                     </tr>
-                                                ))}
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={consolidatedData ? 6 : 5} className="px-4 py-8 text-center text-gray-500 border border-gray-300">
+                                                        No payment information available
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {selectedHistory.paymentData && selectedHistory.paymentData.length > 0 && (
                                                 <tr className="bg-gray-100 font-semibold">
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">TOTAL</td>
+                                                    {consolidatedData && <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">-</td>}
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.phonepe) || 0), 0) || 0}</td>
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.cash) || 0), 0) || 0}</td>
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">{selectedHistory.paymentData?.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0) || 0}</td>
                                                     <td className="px-4 py-3 text-sm border border-gray-300 text-gray-900">-</td>
                                                 </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PDF Confirmation Modal */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
+                        <div className="bg-blue-600 text-white p-4 rounded-t-lg">
+                            <h2 className="text-xl font-bold">Confirm PDF Data</h2>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-4">
+                                PDF data processed successfully.
+                            </p>
+                            <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                                <p className="font-semibold text-blue-800 mb-2">
+                                    Items Found: {matchedItemsCount}
+                                </p>
+                                <p className="font-semibold text-blue-800">
+                                    Total Amount: ₹{pdfTotal.toFixed(2)}
+                                </p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setFilterData(pendingData);
+                                        setShowConfirmModal(false);
+                                        setPendingData([]);
+                                        setChildData([]);
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                                >
+                                    Add
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setChildData([]);
+                                        setShowConfirmModal(false);
+                                        setPendingData([]);
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
