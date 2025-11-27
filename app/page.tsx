@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
-import PDFToExcelConverter from "@/app/invoice-pdf";
+import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
 import LoginForm from "@/app/login";
 
 // Firebase configuration
@@ -83,6 +83,7 @@ const formatDateFromInput = (dateStr: string): string => {
 };
 
 export default function Home() {
+    const pdfConverterRef = useRef<PDFToExcelConverterRef>(null);
     const [childData, setChildData] = useState<ChildData>([]);
     const [filterData, setFilterData] = useState<FilteredItem[]>([]);
     const [isSaving, setIsSaving] = useState(false);
@@ -118,6 +119,7 @@ export default function Home() {
     const [matchedItemsCount, setMatchedItemsCount] = useState(0);
     const [sheetFromDate, setSheetFromDate] = useState('');
     const [sheetToDate, setSheetToDate] = useState('');
+    const [lastSavedToDate, setLastSavedToDate] = useState('');
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -137,6 +139,9 @@ export default function Home() {
     
     const field6Value = totalExpenses.toString();
     const field7Value = Math.abs(parseFloat(field5Value) - parseFloat(field6Value)).toString();
+
+    // Check if this is the latest sheet (no saved sheet after current to date)
+    const isLatestSheet = !sheetToDate || !lastSavedToDate || sheetToDate >= lastSavedToDate;
 
     // Handle closing stock change
     const handleClosingStockChange = (index: number, value: string) => {
@@ -196,6 +201,8 @@ export default function Home() {
 
     // Handle tran out change
     const handleTranOutChange = (index: number, value: string) => {
+        if (!isLatestSheet) return;
+        
         const newValue = parseInt(value) || 0;
         if (newValue < 0) return;
 
@@ -245,6 +252,18 @@ export default function Home() {
         setChildData(data);
         setSaveAllowed(false);
         setSaveStatus('idle');
+    }, []);
+
+    const handlePdfReset = useCallback((): void => {
+        setChildData([]);
+        setPendingData([]);
+        setPdfTotal(0);
+        setMatchedItemsCount(0);
+        setShowConfirmModal(false);
+    }, []);
+
+    const handlePdfConfirm = useCallback((): void => {
+        pdfConverterRef.current?.confirmProcessing();
     }, []);
 
     const filterWineData = useCallback((): void => {
@@ -366,6 +385,8 @@ export default function Home() {
                 // Only load dates if they exist, otherwise keep current auto-generated dates
                 if (data.sheetFromDate) setSheetFromDate(data.sheetFromDate);
                 if (data.sheetToDate) setSheetToDate(data.sheetToDate);
+                // Set last saved to date for validation
+                if (data.sheetToDate) setLastSavedToDate(data.sheetToDate);
                 // Don't load payment data - always start fresh
                 setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
                 setSaveStatus('success');
@@ -436,23 +457,34 @@ export default function Home() {
                 sheetToDate: sheetToDate
             });
 
-            // If closing stock is entered, update opening stock
-            let updatedData;
-            if (hasClosingStock) {
-                updatedData = filterData.map(item => ({
-                    ...item,
-                    openingStock: item.closingStock > 0 ? item.closingStock : item.openingStock,
-                    receipts: item.closingStock > 0 ? 0 : item.receipts,
-                    tranIn: 0,
-                    tranOut: 0,
-                    closingStock: 0,
-                    sales: 0,
-                    amount: '₹0',
-                }));
-            } else {
-                // Keep data as is if no closing stock
-                updatedData = filterData;
-            }
+            // Update opening stock based on closing stock or receipts
+            let updatedData = filterData.map(item => {
+                if (item.closingStock > 0) {
+                    // If closing stock is entered, use it as next opening stock
+                    return {
+                        ...item,
+                        openingStock: item.closingStock,
+                        receipts: 0,
+                        tranIn: 0,
+                        tranOut: 0,
+                        closingStock: 0,
+                        sales: 0,
+                        amount: '₹0',
+                    };
+                } else {
+                    // If no closing stock, add receipts to opening stock
+                    return {
+                        ...item,
+                        openingStock: hasClosingStock ? item.openingStock + item.receipts : item.openingStock,
+                        receipts: hasClosingStock ? 0 : item.receipts,
+                        tranIn: 0,
+                        tranOut: 0,
+                        closingStock: 0,
+                        sales: 0,
+                        amount: '₹0',
+                    };
+                }
+            });
 
             // Save updated data to main collection (latest state) - without payment data
             const docData = {
@@ -492,15 +524,16 @@ export default function Home() {
             setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]); // Clear payment data
             
             // Auto-set next sheet's from date to day after current to date
-            // if (sheetToDate) {
-            //     const parts = sheetToDate.split('/');
-            //     if (parts.length === 3) {
-            //         const nextDay = new Date(parts[2], parts[1] - 1, parts[0]);
-            //         nextDay.setDate(nextDay.getDate() + 1);
-            //         setSheetFromDate(formatDateForDisplay(nextDay.toISOString()));
-            //     }
-            //     setSheetToDate(''); // Clear to date for next sheet
-            // }
+            if (sheetToDate) {
+                const parts = sheetToDate.split('/');
+                if (parts.length === 3) {
+                    const nextDay = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                    nextDay.setDate(nextDay.getDate());
+                    setSheetFromDate(formatDateForDisplay(nextDay.toISOString()));
+                }
+                setLastSavedToDate(sheetToDate); // Update last saved date
+                setSheetToDate(''); // Clear to date for next sheet
+            }
         } catch (error) {
             console.error('Error saving to Firebase:', error);
             console.error('Error details:', error);
@@ -726,11 +759,12 @@ export default function Home() {
     const downloadPDF = () => {
         if (filterData.length === 0) return;
 
-        const printWindow = window.open('', '', 'height=800,width=1000');
-        if (!printWindow) return;
-
         const date = new Date().toLocaleDateString();
-        printWindow.document.write(`
+        const filename = sheetFromDate && sheetToDate ? 
+            `wine-invoice-${username}-${sheetFromDate}-to-${sheetToDate}` :
+            `wine-invoice-${username}-${date.replace(/\//g, '-')}`;
+
+        const htmlContent = `
             <!DOCTYPE html>
             <html>
             <head>
@@ -893,7 +927,12 @@ export default function Home() {
                 </script>
             </body>
             </html>
-        `);
+        `;
+
+        const printWindow = window.open('', '', 'height=800,width=1000');
+        if (!printWindow) return;
+        
+        printWindow.document.write(htmlContent);
         printWindow.document.close();
     };
 
@@ -924,12 +963,22 @@ export default function Home() {
             const shops = new Set<string>();
             
             // Get all collection names that start with 'invoices_'
-            const allCollections = ['shop1', 'shop2', 'shop3']; // You can expand this list
+            const allCollections = [
+                'shop1', 'shop2', 'shop3', 'shop4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
+                'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
+                'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
+                'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
+            ];
             setAvailableShops(allCollections);
         } catch (error) {
             console.error('Error loading shops:', error);
             // Fallback to predefined shops
-            setAvailableShops(['shop1', 'shop2', 'shop3']);
+            setAvailableShops([
+                'shop1', 'shop2', 'shop3', 'shop4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
+                'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
+                'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
+                'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
+            ]);
         }
     };
 
@@ -937,6 +986,20 @@ export default function Home() {
         setSelectedShop(shopName);
         setUsername(shopName);
         setShowShopSelection(false);
+        
+        // Clear all data when switching shops
+        setFilterData([]);
+        setField1('');
+        setField2('');
+        setField3('');
+        setField4('');
+        setField5('');
+        setField6('');
+        setField7('');
+        setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
+        setSheetFromDate('');
+        setSheetToDate('');
+        setChildData([]);
         
         // Update localStorage with selected shop
         const loginData = JSON.parse(localStorage.getItem('wineAppLogin') || '{}');
@@ -1090,11 +1153,14 @@ export default function Home() {
         XLSX.writeFile(workbook, filename);
     };
 
+    // Mobile detection utility
+    const isMobile = () => {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+               window.innerWidth <= 768;
+    };
+
     const downloadHistoryPDF = (historyItem: any) => {
         if (!historyItem.items || historyItem.items.length === 0) return;
-
-        const printWindow = window.open('', '', 'height=800,width=1000');
-        if (!printWindow) return;
 
         const title = consolidatedData ? 
             `Consolidated Report: ${consolidatedData.startDate} to ${consolidatedData.endDate}` :
@@ -1102,14 +1168,19 @@ export default function Home() {
         const subtitle = consolidatedData ? 
             `${consolidatedData.recordCount} sheets consolidated` :
             new Date(historyItem.savedAt).toLocaleTimeString();
+        const filename = consolidatedData ? 
+            `consolidated-${username}-${consolidatedData.startDate}-to-${consolidatedData.endDate}` :
+            `history-${username}-${new Date(historyItem.savedAt).toLocaleDateString().replace(/\//g, '-')}`;
 
-        printWindow.document.write(`
+        const htmlContent = `
             <!DOCTYPE html>
             <html>
             <head>
                 <title>${title}</title>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
                     h1 { color: #2563eb; text-align: center; margin-bottom: 10px; }
                     .date { text-align: center; color: #666; margin-bottom: 20px; }
                     .user-info { text-align: center; color: #666; margin-bottom: 20px; font-weight: bold; }
@@ -1120,12 +1191,24 @@ export default function Home() {
                     .text-center { text-align: center; }
                     .text-right { text-align: right; }
                     @media print { body { padding: 10px; } }
+                    @media (max-width: 768px) {
+                        body { padding: 10px; }
+                        table { font-size: 12px; }
+                        th, td { padding: 6px; }
+                    }
                 </style>
             </head>
             <body>
                 <h1>${consolidatedData ? 'Consolidated Report' : 'Wine Invoice History'}</h1>
                 <div class="user-info">${userRole}: ${username}</div>
                 <div class="date">${subtitle}</div>
+                ${(historyItem.sheetFromDate || historyItem.sheetToDate) ? `
+                    <div style="margin-bottom: 20px; padding: 15px; background-color: #f0f9ff; border-left: 4px solid #2563eb;">
+                        <h3 style="color: #2563eb; margin: 0 0 10px 0;">Sheet Period</h3>
+                        <p style="margin: 5px 0;"><strong>From:</strong> ${historyItem.sheetFromDate || 'Not specified'}</p>
+                        <p style="margin: 5px 0;"><strong>To:</strong> ${historyItem.sheetToDate || 'Not specified'}</p>
+                    </div>
+                ` : ''}
                 <table>
                     <thead>
                         <tr>
@@ -1183,41 +1266,39 @@ export default function Home() {
                     </tbody>
                 </table>
                 
-                ${(historyItem.field1 || historyItem.field2 || historyItem.field3 || historyItem.field4 || historyItem.field5 || historyItem.field6) ? `
-                    <div style="margin-top: 30px;">
-                        <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total Sale</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field1 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Opening Balance</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field2 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field3 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Jama</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field4 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field5 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Expenses</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field6 || '0'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Closing Balance</td>
-                                <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field7 || '0'}</td>
-                            </tr>
-                        </table>
-                    </div>
-                ` : ''}
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #2563eb; margin-bottom: 15px;">Additional Information</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total Sale</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field1 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Opening Balance</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field2 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field3 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Jama</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field4 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Total</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field5 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Expenses</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field6 || '0'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background-color: #f3e8ff;">Closing Balance</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.field7 || '0'}</td>
+                        </tr>
+                    </table>
+                </div>
                 
                 <div style="margin-top: 30px;">
                     <h3 style="color: #2563eb; margin-bottom: 15px;">Payment Information${consolidatedData ? ` (Consolidated from ${consolidatedData.recordCount} sheets)` : ''}</h3>
@@ -1234,19 +1315,16 @@ export default function Home() {
                         </thead>
                         <tbody>
                             ${historyItem.paymentData && historyItem.paymentData.length > 0 ? 
-                                historyItem.paymentData.map((payment: any) => `
+                                historyItem.paymentData.filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments).map((payment: any) => `
                                     <tr>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.date}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.date || '-'}</td>
                                         ${consolidatedData ? `<td style="padding: 10px; border: 1px solid #ddd;">${payment.recordDate || ''}</td>` : ''}
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe}</td>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash}</td>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount}</td>
-                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.phonepe || '0'}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.cash || '0'}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.amount || '0'}</td>
+                                        <td style="padding: 10px; border: 1px solid #ddd;">${payment.comments || '-'}</td>
                                     </tr>
-                                `).join('') :
-                                `<tr><td colspan="${consolidatedData ? '6' : '5'}" style="padding: 20px; text-align: center; color: #666; border: 1px solid #ddd;">No payment information available</td></tr>`
-                            }
-                            ${historyItem.paymentData && historyItem.paymentData.length > 0 ? `
+                                `).join('') + `
                                 <tr style="background-color: #f3f4f6; font-weight: bold;">
                                     <td style="padding: 10px; border: 1px solid #ddd;">TOTAL</td>
                                     ${consolidatedData ? '<td style="padding: 10px; border: 1px solid #ddd;">-</td>' : ''}
@@ -1254,21 +1332,40 @@ export default function Home() {
                                     <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.cash) || 0), 0)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">${historyItem.paymentData.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0)}</td>
                                     <td style="padding: 10px; border: 1px solid #ddd;">-</td>
-                                </tr>
-                            ` : ''}
+                                </tr>` :
+                                `<tr><td colspan="${consolidatedData ? '6' : '5'}" style="padding: 20px; text-align: center; color: #666; border: 1px solid #ddd;">No payment information available</td></tr>`
+                            }
                         </tbody>
                     </table>
                 </div>
-                <script>
-                    window.onload = () => {
-                        window.print();
-                        window.onafterprint = () => window.close();
-                    };
-                </script>
             </body>
             </html>
-        `);
-        printWindow.document.close();
+        `;
+
+        if (isMobile()) {
+            // For mobile devices, create a blob and trigger direct download
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename + '.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } else {
+            // For desktop, use the print window approach
+            const printWindow = window.open('', '', 'height=800,width=1000');
+            if (!printWindow) return;
+            
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            
+            printWindow.onload = () => {
+                printWindow.print();
+                printWindow.onafterprint = () => printWindow.close();
+            };
+        }
     };
 
     const viewHistorySheet = (record: any) => {
@@ -1280,79 +1377,168 @@ export default function Home() {
         setConsolidatedData(null);
     };
 
-    const consolidateSheets = () => {
-        if (!startDate || !endDate) return;
-        const records = historyData.filter((r: any) => {
-            if (!r.hasClosingStock) return false;
-            const sheetStart = r.sheetFromDate;
-            const sheetEnd = r.sheetToDate;
-            if (!sheetStart || !sheetEnd) return false;
-            return sheetStart <= endDate && sheetEnd >= startDate;
-        }).sort((a: any, b: any) => new Date(a.sheetFromDate).getTime() - new Date(b.sheetFromDate).getTime());
-        if (!records.length) return;
-        
-        const [first, last] = [records[0], records[records.length - 1]];
-        const items = new Map<string, any>();
-        
-        records.forEach((r: any) => r.items.forEach((item: FilteredItem) => {
-            const key = item.particulars;
-            if (!items.has(key)) items.set(key, {...item, openingStock: 0, receipts: 0, tranIn: 0, tranOut: 0, sales: 0});
-            const c = items.get(key)!;
-            (['receipts', 'tranIn', 'tranOut', 'sales'] as const).forEach((f: keyof FilteredItem) => {
-                c[f] = (c[f] || 0) + (item[f] || 0);
+    const consolidateSheets = async () => {
+        if (!startDate || !endDate || !username) return;
+
+        try {
+            // Parse date helper function
+            const parseDate = (dateStr: string) => {
+                if (!dateStr) return null;
+                if (dateStr.includes('/')) {
+                    const parts = dateStr.split('/');
+                    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                }
+                return dateStr;
+            };
+
+            // Filter records that have closing stock and overlap with the selected date range
+            const matchingRecords = historyData.filter((record: any) => {
+                if (!record.hasClosingStock) return false;
+                
+                const sheetStart = parseDate(record.sheetFromDate);
+                const sheetEnd = parseDate(record.sheetToDate);
+                
+                if (!sheetStart || !sheetEnd) return false;
+                
+                // Check if the sheet period overlaps with the selected range
+                return sheetStart <= endDate && sheetEnd >= startDate;
             });
-        }));
-        
-        first.items.forEach((item: FilteredItem) => {
-            if (items.has(item.particulars)) {
-                items.get(item.particulars)!.openingStock = item.openingStock;
+
+            if (matchingRecords.length === 0) {
+                alert('No records found with closing stock data in the selected date range.');
+                return;
             }
-        });
-        
-        last.items.forEach((item: FilteredItem) => {
-            if (items.has(item.particulars)) {
-                items.get(item.particulars)!.closingStock = item.closingStock;
+
+            // Sort records by date to get first and last sheets
+            const sortedRecords = matchingRecords.sort((a: any, b: any) => {
+                const dateA = parseDate(a.sheetToDate) || '0';
+                const dateB = parseDate(b.sheetToDate) || '0';
+                return dateA.localeCompare(dateB);
+            });
+            
+            const firstSheet = sortedRecords[0];
+            const lastSheet = sortedRecords[sortedRecords.length - 1];
+            
+            // Get particulars from the last sheet
+            const consolidatedItems: { [key: string]: FilteredItem } = {};
+            const allPaymentData: any[] = [];
+            
+            // Initialize with particulars from last sheet
+            if (lastSheet.items && Array.isArray(lastSheet.items)) {
+                lastSheet.items.forEach((item: FilteredItem) => {
+                    const key = `${item.particulars}_${item.rate}`;
+                    consolidatedItems[key] = {
+                        ...item,
+                        openingStock: 0, // Will be set from first sheet
+                        receipts: 0, // Will be summed from all sheets
+                        tranIn: 0, // Will be summed from all sheets
+                        tranOut: 0, // Will be summed from all sheets
+                        closingStock: item.closingStock || 0, // From last sheet
+                        sales: 0 // Will be summed from all sheets
+                    };
+                });
             }
-        });
-        
-        // Recalculate amounts for all items after consolidation
-        Array.from(items.values()).forEach(item => {
-            if (item.sales >= 0) {
-                item.amount = `₹${(item.sales * item.rate).toFixed(2)}`;
+            
+            // Set opening stock from first sheet
+            if (firstSheet.items && Array.isArray(firstSheet.items)) {
+                firstSheet.items.forEach((item: FilteredItem) => {
+                    const key = `${item.particulars}_${item.rate}`;
+                    if (consolidatedItems[key]) {
+                        consolidatedItems[key].openingStock = item.openingStock || 0;
+                    }
+                });
             }
-        });
-        
-        // Calculate total sale amount from consolidated items
-        const totalSaleFromItems = Array.from(items.values()).reduce((sum, item) => {
-            const amount = parseFloat(item.amount.replace('₹', '').replace(/,/g, '')) || 0;
-            return sum + amount;
-        }, 0);
-        const f1 = totalSaleFromItems.toFixed(2);
-        const f2 = (parseFloat(first.field2) || 0).toFixed(2);
-        const f4 = records.reduce((s: number, r: any) => s + (parseFloat(r.field4) || 0), 0).toFixed(2);
-        const f6 = records.reduce((s: number, r: any) => s + (parseFloat(r.field6) || 0), 0).toFixed(2);
-        const f3 = (parseFloat(f1) + parseFloat(f2)).toFixed(2);
-        const f5 = (parseFloat(f3) + parseFloat(f4)).toFixed(2);
-        const f7 = (parseFloat(f5) - parseFloat(f6)).toFixed(2);
-        
-        // Collect all payment data with record dates
-        const allPayments = records.flatMap((r: any) => 
-            (r.paymentData || []).filter((p: any) => p.date || p.phonepe || p.cash || p.amount || p.comments)
-                .map((p: any) => ({...p, recordDate: `${r.sheetFromDate} to ${r.sheetToDate}`}))
-        );
-        
-        const data = {
-            items: Array.from(items.values()),
-            startDate, endDate, recordCount: records.length, savedAt: `${startDate} to ${endDate}`,
-            field1: f1, field2: f2, field3: f3, field4: f4, field5: f5, field6: f6, field7: f7,
-            paymentData: allPayments,
-            sheetFromDate: startDate,
-            sheetToDate: endDate
-        };
-        
-        setConsolidatedData(data);
-        setSelectedHistory(data);
+            
+            // Sum receipts, tranIn, tranOut, and sales from all sheets
+            sortedRecords.forEach((record: any) => {
+                if (record.items && Array.isArray(record.items)) {
+                    record.items.forEach((item: FilteredItem) => {
+                        const key = `${item.particulars}_${item.rate}`;
+                        
+                        if (consolidatedItems[key]) {
+                            // Sum these values from all sheets
+                            consolidatedItems[key].receipts += item.receipts || 0;
+                            consolidatedItems[key].tranIn += item.tranIn || 0;
+                            consolidatedItems[key].tranOut += item.tranOut || 0;
+                            consolidatedItems[key].sales += item.sales || 0;
+                            
+                            // Recalculate amount based on total sales
+                            const totalSales = consolidatedItems[key].sales;
+                            consolidatedItems[key].amount = `₹${(totalSales * consolidatedItems[key].rate).toFixed(2)}`;
+                        }
+                    });
+                }
+
+                // Consolidate payment data with record date information
+                if (record.paymentData && Array.isArray(record.paymentData)) {
+                    record.paymentData.forEach((payment: any) => {
+                        // Only include payments that have actual data
+                        if (payment.date || payment.phonepe || payment.cash || payment.amount || payment.comments) {
+                            allPaymentData.push({
+                                ...payment,
+                                recordDate: `${record.sheetFromDate || 'N/A'} to ${record.sheetToDate || 'N/A'}`
+                            });
+                        }
+                    });
+                }
+            });
+            
+            // Sum field values from all sheets, but use opening balance from first sheet
+            let totalField1 = 0;
+            let totalField2 = parseFloat(firstSheet.field2 || '0'); // Opening balance from first sheet
+            let totalField3 = 0;
+            let totalField4 = 0;
+            let totalField5 = 0;
+            let totalField6 = 0;
+            let totalField7 = 0;
+
+            sortedRecords.forEach((record: any) => {
+                totalField1 += parseFloat(record.field1 || '0');
+                // Skip field2 - already set from first sheet
+                totalField3 += parseFloat(record.field3 || '0');
+                totalField4 += parseFloat(record.field4 || '0');
+                totalField5 += parseFloat(record.field5 || '0');
+                totalField6 += parseFloat(record.field6 || '0');
+                totalField7 += parseFloat(record.field7 || '0');
+            });
+
+            // Convert consolidated items back to array
+            const consolidatedItemsArray = Object.values(consolidatedItems);
+
+            // Create consolidated record
+            const consolidatedRecord = {
+                items: consolidatedItemsArray,
+                paymentData: allPaymentData,
+                field1: totalField1.toString(),
+                field2: totalField2.toString(),
+                field3: totalField3.toString(),
+                field4: totalField4.toString(),
+                field5: totalField5.toString(),
+                field6: totalField6.toString(),
+                field7: totalField7.toString(),
+                sheetFromDate: startDate,
+                sheetToDate: endDate,
+                savedAt: new Date().toISOString()
+            };
+
+            // Set consolidated data info
+            setConsolidatedData({
+                startDate,
+                endDate,
+                recordCount: matchingRecords.length
+            });
+
+            // Show the consolidated record
+            setSelectedHistory(consolidatedRecord);
+            setShowHistory(false);
+
+        } catch (error) {
+            console.error('Error consolidating sheets:', error);
+            alert('Error consolidating sheets. Please try again.');
+        }
     };
+
+    
 
     const handleLogout = () => {
         setIsLoggedIn(false);
@@ -1382,6 +1568,20 @@ export default function Home() {
 
     useEffect(() => {
         if (isLoggedIn && username) {
+            // Clear all data before loading new shop data
+            setFilterData([]);
+            setField1('');
+            setField2('');
+            setField3('');
+            setField4('');
+            setField5('');
+            setField6('');
+            setField7('');
+            setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
+            setSheetFromDate('');
+            setSheetToDate('');
+            setChildData([]);
+            
             loadFromFirebase();
         }
     }, [isLoggedIn, username]);
@@ -1472,7 +1672,12 @@ export default function Home() {
                             })}
                         </h2>
                     </div>
-                    <PDFToExcelConverter sendDataToParent={handleDataFromChild} saveAllowed={saveAllowed} />
+                    <PDFToExcelConverter 
+                        ref={pdfConverterRef}
+                        sendDataToParent={handleDataFromChild} 
+                        saveAllowed={saveAllowed} 
+                        onReset={handlePdfReset}
+                    />
                 </div>
 
                 {filterData.length > 0 && (
@@ -1623,7 +1828,7 @@ export default function Home() {
                                                     {item.size}
                                                 </span>
                                             </td>
-                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                            <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-900">
                                                 <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
                                             </td>
                                             <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
@@ -1677,25 +1882,25 @@ export default function Home() {
                                         <tr className="font-bold">
                                             <td className="px-2 sm:px-4 py-3 text-sm text-gray-800">TOTAL</td>
                                             <td className="px-2 sm:px-4 py-3 text-center">-</td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.openingStock, 0)}
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-blue-600">
                                                 {filterData.reduce((sum, item) => sum + item.receipts, 0)}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.tranIn, 0)}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.tranOut, 0)}
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-purple-600">
                                                 {filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.closingStock, 0)}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm">
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.sales, 0)}
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 text-center">-</td>
@@ -1965,39 +2170,84 @@ export default function Home() {
                                         type="month"
                                         value={selectedMonth}
                                         onChange={(e) => setSelectedMonth(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
                                     />
                                 </div>
                                 <div className="border-t pt-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Consolidate Date Range</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="date"
-                                            value={startDate}
-                                            onChange={(e) => setStartDate(e.target.value)}
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                            placeholder="Period Start"
-                                        />
-                                        <input
-                                            type="date"
-                                            value={endDate}
-                                            onChange={(e) => setEndDate(e.target.value)}
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
-                                            placeholder="Period End"
-                                        />
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <div className="flex-1">
+                                                <label className="block text-xs text-gray-600 mb-1">Start Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={startDate}
+                                                    onChange={(e) => setStartDate(e.target.value)}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="block text-xs text-gray-600 mb-1">End Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={endDate}
+                                                    onChange={(e) => setEndDate(e.target.value)}
+                                                    min={startDate}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-center">
                                         <button
                                             onClick={consolidateSheets}
                                             disabled={!startDate || !endDate}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm transition-colors"
+                                            title={!startDate || !endDate ? 'Please select both start and end dates' : 'Consolidate sheets in date range'}
                                         >
                                             Consolidate
                                         </button>
+                                        </div>
+                                        {startDate && endDate && startDate > endDate && (
+                                            <p className="text-xs text-red-600 mt-1">End date must be after start date</p>
+                                        )}
                                     </div>
-                                    <p className="text-xs text-gray-600 mt-2">Consolidates sheets that overlap with the selected date range</p>
+                                    <p className="text-xs text-gray-600 mt-2">Consolidates all sheets with closing stock data that overlap with the selected date range</p>
+                                    
+                                    {/* Debug Information */}
+                                    {startDate && endDate && (
+                                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                            <p className="text-xs font-medium text-gray-700 mb-2">Debug Info:</p>
+                                            <p className="text-xs text-gray-600">Total records: {historyData.length}</p>
+                                            <p className="text-xs text-gray-600">Records with closing stock: {historyData.filter(r => r.hasClosingStock).length}</p>
+                                            <p className="text-xs text-gray-600">Selected range: {startDate} to {endDate}</p>
+                                            <p className="text-xs text-gray-600">
+                                                Matching records: {historyData.filter((r: any) => {
+                                                    if (!r.hasClosingStock) return false;
+                                                    const parseDate = (dateStr: string) => {
+                                                        if (!dateStr) return null;
+                                                        if (dateStr.includes('/')) {
+                                                            const parts = dateStr.split('/');
+                                                            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                                                        }
+                                                        return dateStr;
+                                                    };
+                                                    const sheetStart = parseDate(r.sheetFromDate);
+                                                    const sheetEnd = parseDate(r.sheetToDate);
+                                                    if (!sheetStart || !sheetEnd) return false;
+                                                    return sheetStart <= endDate && sheetEnd >= startDate;
+                                                }).length}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            {historyData.filter(record => record.hasClosingStock).length === 0 ? (
-                                <p className="text-center text-gray-500 py-8">No closing stock history found</p>
+                            {historyData.length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">No history records found</p>
+                            ) : historyData.filter(record => record.hasClosingStock).length === 0 ? (
+                                <div className="text-center py-8">
+                                    <p className="text-gray-500 mb-2">No closing stock history found</p>
+                                    <p className="text-xs text-gray-400">Found {historyData.length} total records, but none have closing stock data</p>
+                                </div>
                             ) : (
                                 <div className="space-y-2">
                                     {historyData
@@ -2008,11 +2258,32 @@ export default function Home() {
                                             const recordMonth = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
                                             return recordMonth === selectedMonth;
                                         })
-                                        .map((record) => (
+                                        .map((record) => {
+                                            // Check if this record matches the selected date range
+                                            const isMatched = startDate && endDate && (() => {
+                                                const parseDate = (dateStr: string) => {
+                                                    if (!dateStr) return null;
+                                                    if (dateStr.includes('/')) {
+                                                        const parts = dateStr.split('/');
+                                                        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                                                    }
+                                                    return dateStr;
+                                                };
+                                                const sheetStart = parseDate(record.sheetFromDate);
+                                                const sheetEnd = parseDate(record.sheetToDate);
+                                                if (!sheetStart || !sheetEnd) return false;
+                                                return sheetStart <= endDate && sheetEnd >= startDate;
+                                            })();
+                                            
+                                            return (
                                         <button
                                             key={record.id}
                                             onClick={() => viewHistorySheet(record)}
-                                            className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition"
+                                            className={`w-full text-left px-4 py-3 border rounded-lg transition ${
+                                                isMatched 
+                                                    ? 'border-green-400 bg-green-50 hover:bg-green-100' 
+                                                    : 'border-gray-200 hover:bg-blue-50 hover:border-blue-300'
+                                            }`}
                                         >
                                             <p className="font-semibold text-blue-600 hover:text-blue-700">
                                                 {/*{record.invoiceName || new Date(record.savedAt).toLocaleDateString('en-US', {*/}
@@ -2035,7 +2306,8 @@ export default function Home() {
                                                 </span>
                                             )}
                                         </button>
-                                    ))}
+                                            );
+                                        })}
                                     {historyData
                                         .filter(record => record.hasClosingStock)
                                         .filter(record => {
@@ -2117,13 +2389,13 @@ export default function Home() {
                                             <tr key={i} className="border-b border-gray-200 hover:bg-purple-50">
                                                 <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
                                                 <td className="px-4 py-3 text-center text-sm"><span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700">{item.size}</span></td>
-                                                <td className="px-4 py-3 text-center text-sm">{item.openingStock}</td>
+                                                <td className="px-4 py-3 text-center text-sm text-gray-900">{item.openingStock}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{item.tranIn}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">{item.tranOut}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
                                                 <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.sales}</td>
-                                                <td className="px-4 py-3 text-center text-sm">₹{item.rate}</td>
+                                                <td className="px-4 py-3 text-center text-sm text-gray-900">₹{item.rate}</td>
                                                 <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{item.amount}</td>
                                             </tr>
                                         ))}
@@ -2253,6 +2525,9 @@ export default function Home() {
                                         setShowConfirmModal(false);
                                         setPendingData([]);
                                         setChildData([]);
+                                        setPdfTotal(0);
+                                        setMatchedItemsCount(0);
+                                        handlePdfConfirm();
                                     }}
                                     className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
                                 >
@@ -2260,9 +2535,7 @@ export default function Home() {
                                 </button>
                                 <button
                                     onClick={() => {
-                                        setChildData([]);
-                                        setShowConfirmModal(false);
-                                        setPendingData([]);
+                                        handlePdfReset();
                                     }}
                                     className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition"
                                 >
