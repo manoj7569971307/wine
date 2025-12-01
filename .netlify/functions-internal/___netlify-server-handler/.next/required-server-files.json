@@ -100,7 +100,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "/home/nexbuilder/wines/accounts-sheet",
+    "outputFileTracingRoot": "/home/manoj/pro/wine",
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -291,11 +291,11 @@
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "/home/nexbuilder/wines/accounts-sheet"
+      "root": "/home/manoj/pro/wine"
     },
     "distDirRoot": ".next"
   },
-  "appDir": "/home/nexbuilder/wines/accounts-sheet",
+  "appDir": "/home/manoj/pro/wine",
   "relativeAppDir": "",
   "files": [
     ".next/routes-manifest.json",

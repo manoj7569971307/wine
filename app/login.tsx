@@ -34,7 +34,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
         if (selectedRole === 'admin') {
             // Admin credentials
-            if (username === 'admin' && password === 'admin') {
+            if (username === 'admin' && password === 'GOPI') {
                 isValid = true;
             }
         } else if (selectedRole === 'shopowner') {

@@ -12,7 +12,7 @@ package = "@netlify/plugin-nextjs"
 [plugins.inputs]
 
 [build]
-publish = "/home/nexbuilder/wines/accounts-sheet/.next"
+publish = "/home/manoj/pro/wine/.next"
 publishOrigin = "ui"
 commandOrigin = "ui"
 command = "npm run build"
