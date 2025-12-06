@@ -4,15 +4,6 @@
 import { useState } from 'react';
 import { Upload, Download, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
 
-const firebaseConfig = {
-    apiKey: "AIzaSyBf-dvyFjMttuLD43V4MBBRbuvfbwBRKsI",
-    authDomain: "wines-sheet.firebaseapp.com",
-    projectId: "wines-sheet",
-    storageBucket: "wines-sheet.firebasestorage.app",
-    messagingSenderId: "313820033015",
-    appId: "1:313820033015:web:75cc4ccf84217324bf08f2",
-    measurementId: "G-C8JCT3DNNH"
-};
 interface Wine {
     "S.no": number,
     "Brand Number": string | number,

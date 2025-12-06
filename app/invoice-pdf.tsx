@@ -22,17 +22,6 @@ interface PDFToExcelConverterRef {
 
 type TableData = string[][];
 
-// Firebase configuration
-const firebaseConfig = {
-    apiKey: "AIzaSyBf-dvyFjMttuLD43V4MBBRbuvfbwBRKsI",
-    authDomain: "wines-sheet.firebaseapp.com",
-    projectId: "wines-sheet",
-    storageBucket: "wines-sheet.firebasestorage.app",
-    messagingSenderId: "313820033015",
-    appId: "1:313820033015:web:75cc4ccf84217324bf08f2",
-    measurementId: "G-C8JCT3DNNH"
-};
-
 const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConverterProps>(({ sendDataToParent, saveAllowed, onReset }, ref) => {
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [tableData, setTableData] = useState<TableData>([]);
@@ -79,7 +68,15 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                 // Initialize Firebase
                 const firebase = (window as any).firebase;
                 if (!firebase.apps.length) {
-                    firebase.initializeApp(firebaseConfig);
+                    firebase.initializeApp({
+                        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+                        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+                        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+                        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+                        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+                        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+                        measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+                    });
                 }
 
                 setFirebaseReady(true);

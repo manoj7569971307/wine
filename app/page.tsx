@@ -1,28 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
 import LoginForm from "@/app/login";
-
-// Firebase configuration
-const firebaseConfig = {
-    apiKey: "AIzaSyBf-dvyFjMttuLD43V4MBBRbuvfbwBRKsI",
-    authDomain: "wines-sheet.firebaseapp.com",
-    projectId: "wines-sheet",
-    storageBucket: "wines-sheet.firebasestorage.app",
-    messagingSenderId: "313820033015",
-    appId: "1:313820033015:web:75cc4ccf84217324bf08f2",
-    measurementId: "G-C8JCT3DNNH"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+import { db } from "@/app/lib/firebase";
 
 interface FilteredItem {
     particulars: string;
