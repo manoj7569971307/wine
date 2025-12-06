@@ -1,5 +1,4 @@
 import React from 'react';
-import Button from '../ui/Button';
 
 interface ShopSelectionProps {
     availableShops: string[];

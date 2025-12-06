@@ -14,10 +14,12 @@ interface PDFToExcelConverterProps {
     sendDataToParent: (data: string[][]) => void;
     saveAllowed: boolean;
     onReset?: () => void;
+    onShowIdocs?: (idocs: Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>) => void;
 }
 
 interface PDFToExcelConverterRef {
     confirmProcessing: () => void;
+    loadAllIdocs: () => Promise<void>;
 }
 
 type TableData = string[][];
@@ -33,7 +35,7 @@ const firebaseConfig = {
     measurementId: "G-C8JCT3DNNH"
 };
 
-const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConverterProps>(({ sendDataToParent, saveAllowed, onReset }, ref) => {
+const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConverterProps>(({ sendDataToParent, saveAllowed, onReset, onShowIdocs }, ref) => {
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [tableData, setTableData] = useState<TableData>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -44,6 +46,8 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
     const [showDuplicateModal, setShowDuplicateModal] = useState<boolean>(false);
     const [duplicateIdoc, setDuplicateIdoc] = useState<string>('');
     const [firebaseReady, setFirebaseReady] = useState<boolean>(false);
+    const [showIdocList, setShowIdocList] = useState<boolean>(false);
+    const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>>([]);
 
     // Load Firebase SDK
     useEffect(() => {
@@ -364,6 +368,13 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // Double check Firebase is ready
+        if (!firebaseReady) {
+            setError('Please wait for Firebase to initialize');
+            e.target.value = '';
+            return;
+        }
+
         if (file.type !== 'application/pdf') {
             setError('Please upload a PDF file');
             e.target.value = ''; // Clear input on error
@@ -407,8 +418,37 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
         }
     };
 
+    const loadAllIdocs = async (): Promise<void> => {
+        try {
+            const firebase = (window as any).firebase;
+            const db = firebase.firestore();
+
+            const querySnapshot = await db.collection('processedIdocs')
+                .orderBy('timestamp', 'desc')
+                .get();
+
+            const idocs = querySnapshot.docs.map((doc: any) => ({
+                id: doc.id,
+                idocNumber: doc.data().idocNumber,
+                fileName: doc.data().fileName,
+                timestamp: doc.data().timestamp
+            }));
+
+            setIdocList(idocs);
+            if (onShowIdocs) {
+                onShowIdocs(idocs);
+            } else {
+                setShowIdocList(true);
+            }
+        } catch (err) {
+            console.error('Error loading iDOCs:', err);
+            setError('Failed to load iDOC list');
+        }
+    };
+
     useImperativeHandle(ref, () => ({
-        confirmProcessing
+        confirmProcessing,
+        loadAllIdocs
     }));
 
     return (
@@ -443,6 +483,13 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                         </div>
                     )}
 
+                    {!firebaseReady && (
+                        <div className="mb-6 bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4 flex items-center gap-3">
+                            <div className="w-5 h-5 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-yellow-700 font-semibold">Initializing Firebase... Please wait</p>
+                        </div>
+                    )}
+
                     <div className="space-y-4">
                         <label className="block">
                             <span className="text-gray-700 font-medium">Upload Invoice PDF</span>
@@ -450,12 +497,45 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                                 type="file"
                                 accept=".pdf"
                                 onChange={handleFileUpload}
-                                className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                disabled={!firebaseReady}
+                                className={`mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold ${firebaseReady ? 'file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100' : 'file:bg-gray-200 file:text-gray-400 cursor-not-allowed'}`}
                             />
+                            {!firebaseReady && (
+                                <p className="mt-2 text-xs text-gray-500">File upload will be enabled once Firebase is ready</p>
+                            )}
                         </label>
                     </div>
                 </div>
             </div>
+
+            {showIdocList && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+                        <div className="bg-purple-600 text-white p-4 flex justify-between items-center">
+                            <h2 className="text-xl font-bold">ICDC IDs ({idocList.length})</h2>
+                            <button
+                                onClick={() => setShowIdocList(false)}
+                                className="text-white hover:bg-purple-700 rounded-full p-2 transition"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {idocList.length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">No PDFs processed yet</p>
+                            ) : (
+                                <div className="space-y-1">
+                                    {idocList.map((item) => (
+                                        <div key={item.id} className="p-2 hover:bg-purple-50 rounded">
+                                            <p className="font-mono text-sm text-purple-700">{item.idocNumber}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {showDuplicateModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

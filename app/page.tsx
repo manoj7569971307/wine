@@ -129,6 +129,8 @@ export default function Home() {
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [showClosingStockView, setShowClosingStockView] = useState(false);
     const [originalClosingStocks, setOriginalClosingStocks] = useState<{[key: string]: number}>({});
+    const [showIdocList, setShowIdocList] = useState(false);
+    const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>>([]);
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -1227,17 +1229,6 @@ export default function Home() {
             return;
         }
 
-        // Validation: Check for duplicate From Date
-        const duplicateDate = historyData.find(record =>
-            record.id !== editingHistory.id &&
-            record.sheetFromDate === formatDateFromInput(editedDates.from)
-        );
-
-        if (duplicateDate) {
-            alert(`A sheet with From Date ${formatDateFromInput(editedDates.from)} already exists. Please choose a different date.`);
-            return;
-        }
-
         setIsSaving(true);
         try {
             const historyCollectionName = getHistoryCollectionName();
@@ -1635,10 +1626,10 @@ export default function Home() {
                 <div className="container mx-auto flex justify-between items-center">
                     <div>
                         <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold">
-                            Wine Invoice Tracker
+                            {userRole === 'Shop Owner' ? username : 'Wine Invoice Tracker'}
                         </h1>
                         <p className="text-blue-100 text-sm mt-1">
-                            {userRole}: {username} {userRole === 'Admin' && selectedShop && selectedShop !== 'admin' && `(Viewing: ${selectedShop})`}
+                            {userRole}{userRole === 'Admin' && selectedShop && selectedShop !== 'admin' && ` (Viewing: ${selectedShop})`}
                         </p>
                     </div>
                     <div className="flex gap-2">
@@ -1678,6 +1669,10 @@ export default function Home() {
                         sendDataToParent={handleDataFromChild}
                         saveAllowed={saveAllowed}
                         onReset={handlePdfReset}
+                        onShowIdocs={(idocs) => {
+                            setIdocList(idocs);
+                            setShowIdocList(true);
+                        }}
                     />
                 </div>
 
@@ -1747,17 +1742,29 @@ export default function Home() {
                                     </button>
 
                                     {(userRole === 'Shop Owner' || (userRole === 'Admin' && selectedShop && selectedShop !== 'admin')) && (
-                                        <button
-                                            onClick={loadHistory}
-                                            disabled={isLoading}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${isLoading
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg'
-                                                }`}
-                                        >
-                                            <Download className="w-4 h-4" />
-                                            History
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={loadHistory}
+                                                disabled={isLoading}
+                                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${isLoading
+                                                    ? 'bg-gray-400 cursor-not-allowed'
+                                                    : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg'
+                                                    }`}
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                History
+                                            </button>
+                                            <button
+                                                onClick={() => pdfConverterRef.current?.loadAllIdocs()}
+                                                disabled={isLoading}
+                                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${isLoading
+                                                    ? 'bg-gray-400 cursor-not-allowed'
+                                                    : 'bg-orange-600 hover:bg-orange-700 text-white shadow-md hover:shadow-lg'
+                                                    }`}
+                                            >
+                                                ID's
+                                            </button>
+                                        </>
                                     )}
 
                                     <div className="h-6 w-px bg-gray-300"></div>
@@ -2142,6 +2149,36 @@ export default function Home() {
                     </div>
                 )}
             </main>
+
+            {/* ICDC IDs Modal */}
+            {showIdocList && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl max-w-md w-full max-h-[70vh] overflow-hidden flex flex-col">
+                        <div className="bg-orange-600 text-white p-4 flex justify-between items-center">
+                            <h2 className="text-xl font-bold">ICDC IDs ({idocList.length})</h2>
+                            <button
+                                onClick={() => setShowIdocList(false)}
+                                className="text-white hover:bg-orange-700 rounded-full p-2 transition"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {idocList.length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">No PDFs processed yet</p>
+                            ) : (
+                                <div className="space-y-1">
+                                    {idocList.map((item) => (
+                                        <div key={item.id} className="p-2 hover:bg-orange-50 rounded">
+                                            <p className="font-mono text-sm text-orange-700">{item.idocNumber}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* History Modal */}
             {showHistory && (
