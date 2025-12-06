@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { User, Store, Lock, Mail } from 'lucide-react';
+import { User, Store, Lock, Mail, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
     onLoginSuccess: (roleName: string, username: string) => void;
@@ -12,6 +12,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     const [password, setPassword] = useState('');
     const [selectedRole, setSelectedRole] = useState('');
     const [error, setError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     const roles = [
         { id: 'admin', name: 'Admin', icon: User, color: 'from-purple-500 to-purple-700' },
@@ -39,10 +40,17 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             }
         } else if (selectedRole === 'shopowner') {
             // Shop owner credentials (30 shops)
-            const shopOwners = Array.from({ length: 30 }, (_, i) => ({
-                username: `shop${i + 1}`,
-                password: `shop_${i + 1}`
-            }));
+            const shopOwners = [
+                { username: 'likitha wines', password: 'shop_1' },
+                { username: 'shivani wines', password: 'shop_2' },
+                { username: 'laxmi wines', password: 'shop_3' },
+                { username: 'shivani wines', password: 'shop_4' },
+                { username: 'sri thirumala wines', password: 'shop_5' },
+                ...Array.from({ length: 25 }, (_, i) => ({
+                    username: `shop${i + 6}`,
+                    password: `shop_${i + 6}`
+                }))
+            ];
 
             isValid = shopOwners.some(
                 owner => owner.username === username && owner.password === password
@@ -132,12 +140,21 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     placeholder="Enter your password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-gray-900"
+                                    className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-gray-900"
                                 />
+                                {password && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                                    >
+                                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
+                                )}
                             </div>
                         </div>
 

@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
 import LoginForm from "@/app/login";
+import FeedbackButton from "@/app/components/FeedbackButton";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -2878,6 +2879,8 @@ export default function Home() {
                     </div>
                 </div>
             )}
+            
+            <FeedbackButton />
         </div>
     );
 }
