@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { User, Store, Lock, Mail } from 'lucide-react';
+import {User, Store, Lock, Mail, Eye, EyeOff} from 'lucide-react';
 
 interface LoginProps {
     onLoginSuccess: (roleName: string, username: string) => void;
@@ -12,6 +12,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     const [password, setPassword] = useState('');
     const [selectedRole, setSelectedRole] = useState('');
     const [error, setError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     const roles = [
         { id: 'admin', name: 'Admin', icon: User, color: 'from-purple-500 to-purple-700' },
@@ -130,14 +131,20 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                                 Password
                             </label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     placeholder="Enter your password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-gray-900"
+                                    className="w-full pl-4 pr-11 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-gray-900"
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
                             </div>
                         </div>
 
