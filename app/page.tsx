@@ -283,6 +283,7 @@ export default function Home() {
         if (newValue < 0) return;
 
         setFilterData(prevData => {
+
             const newData = [...prevData];
             const item = newData[index];
             item.tranIn = newValue;
