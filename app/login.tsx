@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Store, Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import { db } from './lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface LoginProps {
     onLoginSuccess: (roleName: string, username: string) => void;
@@ -13,6 +15,17 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     const [selectedRole, setSelectedRole] = useState('');
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [shops, setShops] = useState<any[]>([]);
+
+    useEffect(() => {
+        loadShops();
+    }, []);
+
+    const loadShops = async () => {
+        const querySnapshot = await getDocs(collection(db, 'shops'));
+        const shopsData = querySnapshot.docs.map(doc => doc.data());
+        setShops(shopsData);
+    };
 
     const roles = [
         { id: 'admin', name: 'Admin', icon: User, color: 'from-purple-500 to-purple-700' },
@@ -34,26 +47,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         let isValid = false;
 
         if (selectedRole === 'admin') {
-            // Admin credentials
             if (username === 'admin' && password === 'GOPI') {
                 isValid = true;
             }
         } else if (selectedRole === 'shopowner') {
-            // Shop owner credentials (30 shops)
-            const shopOwners = [
-                { username: 'likitha wines', password: 'shop_1' },
-                { username: 'shivani wines', password: 'shop_2' },
-                { username: 'laxmi wines', password: 'shop_3' },
-                { username: 'shivani wines', password: 'shop_4' },
-                { username: 'sri thirumala wines', password: 'shop_5' },
-                ...Array.from({ length: 25 }, (_, i) => ({
-                    username: `shop${i + 6}`,
-                    password: `shop_${i + 6}`
-                }))
-            ];
-
-            isValid = shopOwners.some(
-                owner => owner.username === username && owner.password === password
+            isValid = shops.some(
+                shop => shop.username === username && shop.password === password
             );
         }
 

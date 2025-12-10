@@ -1,29 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where, doc, updateDoc } from 'firebase/firestore';
-import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil } from 'lucide-react';
+import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where, doc, updateDoc } from 'firebase/firestore';
+import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
 import LoginForm from "@/app/login";
 import FeedbackButton from "@/app/components/FeedbackButton";
-
-// Firebase configuration
-const firebaseConfig = {
-    apiKey: "AIzaSyBf-dvyFjMttuLD43V4MBBRbuvfbwBRKsI",
-    authDomain: "wines-sheet.firebaseapp.com",
-    projectId: "wines-sheet",
-    storageBucket: "wines-sheet.firebasestorage.app",
-    messagingSenderId: "313820033015",
-    appId: "1:313820033015:web:75cc4ccf84217324bf08f2",
-    measurementId: "G-C8JCT3DNNH"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+import AdminPanel from "@/app/admin";
+import { db } from './lib/firebase';
 
 interface FilteredItem {
     particulars: string;
@@ -95,6 +81,7 @@ export default function Home() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userRole, setUserRole] = useState('');
     const [username, setUsername] = useState('');
+    const [showAdminPanel, setShowAdminPanel] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [historyData, setHistoryData] = useState<any[]>([]);
     const [selectedHistory, setSelectedHistory] = useState<any>(null);
@@ -322,19 +309,23 @@ export default function Home() {
         });
     };
 
+    const sanitizeShopName = (name: string) => {
+        return name.toLowerCase().replace(/\s+/g, '_');
+    };
+
     const getCollectionName = () => {
         if (userRole === 'Admin') {
-            return selectedShop === 'admin' ? 'invoices_admin' : `invoices_${selectedShop}`;
+            return selectedShop === 'admin' ? 'invoices_admin' : `invoices_${sanitizeShopName(selectedShop)}`;
         } else {
-            return `invoices_${username}`;
+            return `invoices_${sanitizeShopName(username)}`;
         }
     };
 
     const getHistoryCollectionName = () => {
         if (userRole === 'Admin') {
-            return selectedShop === 'admin' ? 'history_admin' : `history_${selectedShop}`;
+            return selectedShop === 'admin' ? 'history_admin' : `history_${sanitizeShopName(selectedShop)}`;
         } else {
-            return `history_${username}`;
+            return `history_${sanitizeShopName(username)}`;
         }
     };
 
@@ -638,24 +629,12 @@ export default function Home() {
 
     const loadAvailableShops = async () => {
         try {
-            const collections = await getDocs(query(collection(db, 'invoices_admin')));
-            const shops = new Set<string>();
-            const allCollections = [
-                'shop1', 'shop2', 'shop3', 'shop4', 'shop_4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
-                'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
-                'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
-                'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
-            ];
-            setAvailableShops(allCollections);
+            const querySnapshot = await getDocs(collection(db, 'shops'));
+            const shopNames = querySnapshot.docs.map(doc => doc.data().username);
+            setAvailableShops(shopNames);
         } catch (error) {
             console.error('Error loading shops:', error);
-            // Fallback to predefined shops
-            setAvailableShops([
-                'shop1', 'shop2', 'shop3', 'shop4', 'shop_4', 'shop5', 'shop6', 'shop7', 'shop8', 'shop9', 'shop10',
-                'shop11', 'shop12', 'shop13', 'shop14', 'shop15', 'shop16', 'shop17', 'shop18', 'shop19', 'shop20',
-                'shop21', 'shop22', 'shop23', 'shop24', 'shop25', 'shop26', 'shop27', 'shop28', 'shop29', 'shop30',
-                'shop31', 'shop32', 'shop33', 'shop34', 'shop35', 'shop36', 'shop37', 'shop38', 'shop39', 'shop40'
-            ]);
+            setAvailableShops([]);
         }
     };
 
@@ -1587,6 +1566,13 @@ export default function Home() {
         return <LoginForm onLoginSuccess={handleLoginSuccess} />;
     }
 
+    if (showAdminPanel && userRole === 'Admin') {
+        return <AdminPanel onBack={() => {
+            setShowAdminPanel(false);
+            loadAvailableShops();
+        }} />;
+    }
+
     if (userRole === 'Admin' && showShopSelection) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -1640,6 +1626,17 @@ export default function Home() {
                                 className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-all"
                             >
                                 Switch Shop
+                            </button>
+                        )}
+                        {userRole === 'Admin' && (
+                            <button
+                                onClick={() => {
+                                    setShowAdminPanel(true);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-white text-purple-600 rounded-lg font-semibold hover:bg-purple-50 transition-all"
+                            >
+                                <Settings className="w-4 h-4" />
+                                Manage Shops
                             </button>
                         )}
                         <button
