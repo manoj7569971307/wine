@@ -1610,20 +1610,20 @@ export default function Home() {
     return (
         <div className="min-h-screen bg-gray-50">
             <header className="bg-blue-600 p-3 sm:p-4 shadow-md">
-                <div className="container mx-auto flex justify-between items-center">
-                    <div>
-                        <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold">
+                <div className="container mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div className="flex-1">
+                        <h1 className="text-white text-lg sm:text-xl md:text-2xl font-bold">
                             {userRole === 'Shop Owner' ? username : 'Wine Invoice Tracker'}
                         </h1>
-                        <p className="text-blue-100 text-sm mt-1">
+                        <p className="text-blue-100 text-xs sm:text-sm mt-1">
                             {userRole}{userRole === 'Admin' && selectedShop && selectedShop !== 'admin' && ` (Viewing: ${selectedShop})`}
                         </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                         {userRole === 'Admin' && (
                             <button
                                 onClick={() => setShowShopSelection(true)}
-                                className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-all"
+                                className="flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-white text-blue-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-blue-50 transition-all flex-1 sm:flex-initial"
                             >
                                 Switch Shop
                             </button>
@@ -1633,17 +1633,17 @@ export default function Home() {
                                 onClick={() => {
                                     setShowAdminPanel(true);
                                 }}
-                                className="flex items-center gap-2 px-4 py-2 bg-white text-purple-600 rounded-lg font-semibold hover:bg-purple-50 transition-all"
+                                className="flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-white text-purple-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-purple-50 transition-all flex-1 sm:flex-initial"
                             >
-                                <Settings className="w-4 h-4" />
-                                Manage Shops
+                                <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
+                                Manage
                             </button>
                         )}
                         <button
                             onClick={handleLogout}
-                            className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-all"
+                            className="flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-white text-blue-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-blue-50 transition-all flex-1 sm:flex-initial"
                         >
-                            <LogOut className="w-4 h-4" />
+                            <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
                             Logout
                         </button>
                     </div>

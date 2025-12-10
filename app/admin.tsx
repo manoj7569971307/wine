@@ -52,44 +52,44 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-50 to-blue-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-50 to-blue-100 p-2 sm:p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white flex justify-between items-center">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-3 sm:p-4 md:p-6 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
-              <h1 className="text-3xl font-bold">Shop Management</h1>
-              <p className="text-purple-100 mt-1">Manage shop accounts</p>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Shop Management</h1>
+              <p className="text-purple-100 mt-1 text-sm sm:text-base">Manage shop accounts</p>
             </div>
-            <button onClick={onBack} className="bg-white text-purple-600 px-4 py-2 rounded-lg font-semibold hover:bg-purple-50">
+            <button onClick={onBack} className="bg-white text-purple-600 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-semibold hover:bg-purple-50 w-full sm:w-auto">
               Back
             </button>
           </div>
 
-          <div className="p-6">
+          <div className="p-3 sm:p-4 md:p-6">
             <button
               onClick={() => setShowAddModal(true)}
-              className="mb-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 flex items-center gap-2"
+              className="mb-4 sm:mb-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-semibold hover:from-purple-700 hover:to-blue-700 flex items-center justify-center gap-2 w-full sm:w-auto"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
               Add Shop
             </button>
 
-            <div className="grid gap-4">
+            <div className="grid gap-3 sm:gap-4">
               {shops.map((shop) => (
-                <div key={shop.id} className="bg-gray-50 p-4 rounded-lg flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <Store className="w-6 h-6 text-purple-600" />
-                    <div>
-                      <p className="font-semibold text-gray-900">{shop.username}</p>
-                      <p className="text-sm text-gray-500">Password: {shop.password}</p>
+                <div key={shop.id} className="bg-gray-50 p-3 sm:p-4 rounded-lg flex justify-between items-center gap-2">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                    <Store className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-900 text-sm sm:text-base truncate">{shop.username}</p>
+                      <p className="text-xs sm:text-sm text-gray-500 truncate">Password: {shop.password}</p>
                     </div>
                   </div>
                   <button
                     onClick={() => handleDeleteShop(shop.id)}
                     disabled={loading}
-                    className="text-red-600 hover:text-red-800 p-2"
+                    className="text-red-600 hover:text-red-800 p-2 flex-shrink-0"
                   >
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
               ))}
@@ -99,22 +99,23 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Add New Shop</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 sm:p-6 text-white flex justify-between items-center">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold">Add New Shop</h2>
               <button onClick={() => setShowAddModal(false)} className="text-white hover:text-gray-200">
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
                 <input
                   type="text"
                   value={newShop.username}
                   onChange={(e) => setNewShop({ ...newShop, username: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
+                  placeholder="Enter shop username"
                 />
               </div>
               <div>
@@ -123,13 +124,14 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
                   type="text"
                   value={newShop.password}
                   onChange={(e) => setNewShop({ ...newShop, password: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-gray-900"
+                  placeholder="Enter shop password"
                 />
               </div>
               <button
                 onClick={handleAddShop}
                 disabled={loading || !newShop.username || !newShop.password}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 sm:py-3 text-sm sm:text-base rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
               >
                 Add Shop
               </button>
