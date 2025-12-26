@@ -1,1 +1,1 @@
-{"config":{"name":"Next.js Server Handler","generator":"@netlify/plugin-nextjs@5.14.7","nodeBundler":"none","includedFiles":["**"],"includedFilesBasePath":"/home/nexbuilder/wines/accounts-sheet/.netlify/functions-internal/___netlify-server-handler"},"version":1}
+{"config":{"name":"Next.js Server Handler","generator":"@netlify/plugin-nextjs@5.14.7","nodeBundler":"none","includedFiles":["**"],"includedFilesBasePath":"/home/manoj/pro/wine/.netlify/functions-internal/___netlify-server-handler"},"version":1}

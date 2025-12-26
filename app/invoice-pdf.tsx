@@ -52,8 +52,9 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
     // Load Firebase SDK
     useEffect(() => {
         // Only save when parent sends true AND idoc exists AND not saved before
-        if (saveAllowed && idocNumber && firebaseReady) {
+        if (saveAllowed && idocNumber && firebaseReady && !processedIdocs.has(idocNumber)) {
             saveIdocToDatabase(idocNumber, pdfFile?.name || "unknown.pdf");
+            setProcessedIdocs(prev => new Set([...prev, idocNumber]));
         }
     }, [saveAllowed, idocNumber, firebaseReady]);
 
@@ -87,6 +88,15 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                 }
 
                 setFirebaseReady(true);
+                
+                // Load existing idocs into memory
+                const db = firebase.firestore();
+                const querySnapshot = await db.collection('processedIdocs').get();
+                const existingIdocs = new Set<string>();
+                querySnapshot.docs.forEach((doc: any) => {
+                    existingIdocs.add(doc.data().idocNumber);
+                });
+                setProcessedIdocs(existingIdocs);
             } catch (err) {
                 console.error('Error loading Firebase:', err);
             }
@@ -96,8 +106,10 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
     }, []);
 
     useEffect(() => {
-        sendDataToParent(tableData);
-    }, [tableData, sendDataToParent]);
+        if (!showDuplicateModal) {
+            sendDataToParent(tableData);
+        }
+    }, [tableData, sendDataToParent, showDuplicateModal]);
 
     const checkIdocInDatabase = async (idoc: string): Promise<boolean> => {
         try {
@@ -331,23 +343,12 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
 
             const extractedIdoc = idocMatch[0];
 
-            // Check in local memory first
+            // Check if duplicate
             if (processedIdocs.has(extractedIdoc)) {
                 setDuplicateIdoc(extractedIdoc);
                 setShowDuplicateModal(true);
                 setLoading(false);
                 return;
-            }
-
-            // Check in database if Firebase is ready
-            if (firebaseReady) {
-                const existsInDb = await checkIdocInDatabase(extractedIdoc);
-                if (existsInDb) {
-                    setDuplicateIdoc(extractedIdoc);
-                    setShowDuplicateModal(true);
-                    setLoading(false);
-                    return;
-                }
             }
 
             setIdocNumber(extractedIdoc);
@@ -368,7 +369,6 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Double check Firebase is ready
         if (!firebaseReady) {
             setError('Please wait for Firebase to initialize');
             e.target.value = '';
@@ -377,21 +377,20 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
 
         if (file.type !== 'application/pdf') {
             setError('Please upload a PDF file');
-            e.target.value = ''; // Clear input on error
+            e.target.value = '';
             return;
         }
 
         setPdfFile(file);
         setTableData([]);
         await extractTextFromPDF(file);
-        
-        // Clear the input value after processing to allow re-upload of same file
         e.target.value = '';
     };
 
     const closeDuplicateModal = (): void => {
         setShowDuplicateModal(false);
         setDuplicateIdoc('');
+        setTableData([]);
         resetPdfState();
     };
 

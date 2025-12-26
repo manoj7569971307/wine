@@ -1,0 +1,3 @@
+module.exports=[45087,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(84062);a.n(d("[project]/pro/wine/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},88583,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(84062);a.n(d("[project]/pro/wine/node_modules/next/dist/client/components/builtin/global-error.js"))},77236,a=>{"use strict";a.i(45087);var b=a.i(88583);a.n(b)}];
+
+//# sourceMappingURL=4f487_next_dist_client_components_builtin_global-error_c7974af1.js.map

@@ -6,15 +6,15 @@ redirectsOrigin = "inline"
 [functions."*"]
 
 [[plugins]]
-origin = "default"
+origin = "config"
 package = "@netlify/plugin-nextjs"
 
 [plugins.inputs]
 
 [build]
-publish = "/home/nexbuilder/wines/accounts-sheet/.next"
-publishOrigin = "ui"
-commandOrigin = "ui"
+publish = "/home/manoj/pro/wine/.next"
+publishOrigin = "config"
+commandOrigin = "config"
 command = "npm run build"
 
 [build.environment]

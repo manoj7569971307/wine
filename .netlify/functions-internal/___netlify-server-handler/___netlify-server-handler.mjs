@@ -1,14 +1,16 @@
 import {
   createRequestContext,
   runWithRequestContext,
-} from './.netlify/dist/run/handlers/request-context.cjs'
-import serverHandler from './.netlify/dist/run/handlers/server.js'
-import { getTracer, withActiveSpan } from './.netlify/dist/run/handlers/tracer.cjs'
+} from '/var/task/pro/wine/.netlify/dist/run/handlers/request-context.cjs'
+import { getTracer, withActiveSpan } from '/var/task/pro/wine/.netlify/dist/run/handlers/tracer.cjs'
+
+process.chdir('/var/task/pro/wine')
 
 // Set feature flag for regional blobs
 process.env.USE_REGIONAL_BLOBS = 'true'
 
-export default async function handler(req, context) {
+let cachedHandler
+export default async function (req, context) {
   const requestContext = createRequestContext(req, context)
   const tracer = getTracer()
 
@@ -22,10 +24,14 @@ export default async function handler(req, context) {
         'http.method': req.method,
         'http.target': req.url,
         isBackgroundRevalidation: requestContext.isBackgroundRevalidation,
-        monorepo: false,
-        cwd: process.cwd(),
+        monorepo: true,
+        cwd: '/var/task/pro/wine',
       })
-      const response = await serverHandler(req, context, span, requestContext)
+      if (!cachedHandler) {
+        const { default: handler } = await import('/var/task/pro/wine/.netlify/dist/run/handlers/server.js')
+        cachedHandler = handler
+      }
+      const response = await cachedHandler(req, context, span, requestContext)
       span?.setAttributes({
         'http.status_code': response.status,
       })
