@@ -357,7 +357,6 @@ export default function Home() {
             if (!row?.[8] || !row[6] || !row[1]) continue;
 
             const quantity = Number(row[6]);
-            if (quantity === 0 || isNaN(quantity)) continue;
 
             const quantitySize = String(row[5] || '');
             const [firstIndex, secondIndex] = quantitySize.includes('/')
