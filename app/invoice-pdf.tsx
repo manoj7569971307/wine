@@ -343,11 +343,13 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
 
             const extractedIdoc = idocMatch[0];
 
-            // Check if duplicate
-            if (processedIdocs.has(extractedIdoc)) {
+            // Check if duplicate in database
+            const isDuplicate = await checkIdocInDatabase(extractedIdoc);
+            if (isDuplicate) {
                 setDuplicateIdoc(extractedIdoc);
                 setShowDuplicateModal(true);
                 setLoading(false);
+                resetPdfState();
                 return;
             }
 
@@ -432,6 +434,12 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                 fileName: doc.data().fileName,
                 timestamp: doc.data().timestamp
             }));
+
+            const existingIdocs = new Set<string>();
+            querySnapshot.docs.forEach((doc: any) => {
+                existingIdocs.add(doc.data().idocNumber);
+            });
+            setProcessedIdocs(existingIdocs);
 
             setIdocList(idocs);
             if (onShowIdocs) {
