@@ -1888,12 +1888,12 @@ export default function Home() {
                                                     </span>
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-900">
-                                                    <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
+                                                    <input type="text" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                     <input
-                                                        type="number"
+                                                        type="text"
                                                         value={item.tranIn}
                                                         onChange={(e) => handleTranInChange(index, e.target.value)}
                                                         disabled={userRole === 'Admin'}
@@ -1903,7 +1903,7 @@ export default function Home() {
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                     <input
-                                                        type="number"
+                                                        type="text"
                                                         value={item.tranOut}
                                                         onChange={(e) => handleTranOutChange(index, e.target.value)}
                                                         disabled={userRole === 'Admin'}
@@ -1919,7 +1919,7 @@ export default function Home() {
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                     <div className="flex items-center justify-center gap-1">
                                                         <input
-                                                            type="number"
+                                                            type="text"
                                                             value={item.closingStockCases || 0}
                                                             onChange={(e) => handleClosingStockCasesChange(index, e.target.value)}
                                                             disabled={userRole === 'Admin'}
@@ -1930,7 +1930,7 @@ export default function Home() {
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                     <input
-                                                        type="number"
+                                                        type="text"
                                                         value={item.closingStockBottles || 0}
                                                         onChange={(e) => handleClosingStockBottlesChange(index, e.target.value)}
                                                         disabled={userRole === 'Admin'}
@@ -2119,7 +2119,7 @@ export default function Home() {
                                                 </td>
                                                 <td className="px-4 py-3 border border-gray-300">
                                                     <input
-                                                        type="number"
+                                                        type="text"
                                                         value={row.phonepe}
                                                         onChange={(e) => {
                                                             const newData = [...paymentData];
@@ -2132,7 +2132,7 @@ export default function Home() {
                                                 </td>
                                                 <td className="px-4 py-3 border border-gray-300">
                                                     <input
-                                                        type="number"
+                                                        type="text"
                                                         value={row.cash}
                                                         onChange={(e) => {
                                                             const newData = [...paymentData];
@@ -2145,7 +2145,7 @@ export default function Home() {
                                                 </td>
                                                 <td className="px-4 py-3 border border-gray-300">
                                                     <input
-                                                        type="number"
+                                                        type="text"
                                                         value={row.amount}
                                                         onChange={(e) => {
                                                             const newData = [...paymentData];
@@ -2584,11 +2584,10 @@ export default function Home() {
                                                             <td className="px-4 py-3 text-center text-sm text-gray-900">
                                                                 {editingHistory ? (
                                                                     <input
-                                                                        type="number"
+                                                                        type="text"
                                                                         value={item.closingStockCases || 0}
                                                                         onChange={(e) => handleHistoryFieldChange(i, 'closingStockCases', e.target.value)}
                                                                         className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
-                                                                        min="0"
                                                                     />
                                                                 ) : (
                                                                     item.closingStockCases || 0
@@ -2597,11 +2596,10 @@ export default function Home() {
                                                             <td className="px-4 py-3 text-center text-sm text-gray-900">
                                                                 {editingHistory ? (
                                                                     <input
-                                                                        type="number"
+                                                                        type="text"
                                                                         value={item.closingStockBottles || 0}
                                                                         onChange={(e) => handleHistoryFieldChange(i, 'closingStockBottles', e.target.value)}
                                                                         className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
-                                                                        min="0"
                                                                     />
                                                                 ) : (
                                                                     item.closingStockBottles || 0
@@ -2610,11 +2608,10 @@ export default function Home() {
                                                             <td className="px-4 py-3 text-center text-sm text-gray-900">
                                                                 {editingHistory ? (
                                                                     <input
-                                                                        type="number"
+                                                                        type="text"
                                                                         value={item.openingStock || 0}
                                                                         onChange={(e) => handleHistoryFieldChange(i, 'openingStock', e.target.value)}
                                                                         className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
-                                                                        min="0"
                                                                     />
                                                                 ) : (
                                                                     item.openingStock
@@ -2623,11 +2620,10 @@ export default function Home() {
                                                             <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">
                                                                 {editingHistory ? (
                                                                     <input
-                                                                        type="number"
+                                                                        type="text"
                                                                         value={item.receipts || 0}
                                                                         onChange={(e) => handleHistoryFieldChange(i, 'receipts', e.target.value)}
                                                                         className="w-20 px-2 py-1 border border-blue-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                                                                        min="0"
                                                                     />
                                                                 ) : (
                                                                     item.receipts
@@ -2638,11 +2634,10 @@ export default function Home() {
                                                             <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">
                                                                 {editingHistory ? (
                                                                     <input
-                                                                        type="number"
+                                                                        type="text"
                                                                         value={item.tranIn || 0}
                                                                         onChange={(e) => handleHistoryFieldChange(i, 'tranIn', e.target.value)}
                                                                         className="w-20 px-2 py-1 border border-orange-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900"
-                                                                        min="0"
                                                                     />
                                                                 ) : (
                                                                     item.tranIn
@@ -2653,12 +2648,10 @@ export default function Home() {
                                                             <td className="px-4 py-3 text-center text-sm font-semibold text-purple-600">
                                                                 {editingHistory ? (
                                                                     <input
-                                                                        type="number"
+                                                                        type="text"
                                                                         value={item.tranOut || 0}
                                                                         onChange={(e) => handleHistoryFieldChange(i, 'tranOut', e.target.value)}
                                                                         className="w-20 px-2 py-1 border border-purple-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
-                                                                        min="0"
-                                                                        max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0)}
                                                                     />
                                                                 ) : (
                                                                     item.tranOut
@@ -2807,7 +2800,7 @@ export default function Home() {
                                                         {consolidatedData && <td className="px-4 py-3 border border-gray-300 text-gray-500">-</td>}
                                                         <td className="px-4 py-3 border border-gray-300">
                                                             <input
-                                                                type="number"
+                                                                type="text"
                                                                 value={p.phonepe || ''}
                                                                 onChange={(e) => handleEditedPaymentChange(i, 'phonepe', e.target.value)}
                                                                 className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
@@ -2816,7 +2809,7 @@ export default function Home() {
                                                         </td>
                                                         <td className="px-4 py-3 border border-gray-300">
                                                             <input
-                                                                type="number"
+                                                                type="text"
                                                                 value={p.cash || ''}
                                                                 onChange={(e) => handleEditedPaymentChange(i, 'cash', e.target.value)}
                                                                 className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
@@ -2825,7 +2818,7 @@ export default function Home() {
                                                         </td>
                                                         <td className="px-4 py-3 border border-gray-300">
                                                             <input
-                                                                type="number"
+                                                                type="text"
                                                                 value={p.amount || ''}
                                                                 onChange={(e) => handleEditedPaymentChange(i, 'amount', e.target.value)}
                                                                 className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm text-gray-900"
