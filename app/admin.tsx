@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { db } from './lib/firebase';
 import { collection, addDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
-import { Store, Trash2, Plus, X } from 'lucide-react';
+import { Store, Trash2, Plus, X, Wine } from 'lucide-react';
+
 
 interface Shop {
   id: string;
@@ -60,9 +61,18 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Shop Management</h1>
               <p className="text-purple-100 mt-1 text-sm sm:text-base">Manage shop accounts</p>
             </div>
-            <button onClick={onBack} className="bg-white text-purple-600 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-semibold hover:bg-purple-50 w-full sm:w-auto">
-              Back
-            </button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <a
+                href="/admin-wine-data"
+                className="bg-white text-purple-600 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-semibold hover:bg-purple-50 flex items-center gap-2 justify-center flex-1 sm:flex-initial"
+              >
+                <Wine className="w-4 h-4" />
+                Wine Data
+              </a>
+              <button onClick={onBack} className="bg-white text-purple-600 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-semibold hover:bg-purple-50 flex-1 sm:flex-initial">
+                Back
+              </button>
+            </div>
           </div>
 
           <div className="p-3 sm:p-4 md:p-6">

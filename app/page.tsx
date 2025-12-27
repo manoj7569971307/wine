@@ -5,6 +5,7 @@ import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, wh
 import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
+import { getWinesForComparison, isWineDatabaseEmpty } from "@/app/lib/wineDatabase";
 import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
 import LoginForm from "@/app/login";
 import FeedbackButton from "@/app/components/FeedbackButton";
@@ -116,9 +117,9 @@ export default function Home() {
     const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [showClosingStockView, setShowClosingStockView] = useState(false);
-    const [originalClosingStocks, setOriginalClosingStocks] = useState<{[key: string]: number}>({});
+    const [originalClosingStocks, setOriginalClosingStocks] = useState<{ [key: string]: number }>({});
     const [showIdocList, setShowIdocList] = useState(false);
-    const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>>([]);
+    const [idocList, setIdocList] = useState<Array<{ id: string, idocNumber: string, fileName: string, timestamp: string }>>([]);
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -226,7 +227,7 @@ export default function Home() {
                 await updateDoc(historyDocRef, updateData);
                 console.log('History auto-saved to Firebase');
                 setAutoSaveStatus('saved');
-                
+
                 // Reset status after showing saved state
                 setTimeout(() => setAutoSaveStatus('idle'), 2000);
             } catch (error) {
@@ -347,10 +348,29 @@ export default function Home() {
         pdfConverterRef.current?.confirmProcessing();
     }, []);
 
-    const filterWineData = useCallback((): void => {
+    const filterWineData = useCallback(async (): Promise<void> => {
         const filtered: FilteredItem[] = [...filterData];
         let totalAmount = 0;
         let matchedCount = 0;
+
+        // Get wine data from database, fallback to sample data
+        let wineDatabase;
+        try {
+            const isEmpty = await isWineDatabaseEmpty();
+            if (isEmpty) {
+                console.warn('Wine database is empty, using sample data as fallback');
+                wineDatabase = sampleWinesData;
+                setSaveStatus('info' as any);
+                setSaveMessage('Warning: Using sample wine data. Please migrate data from admin panel.');
+                setTimeout(() => setSaveStatus('idle'), 5000);
+            } else {
+                wineDatabase = await getWinesForComparison();
+                console.log('Using database wine data:', wineDatabase.length, 'wines');
+            }
+        } catch (error) {
+            console.error('Error loading wine database:', error);
+            wineDatabase = sampleWinesData;
+        }
 
         for (let j = 1; j < childData.length; j++) {
             const row = childData[j];
@@ -380,7 +400,7 @@ export default function Home() {
 
             const brandNumberFromChild = String(row[1]).trim();
 
-            for (const wine of sampleWinesData) {
+            for (const wine of wineDatabase) {
                 const brandNumberFromSample = String(wine['Brand Number']).trim();
                 const sampleIssuePrice = Number(wine['Issue Price']);
 
@@ -1038,7 +1058,7 @@ export default function Home() {
             clearTimeout(autoSaveTimeout);
             setAutoSaveTimeout(null);
         }
-        
+
         setAutoSaveStatus('idle');
         setSelectedHistory(null);
         setConsolidatedData(null);
@@ -1073,7 +1093,7 @@ export default function Home() {
             to: formatDateForInput(record.sheetToDate || '')
         });
         // Store original closing stocks for comparison
-        const originalStocks: {[key: string]: number} = {};
+        const originalStocks: { [key: string]: number } = {};
         if (record.items) {
             record.items.forEach((item: FilteredItem, index: number) => {
                 const key = `${item.particulars}_${item.rate}`;
@@ -1086,7 +1106,7 @@ export default function Home() {
     const handleHistoryFieldChange = (itemIndex: number, field: string, value: string) => {
         const updatedData = [...editedHistoryData];
         const item = updatedData[itemIndex];
-        
+
         // Parse and validate input (ensure non-negative values)
         const numValue = Math.max(0, parseInt(value) || 0);
 
@@ -1129,7 +1149,7 @@ export default function Home() {
             field5: (newTotalSale + parseFloat(editedAdditionalInfo.field2 || '0') + parseFloat(editedAdditionalInfo.field4 || '0')).toString(),
             field7: Math.abs((newTotalSale + parseFloat(editedAdditionalInfo.field2 || '0') + parseFloat(editedAdditionalInfo.field4 || '0')) - parseFloat(editedAdditionalInfo.field6 || '0')).toString()
         };
-        
+
         setEditedAdditionalInfo(updatedAdditionalInfo);
 
         // Auto-save to Firebase with debounce
@@ -1143,26 +1163,26 @@ export default function Home() {
             [field]: value
         };
         setEditedPaymentData(updatedPaymentData);
-        
+
         // Recalculate total expenses in additional info
         const phonepeTotal = updatedPaymentData.reduce((sum, p) => sum + (parseFloat(p.phonepe) || 0), 0);
         const cashTotal = updatedPaymentData.reduce((sum, p) => sum + (parseFloat(p.cash) || 0), 0);
         const amountTotal = updatedPaymentData.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
         const totalExpenses = phonepeTotal + cashTotal + amountTotal;
-        
+
         const updatedInfo = {
             ...editedAdditionalInfo,
             field6: totalExpenses.toString()
         };
-        
+
         // Recalculate field7 (closing balance)
         const field1Val = parseFloat(updatedInfo.field1 || '0');
         const field2Val = parseFloat(updatedInfo.field2 || '0');
         const field4Val = parseFloat(updatedInfo.field4 || '0');
         updatedInfo.field7 = Math.abs((field1Val + field2Val + field4Val) - totalExpenses).toString();
-        
+
         setEditedAdditionalInfo(updatedInfo);
-        
+
         // Auto-save to Firebase with debounce
         debouncedAutoSaveHistoryEdits(editedHistoryData, updatedInfo, updatedPaymentData);
     };
@@ -1172,21 +1192,21 @@ export default function Home() {
             ...editedAdditionalInfo,
             [field]: value
         };
-        
+
         // Recalculate dependent fields
         if (field === 'field2' || field === 'field4' || field === 'field6') {
             const field1Val = parseFloat(updatedInfo.field1 || '0');
             const field2Val = parseFloat(updatedInfo.field2 || '0');
             const field4Val = parseFloat(updatedInfo.field4 || '0');
             const field6Val = parseFloat(updatedInfo.field6 || '0');
-            
+
             updatedInfo.field3 = (field1Val + field2Val).toString();
             updatedInfo.field5 = (field1Val + field2Val + field4Val).toString();
             updatedInfo.field7 = Math.abs((field1Val + field2Val + field4Val) - field6Val).toString();
         }
-        
+
         setEditedAdditionalInfo(updatedInfo);
-        
+
         // Auto-save to Firebase with debounce
         debouncedAutoSaveHistoryEdits(editedHistoryData, updatedInfo);
     };
@@ -1237,7 +1257,7 @@ export default function Home() {
                     const latestDoc = mainSnapshot.docs[0];
                     const latestDocRef = doc(db, collectionName, latestDoc.id);
                     const currentMainData = latestDoc.data();
-                    
+
                     // Update main sheet items based on closing stock changes
                     const updatedMainItems = [...(currentMainData.items || [])];
                     let hasChanges = false;
@@ -1246,15 +1266,15 @@ export default function Home() {
                         const key = `${editedItem.particulars}_${editedItem.rate}`;
                         const originalClosingStock = originalClosingStocks[key] || 0;
                         const newClosingStock = editedItem.closingStock || 0;
-                        
+
                         // Only update if closing stock actually changed
                         if (originalClosingStock !== newClosingStock) {
                             const mainItemIndex = updatedMainItems.findIndex(
-                                (mainItem: FilteredItem) => 
-                                    mainItem.particulars === editedItem.particulars && 
+                                (mainItem: FilteredItem) =>
+                                    mainItem.particulars === editedItem.particulars &&
                                     mainItem.rate === editedItem.rate
                             );
-                            
+
                             if (mainItemIndex !== -1) {
                                 // Update opening stock in main sheet with new closing stock
                                 updatedMainItems[mainItemIndex].openingStock = newClosingStock;
@@ -1280,7 +1300,7 @@ export default function Home() {
                             field5: newField5.toString(),
                             field7: newField7.toString()
                         });
-                        
+
                         // Update local state
                         setFilterData(updatedMainItems);
                         setField2(closingBalance.toString());
@@ -1318,7 +1338,7 @@ export default function Home() {
             clearTimeout(autoSaveTimeout);
             setAutoSaveTimeout(null);
         }
-        
+
         setAutoSaveStatus('idle');
         setEditingHistory(null);
         setEditedHistoryData([]);
@@ -2486,7 +2506,7 @@ export default function Home() {
                                         <thead>
                                             <tr className={`${showClosingStockView ? 'bg-green-50 border-b-2 border-green-200' : 'bg-purple-50 border-b-2 border-purple-200'}`}>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
-                                                {showClosingStockView ? 
+                                                {showClosingStockView ?
                                                     ['Size', 'Closing Stock', 'Rate'].map((h, i) => (
                                                         <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 2 ? 'text-right' : 'text-center'}`}>{h}</th>
                                                     )) :
@@ -2875,7 +2895,7 @@ export default function Home() {
                     </div>
                 </div>
             )}
-            
+
             <FeedbackButton />
         </div>
     );
