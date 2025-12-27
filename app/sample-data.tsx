@@ -34613,6 +34613,29 @@ const wineData3: Wine[] = [
             "MRP": 1320,
             "Type": "Local"
         }
+        ,
+        {
+            "S.no": 3145,
+            "Brand Number": 2088,
+            "Size Code": "DD",
+            "Pack Type": "P",
+            "Product Name": "SUMO SUPREME WHISKY",
+            "Issue Price": 4008,
+            "Special Margin": 9.9,
+            "MRP": 60,
+            "Type": "Local"
+        },
+        {
+            "S.no": 3146,
+            "Brand Number": 2088,
+            "Size Code": "NN",
+            "Pack Type": "P",
+            "Product Name": "SUMO SUPREME WHISKY",
+            "Issue Price": 3784,
+            "Special Margin": 9.9,
+            "MRP": 110,
+            "Type": "Local"
+        }
 ]
 
 
