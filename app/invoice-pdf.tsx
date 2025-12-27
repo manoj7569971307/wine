@@ -15,6 +15,7 @@ interface PDFToExcelConverterProps {
     saveAllowed: boolean;
     onReset?: () => void;
     onShowIdocs?: (idocs: Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>) => void;
+    onIdocExtracted?: (idoc: string, fileName: string) => void;
 }
 
 interface PDFToExcelConverterRef {
@@ -35,7 +36,7 @@ const firebaseConfig = {
     measurementId: "G-C8JCT3DNNH"
 };
 
-const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConverterProps>(({ sendDataToParent, saveAllowed, onReset, onShowIdocs }, ref) => {
+const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConverterProps>(({ sendDataToParent, saveAllowed, onReset, onShowIdocs, onIdocExtracted }, ref) => {
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [tableData, setTableData] = useState<TableData>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -49,14 +50,7 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
     const [showIdocList, setShowIdocList] = useState<boolean>(false);
     const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>>([]);
 
-    // Load Firebase SDK
-    useEffect(() => {
-        // Only save when parent sends true AND idoc exists AND not saved before
-        if (saveAllowed && idocNumber && firebaseReady && !processedIdocs.has(idocNumber)) {
-            saveIdocToDatabase(idocNumber, pdfFile?.name || "unknown.pdf");
-            setProcessedIdocs(prev => new Set([...prev, idocNumber]));
-        }
-    }, [saveAllowed, idocNumber, firebaseReady]);
+
 
     useEffect(() => {
         const loadFirebase = async () => {
@@ -97,6 +91,7 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                     existingIdocs.add(doc.data().idocNumber);
                 });
                 setProcessedIdocs(existingIdocs);
+                console.log('Loaded', existingIdocs.size, 'processed ICDCs from database');
             } catch (err) {
                 console.error('Error loading Firebase:', err);
             }
@@ -120,7 +115,9 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                 .where('idocNumber', '==', idoc)
                 .get();
 
-            return !querySnapshot.empty;
+            const exists = !querySnapshot.empty;
+            console.log('ICDC check:', idoc, 'exists:', exists);
+            return exists;
         } catch (err) {
             console.error('Error checking iDOC in database:', err);
             return false;
@@ -342,10 +339,12 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
             }
 
             const extractedIdoc = idocMatch[0];
+            console.log('Extracted ICDC:', extractedIdoc);
 
             // Check if duplicate in database
             const isDuplicate = await checkIdocInDatabase(extractedIdoc);
             if (isDuplicate) {
+                console.log('Duplicate ICDC detected:', extractedIdoc);
                 setDuplicateIdoc(extractedIdoc);
                 setShowDuplicateModal(true);
                 setLoading(false);
@@ -353,13 +352,16 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                 return;
             }
 
+            console.log('ICDC is unique, proceeding...');
             setIdocNumber(extractedIdoc);
 
             const parsedData = parseInvoiceText(rows);
             setTableData(parsedData);
             setConverted(true);
 
-            // Save to database after successful processing
+            if (onIdocExtracted) {
+                onIdocExtracted(extractedIdoc, file.name);
+            }
         } catch (err) {
             setError('Failed to process PDF. Please try again or use a different file.');
         } finally {

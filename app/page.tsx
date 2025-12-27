@@ -122,6 +122,8 @@ export default function Home() {
     const [originalClosingStocks, setOriginalClosingStocks] = useState<{[key: string]: number}>({});
     const [showIdocList, setShowIdocList] = useState(false);
     const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>>([]);
+    const [currentIdocNumber, setCurrentIdocNumber] = useState('');
+    const [currentPdfFileName, setCurrentPdfFileName] = useState('');
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -376,6 +378,8 @@ export default function Home() {
         setPdfTotal(0);
         setMatchedItemsCount(0);
         setShowConfirmModal(false);
+        setCurrentIdocNumber('');
+        setCurrentPdfFileName('');
     }, []);
 
     const handlePdfConfirm = useCallback((): void => {
@@ -623,13 +627,34 @@ export default function Home() {
 
             await addDoc(collection(db, collectionName), docData);
             setFilterData(updatedData);
+            // Save ICDC number after successful save
+            if (currentIdocNumber && currentPdfFileName) {
+                try {
+                    const firebase = (window as any).firebase;
+                    if (firebase && firebase.apps.length > 0) {
+                        const firebaseDb = firebase.firestore();
+                        await firebaseDb.collection('processedIdocs').add({
+                            idocNumber: currentIdocNumber,
+                            fileName: currentPdfFileName,
+                            processedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            timestamp: new Date().toISOString(),
+                            user: username
+                        });
+                    }
+                } catch (idocError) {
+                    console.error('Error saving ICDC:', idocError);
+                }
+            }
+
             setSaveStatus('success');
             setSaveMessage(`Successfully saved ${filterData.length} items`);
             setSaveAllowed(false);
             setInvoiceName('');
             setField2(currentClosingBalance);
-            setField4(''); // Clear Jama
+            setField4('');
             setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
+            setCurrentIdocNumber('');
+            setCurrentPdfFileName('');
             if (sheetToDate) {
                 const parts = sheetToDate.split('/');
                 if (parts.length === 3) {
@@ -1724,6 +1749,10 @@ export default function Home() {
                         onShowIdocs={(idocs) => {
                             setIdocList(idocs);
                             setShowIdocList(true);
+                        }}
+                        onIdocExtracted={(idoc, fileName) => {
+                            setCurrentIdocNumber(idoc);
+                            setCurrentPdfFileName(fileName);
                         }}
                     />
                 </div>
