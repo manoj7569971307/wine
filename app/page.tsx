@@ -25,6 +25,7 @@ interface FilteredItem {
     closingStockCases: number;
     closingStockBottles: number;
     size: string;
+    caseSize: string;
     amount: string;
     brandNumber: string | number;
     issuePrice: string;
@@ -248,7 +249,7 @@ export default function Home() {
             const newData = [...prevData];
             const item = newData[index];
             item.closingStockCases = newValue;
-            const caseSize = parseInt(item.size) || 1;
+            const caseSize = parseInt(item.caseSize || item.size) || 1;
             item.closingStock = (item.closingStockCases * caseSize) + (item.closingStockBottles || 0);
             const openingStock = Number(item.openingStock) || 0;
             const receipts = Number(item.receipts) || 0;
@@ -275,7 +276,7 @@ export default function Home() {
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-            const caseSize = parseInt(item.size) || 1;
+            const caseSize = parseInt(item.caseSize || item.size) || 1;
             if (newValue >= caseSize) return prevData;
             item.closingStockBottles = newValue;
             item.closingStock = ((item.closingStockCases || 0) * caseSize) + newValue;
@@ -363,6 +364,7 @@ export default function Home() {
     };
 
     const handleDataFromChild = useCallback((data: ChildData): void => {
+        console.log('Extracted Invoice Data:', data);
         setChildData(data);
         setSaveAllowed(false);
         setSaveStatus('idle');
@@ -451,6 +453,7 @@ export default function Home() {
                             closingStockCases: 0,
                             closingStockBottles: 0,
                             size: secondIndex,
+                            caseSize: firstIndex,
                             amount: '₹0',
                             brandNumber: wine['Brand Number'],
                             issuePrice: issuePrice.toFixed(2),
@@ -1862,13 +1865,13 @@ export default function Home() {
                                         <tr className="bg-purple-50 border-b-2 border-purple-200">
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">Particulars</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Size</th>
-                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Cases</th>
-                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Bottles</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Opening Stock</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Receipts</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran In</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran Out</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Total</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock Cases</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock Bottles</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Sales</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">Amount</th>
@@ -1882,24 +1885,6 @@ export default function Home() {
                                                     <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
                                                         {item.size}
                                                     </span>
-                                                </td>
-                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                    <input
-                                                        type="number"
-                                                        value={item.closingStockCases || 0}
-                                                        onChange={(e) => handleClosingStockCasesChange(index, e.target.value)}
-                                                        disabled={userRole === 'Admin'}
-                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
-                                                    />
-                                                </td>
-                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                    <input
-                                                        type="number"
-                                                        value={item.closingStockBottles || 0}
-                                                        onChange={(e) => handleClosingStockBottlesChange(index, e.target.value)}
-                                                        disabled={userRole === 'Admin'}
-                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
-                                                    />
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-900">
                                                     <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
@@ -1931,6 +1916,27 @@ export default function Home() {
                                                     </span>
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            value={item.closingStockCases || 0}
+                                                            onChange={(e) => handleClosingStockCasesChange(index, e.target.value)}
+                                                            disabled={userRole === 'Admin'}
+                                                            className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                                                        />
+                                                        <span className="text-xs text-gray-600">x{item.caseSize || item.size}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <input
+                                                        type="number"
+                                                        value={item.closingStockBottles || 0}
+                                                        onChange={(e) => handleClosingStockBottlesChange(index, e.target.value)}
+                                                        disabled={userRole === 'Admin'}
+                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                                                    />
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                     <span className="text-blue-600 font-semibold text-xs sm:text-sm">{item.sales}</span>
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">₹{item.rate}</td>
@@ -1941,8 +1947,6 @@ export default function Home() {
                                     <tfoot className="bg-gray-100 border-t-2 border-gray-300">
                                         <tr className="font-bold">
                                             <td className="px-2 sm:px-4 py-3 text-sm text-gray-800">TOTAL</td>
-                                            <td className="px-2 sm:px-4 py-3 text-center">-</td>
-                                            <td className="px-2 sm:px-4 py-3 text-center">-</td>
                                             <td className="px-2 sm:px-4 py-3 text-center">-</td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.openingStock, 0)}
@@ -1959,6 +1963,8 @@ export default function Home() {
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-purple-600">
                                                 {filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}
                                             </td>
+                                            <td className="px-2 sm:px-4 py-3 text-center">-</td>
+                                            <td className="px-2 sm:px-4 py-3 text-center">-</td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.sales, 0)}
                                             </td>
@@ -1971,7 +1977,7 @@ export default function Home() {
                                             </td>
                                         </tr>
                                         <tr className="font-bold bg-blue-50">
-                                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-800" colSpan={10}>CLOSING STOCK TOTAL AMOUNT</td>
+                                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-800" colSpan={11}>CLOSING STOCK TOTAL AMOUNT</td>
                                             <td className="px-2 sm:px-4 py-3 text-right text-sm text-purple-600">
                                                 ₹{filterData.reduce((sum, item) => {
                                                     return sum + (item.closingStock * item.rate);
