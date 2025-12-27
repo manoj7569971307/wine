@@ -602,6 +602,7 @@ export default function Home() {
                     };
                 }
             });
+            const currentClosingBalance = field7Value;
             const docData = {
                 items: updatedData,
                 timestamp: serverTimestamp(),
@@ -609,13 +610,13 @@ export default function Home() {
                 createdAt: saveDate,
                 user: username,
                 role: userRole,
-                field1: field1Value,
-                field2: field2,
-                field3: field3Value,
-                field4: field4,
-                field5: field5Value,
-                field6: field6Value,
-                field7: field7Value,
+                field1: '0',
+                field2: currentClosingBalance,
+                field3: currentClosingBalance,
+                field4: '',
+                field5: currentClosingBalance,
+                field6: '0',
+                field7: currentClosingBalance,
                 sheetFromDate: sheetFromDate,
                 sheetToDate: sheetToDate
             };
@@ -626,7 +627,6 @@ export default function Home() {
             setSaveMessage(`Successfully saved ${filterData.length} items`);
             setSaveAllowed(false);
             setInvoiceName('');
-            const currentClosingBalance = field7Value;
             setField2(currentClosingBalance);
             setField4(''); // Clear Jama
             setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
@@ -1872,6 +1872,7 @@ export default function Home() {
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Total</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock Cases</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock Bottles</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock Total</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Sales</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">Amount</th>
@@ -1937,6 +1938,9 @@ export default function Home() {
                                                     />
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <span className="text-green-600 font-semibold text-xs sm:text-sm">{item.closingStock || 0}</span>
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                     <span className="text-blue-600 font-semibold text-xs sm:text-sm">{item.sales}</span>
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">₹{item.rate}</td>
@@ -1965,6 +1969,9 @@ export default function Home() {
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 text-center">-</td>
                                             <td className="px-2 sm:px-4 py-3 text-center">-</td>
+                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-green-600">
+                                                {filterData.reduce((sum, item) => sum + (item.closingStock || 0), 0)}
+                                            </td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.sales, 0)}
                                             </td>
