@@ -22,6 +22,8 @@ interface FilteredItem {
     tranOut: number;
     sales: number;
     closingStock: number;
+    closingStockCases: number;
+    closingStockBottles: number;
     size: string;
     amount: string;
     brandNumber: string | number;
@@ -238,28 +240,59 @@ export default function Home() {
         setAutoSaveTimeout(timeout);
     }, [autoSaveTimeout, editingHistory, username]);
 
-    // Handle closing stock change with auto-save
-    const handleClosingStockChange = async (index: number, value: string) => {
+    const handleClosingStockCasesChange = (index: number, value: string) => {
         const newValue = parseInt(value) || 0;
         if (newValue < 0) return;
 
         setFilterData(prevData => {
             const newData = [...prevData];
             const item = newData[index];
-
-            // Ensure all values are numbers
+            item.closingStockCases = newValue;
+            const caseSize = parseInt(item.size) || 1;
+            item.closingStock = (item.closingStockCases * caseSize) + (item.closingStockBottles || 0);
             const openingStock = Number(item.openingStock) || 0;
             const receipts = Number(item.receipts) || 0;
             const tranIn = Number(item.tranIn) || 0;
             const tranOut = Number(item.tranOut) || 0;
             const rate = Number(item.rate) || 0;
             const totalColumn = openingStock + receipts + tranIn - tranOut;
-            if (newValue > totalColumn) return prevData;
-            item.closingStock = newValue;
-            item.sales = openingStock + receipts + tranIn - newValue - tranOut;
+            if (item.closingStock > totalColumn) {
+                item.closingStockCases = 0;
+                item.closingStock = item.closingStockBottles || 0;
+                return prevData;
+            }
+            item.sales = openingStock + receipts + tranIn - item.closingStock - tranOut;
             item.amount = `₹${(item.sales * rate).toFixed(2)}`;
             setTimeout(() => autoSaveToFirebase(newData), 100);
+            return newData;
+        });
+    };
 
+    const handleClosingStockBottlesChange = (index: number, value: string) => {
+        const newValue = parseInt(value) || 0;
+        if (newValue < 0) return;
+
+        setFilterData(prevData => {
+            const newData = [...prevData];
+            const item = newData[index];
+            const caseSize = parseInt(item.size) || 1;
+            if (newValue >= caseSize) return prevData;
+            item.closingStockBottles = newValue;
+            item.closingStock = ((item.closingStockCases || 0) * caseSize) + newValue;
+            const openingStock = Number(item.openingStock) || 0;
+            const receipts = Number(item.receipts) || 0;
+            const tranIn = Number(item.tranIn) || 0;
+            const tranOut = Number(item.tranOut) || 0;
+            const rate = Number(item.rate) || 0;
+            const totalColumn = openingStock + receipts + tranIn - tranOut;
+            if (item.closingStock > totalColumn) {
+                item.closingStockBottles = 0;
+                item.closingStock = (item.closingStockCases || 0) * caseSize;
+                return prevData;
+            }
+            item.sales = openingStock + receipts + tranIn - item.closingStock - tranOut;
+            item.amount = `₹${(item.sales * rate).toFixed(2)}`;
+            setTimeout(() => autoSaveToFirebase(newData), 100);
             return newData;
         });
     };
@@ -415,6 +448,8 @@ export default function Home() {
                             tranOut: 0,
                             sales: 0,
                             closingStock: 0,
+                            closingStockCases: 0,
+                            closingStockBottles: 0,
                             size: secondIndex,
                             amount: '₹0',
                             brandNumber: wine['Brand Number'],
@@ -429,7 +464,10 @@ export default function Home() {
         console.log('Total PDF Amount:', totalAmount);
         setPdfTotal(totalAmount);
         setMatchedItemsCount(matchedCount);
-        setPendingData(filtered.sort((a, b) => a.particulars?.localeCompare(b.particulars || '') || 0));
+        setPendingData(filtered.sort((a, b) => {
+            if (b.rate !== a.rate) return b.rate - a.rate;
+            return a.particulars?.localeCompare(b.particulars || '') || 0;
+        }));
         setShowConfirmModal(true);
     }, [childData, filterData]);
 
@@ -532,10 +570,8 @@ export default function Home() {
                 sheetToDate: sheetToDate
             });
 
-            // Update opening stock based on closing stock or receipts
             let updatedData = filterData.map(item => {
                 if (item.closingStock > 0) {
-                    // If closing stock is entered, use it as next opening stock
                     return {
                         ...item,
                         openingStock: item.closingStock,
@@ -543,6 +579,8 @@ export default function Home() {
                         tranIn: 0,
                         tranOut: 0,
                         closingStock: 0,
+                        closingStockCases: 0,
+                        closingStockBottles: 0,
                         sales: 0,
                         amount: '₹0',
                     };
@@ -554,6 +592,8 @@ export default function Home() {
                         tranIn: 0,
                         tranOut: 0,
                         closingStock: 0,
+                        closingStockCases: 0,
+                        closingStockBottles: 0,
                         sales: 0,
                         amount: '₹0',
                     };
@@ -1087,17 +1127,33 @@ export default function Home() {
         const updatedData = [...editedHistoryData];
         const item = updatedData[itemIndex];
         
-        // Parse and validate input (ensure non-negative values)
         const numValue = Math.max(0, parseInt(value) || 0);
 
-        if (field === 'closingStock') {
-            // Validate closing stock doesn't exceed available stock
+        if (field === 'closingStockCases') {
+            item.closingStockCases = numValue;
+            const caseSize = parseInt(item.size) || 1;
+            item.closingStock = (numValue * caseSize) + (item.closingStockBottles || 0);
+            const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
+            if (item.closingStock > availableStock) {
+                item.closingStockCases = 0;
+                item.closingStock = item.closingStockBottles || 0;
+            }
+        } else if (field === 'closingStockBottles') {
+            const caseSize = parseInt(item.size) || 1;
+            if (numValue >= caseSize) return;
+            item.closingStockBottles = numValue;
+            item.closingStock = ((item.closingStockCases || 0) * caseSize) + numValue;
+            const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
+            if (item.closingStock > availableStock) {
+                item.closingStockBottles = 0;
+                item.closingStock = (item.closingStockCases || 0) * caseSize;
+            }
+        } else if (field === 'closingStock') {
             const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
             item.closingStock = Math.min(numValue, availableStock);
         } else if (field === 'tranIn') {
             item.tranIn = numValue;
         } else if (field === 'tranOut') {
-            // Validate tran out doesn't exceed available stock
             const availableForTranOut = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0);
             item.tranOut = Math.min(numValue, availableForTranOut);
         } else if (field === 'openingStock') {
@@ -1106,17 +1162,14 @@ export default function Home() {
             item.receipts = numValue;
         }
 
-        // Recalculate sales: Sales = (Opening Stock + Receipts + Tran In) - Closing Stock - Tran Out
         const total = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0);
         item.sales = Math.max(0, total - (item.closingStock || 0) - (item.tranOut || 0));
 
-        // Calculate amount = sales * rate (not closing stock * rate)
         const amount = (item.sales || 0) * (item.rate || 0);
         item.amount = `₹${amount.toFixed(2)}`;
 
         setEditedHistoryData(updatedData);
 
-        // Recalculate total sale amount in additional info
         const newTotalSale = updatedData.reduce((sum, dataItem) => {
             const itemAmount = parseFloat(dataItem.amount.replace('₹', '').replace(',', '')) || 0;
             return sum + itemAmount;
@@ -1132,7 +1185,6 @@ export default function Home() {
         
         setEditedAdditionalInfo(updatedAdditionalInfo);
 
-        // Auto-save to Firebase with debounce
         debouncedAutoSaveHistoryEdits(updatedData, updatedAdditionalInfo);
     };
 
@@ -1810,12 +1862,13 @@ export default function Home() {
                                         <tr className="bg-purple-50 border-b-2 border-purple-200">
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-gray-700">Particulars</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Size</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Cases</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Bottles</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Opening Stock</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Receipts</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran In</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Tran Out</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Total</th>
-                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Closing Stock</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Sales</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-gray-700">Rate</th>
                                             <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-semibold text-gray-700">Amount</th>
@@ -1829,6 +1882,24 @@ export default function Home() {
                                                     <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
                                                         {item.size}
                                                     </span>
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <input
+                                                        type="number"
+                                                        value={item.closingStockCases || 0}
+                                                        onChange={(e) => handleClosingStockCasesChange(index, e.target.value)}
+                                                        disabled={userRole === 'Admin'}
+                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                                                    />
+                                                </td>
+                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                    <input
+                                                        type="number"
+                                                        value={item.closingStockBottles || 0}
+                                                        onChange={(e) => handleClosingStockBottlesChange(index, e.target.value)}
+                                                        disabled={userRole === 'Admin'}
+                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                                                    />
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-gray-900">
                                                     <input type="number" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
@@ -1860,16 +1931,6 @@ export default function Home() {
                                                     </span>
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                    <input
-                                                        type="number"
-                                                        value={item.closingStock}
-                                                        onChange={(e) => handleClosingStockChange(index, e.target.value)}
-                                                        disabled={userRole === 'Admin'}
-                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                                                            }`}
-                                                    />
-                                                </td>
-                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                     <span className="text-blue-600 font-semibold text-xs sm:text-sm">{item.sales}</span>
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm text-gray-800">₹{item.rate}</td>
@@ -1880,6 +1941,8 @@ export default function Home() {
                                     <tfoot className="bg-gray-100 border-t-2 border-gray-300">
                                         <tr className="font-bold">
                                             <td className="px-2 sm:px-4 py-3 text-sm text-gray-800">TOTAL</td>
+                                            <td className="px-2 sm:px-4 py-3 text-center">-</td>
+                                            <td className="px-2 sm:px-4 py-3 text-center">-</td>
                                             <td className="px-2 sm:px-4 py-3 text-center">-</td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.openingStock, 0)}
@@ -1895,9 +1958,6 @@ export default function Home() {
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-purple-600">
                                                 {filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
-                                                {filterData.reduce((sum, item) => sum + item.closingStock, 0)}
                                             </td>
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
                                                 {filterData.reduce((sum, item) => sum + item.sales, 0)}
@@ -2490,8 +2550,8 @@ export default function Home() {
                                                     ['Size', 'Closing Stock', 'Rate'].map((h, i) => (
                                                         <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 2 ? 'text-right' : 'text-center'}`}>{h}</th>
                                                     )) :
-                                                    ['Size', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
-                                                        <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 8 ? 'text-right' : 'text-center'}`}>{h}</th>
+                                                    ['Size', 'Cases', 'Bottles', 'Opening Stock', 'Receipts', 'Tran In', 'Tran Out', 'Closing Stock', 'Sales', 'Rate', 'Amount'].map((h, i) => (
+                                                        <th key={h} className={`px-4 py-3 text-sm font-semibold text-gray-700 ${i === 10 ? 'text-right' : 'text-center'}`}>{h}</th>
                                                     ))
                                                 }
                                             </tr>
@@ -2502,14 +2562,38 @@ export default function Home() {
                                                     <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
                                                     <td className="px-4 py-3 text-center text-sm"><span className={`px-2 py-1 text-xs rounded-full ${showClosingStockView ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>{item.size}</span></td>
                                                     {showClosingStockView ? (
-                                                        // Closing Stock View - Only show closing stock and rate
                                                         <>
                                                             <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{item.closingStock}</td>
                                                             <td className="px-4 py-3 text-right text-sm text-gray-900">₹{item.rate}</td>
                                                         </>
                                                     ) : (
-                                                        // Full View - Show all columns
                                                         <>
+                                                            <td className="px-4 py-3 text-center text-sm text-gray-900">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.closingStockCases || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'closingStockCases', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                                        min="0"
+                                                                    />
+                                                                ) : (
+                                                                    item.closingStockCases || 0
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center text-sm text-gray-900">
+                                                                {editingHistory ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        value={item.closingStockBottles || 0}
+                                                                        onChange={(e) => handleHistoryFieldChange(i, 'closingStockBottles', e.target.value)}
+                                                                        className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                                                                        min="0"
+                                                                    />
+                                                                ) : (
+                                                                    item.closingStockBottles || 0
+                                                                )}
+                                                            </td>
                                                             <td className="px-4 py-3 text-center text-sm text-gray-900">
                                                                 {editingHistory ? (
                                                                     <input
@@ -2568,17 +2652,9 @@ export default function Home() {
                                                                 )}
                                                             </td>
 
-                                                            {/* Closing Stock - Editable in edit mode */}
                                                             <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">
                                                                 {editingHistory ? (
-                                                                    <input
-                                                                        type="number"
-                                                                        value={item.closingStock || 0}
-                                                                        onChange={(e) => handleHistoryFieldChange(i, 'closingStock', e.target.value)}
-                                                                        className="w-20 px-2 py-1 border border-green-300 rounded text-center focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
-                                                                        min="0"
-                                                                        max={(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
-                                                                    />
+                                                                    <span className="text-gray-900">{item.closingStock || 0}</span>
                                                                 ) : (
                                                                     item.closingStock
                                                                 )}
