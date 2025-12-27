@@ -386,7 +386,32 @@ export default function Home() {
         pdfConverterRef.current?.confirmProcessing();
     }, []);
 
-    const filterWineData = useCallback((): void => {
+    const filterWineData = useCallback(async (): Promise<void> => {
+        if (currentIdocNumber) {
+            const storedIdocs = JSON.parse(localStorage.getItem('processedIdocs') || '[]');
+            if (storedIdocs.includes(currentIdocNumber)) {
+                alert('This ICDC number has already been processed.');
+                handlePdfReset();
+                return;
+            }
+            
+            try {
+                const idocCollectionName = `processedIdocs_${sanitizeShopName(username)}`;
+                const q = query(
+                    collection(db, idocCollectionName),
+                    where('idocNumber', '==', currentIdocNumber)
+                );
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    alert('This ICDC number has already been saved to the database.');
+                    handlePdfReset();
+                    return;
+                }
+            } catch (error) {
+                console.error('Error checking ICDC in database:', error);
+            }
+        }
+
         const filtered: FilteredItem[] = [...filterData];
         let totalAmount = 0;
         let matchedCount = 0;
@@ -476,7 +501,7 @@ export default function Home() {
             return a.particulars?.localeCompare(b.particulars || '') || 0;
         }));
         setShowConfirmModal(true);
-    }, [childData, filterData]);
+    }, [childData, filterData, currentIdocNumber, handlePdfReset]);
 
     const loadFromFirebase = async () => {
         if (!username) {
@@ -627,24 +652,19 @@ export default function Home() {
 
             await addDoc(collection(db, collectionName), docData);
             setFilterData(updatedData);
-            // Save ICDC number after successful save
-            if (currentIdocNumber && currentPdfFileName) {
-                try {
-                    const firebase = (window as any).firebase;
-                    if (firebase && firebase.apps.length > 0) {
-                        const firebaseDb = firebase.firestore();
-                        await firebaseDb.collection('processedIdocs').add({
-                            idocNumber: currentIdocNumber,
-                            fileName: currentPdfFileName,
-                            processedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            timestamp: new Date().toISOString(),
-                            user: username
-                        });
-                    }
-                } catch (idocError) {
-                    console.error('Error saving ICDC:', idocError);
+            
+            const storedIdocs = JSON.parse(localStorage.getItem('processedIdocs') || '[]');
+            if (storedIdocs.length > 0) {
+                const idocCollectionName = `processedIdocs_${sanitizeShopName(username)}`;
+                for (const idocNumber of storedIdocs) {
+                    await addDoc(collection(db, idocCollectionName), {
+                        idocNumber: idocNumber,
+                        processedAt: serverTimestamp(),
+                        user: username
+                    });
                 }
             }
+            localStorage.removeItem('processedIdocs');
 
             setSaveStatus('success');
             setSaveMessage(`Successfully saved ${filterData.length} items`);
@@ -1583,6 +1603,7 @@ export default function Home() {
 
     // Check for stored login data on component mount
     useEffect(() => {
+        localStorage.removeItem('processedIdocs');
         const storedLoginData = localStorage.getItem('wineAppLogin');
         if (storedLoginData) {
             const { isLoggedIn, userRole, username, selectedShop, expiresAt } = JSON.parse(storedLoginData);
@@ -1836,7 +1857,28 @@ export default function Home() {
                                                 History
                                             </button>
                                             <button
-                                                onClick={() => pdfConverterRef.current?.loadAllIdocs()}
+                                                onClick={async () => {
+                                                    try {
+                                                        const idocCollectionName = `processedIdocs_${sanitizeShopName(username)}`;
+                                                        const q = query(
+                                                            collection(db, idocCollectionName),
+                                                            orderBy('processedAt', 'desc')
+                                                        );
+                                                        const querySnapshot = await getDocs(q);
+                                                        const idocs = querySnapshot.docs.map(doc => ({
+                                                            id: doc.id,
+                                                            idocNumber: doc.data().idocNumber,
+                                                            fileName: '',
+                                                            timestamp: doc.data().timestamp || ''
+                                                        }));
+                                                        setIdocList(idocs);
+                                                        setShowIdocList(true);
+                                                    } catch (error) {
+                                                        console.error('Error loading IDOCs:', error);
+                                                        setIdocList([]);
+                                                        setShowIdocList(true);
+                                                    }
+                                                }}
                                                 disabled={isLoading}
                                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${isLoading
                                                     ? 'bg-gray-400 cursor-not-allowed'
@@ -2254,7 +2296,7 @@ export default function Home() {
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg shadow-2xl max-w-md w-full max-h-[70vh] overflow-hidden flex flex-col">
                         <div className="bg-orange-600 text-white p-4 flex justify-between items-center">
-                            <h2 className="text-xl font-bold">ICDC IDs ({idocList.length})</h2>
+                            <h2 className="text-xl font-bold">ICDC IDs</h2>
                             <button
                                 onClick={() => setShowIdocList(false)}
                                 className="text-white hover:bg-orange-700 rounded-full p-2 transition"
@@ -2263,17 +2305,37 @@ export default function Home() {
                             </button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
-                            {idocList.length === 0 ? (
-                                <p className="text-center text-gray-500 py-8">No PDFs processed yet</p>
-                            ) : (
-                                <div className="space-y-1">
-                                    {idocList.map((item) => (
-                                        <div key={item.id} className="p-2 hover:bg-orange-50 rounded">
-                                            <p className="font-mono text-sm text-orange-700">{item.idocNumber}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                            {(() => {
+                                const pendingIdocs = JSON.parse(localStorage.getItem('processedIdocs') || '[]');
+                                const savedIdocs = idocList.map(item => item.idocNumber);
+                                const allIdocs = [...new Set([...pendingIdocs, ...savedIdocs])];
+                                
+                                return allIdocs.length === 0 ? (
+                                    <p className="text-center text-gray-500 py-8">No PDFs processed yet</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {allIdocs.map((idocNumber) => {
+                                            const isSaved = savedIdocs.includes(idocNumber);
+                                            const isPending = pendingIdocs.includes(idocNumber);
+                                            
+                                            return (
+                                                <div key={idocNumber} className={`p-3 rounded-lg border ${
+                                                    isSaved ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+                                                }`}>
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="font-mono text-sm text-gray-800">{idocNumber}</p>
+                                                        <span className={`px-2 py-1 text-xs rounded-full ${
+                                                            isSaved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                                        }`}>
+                                                            {isSaved ? 'Saved' : 'Pending'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -2961,6 +3023,11 @@ export default function Home() {
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => {
+                                        if (currentIdocNumber) {
+                                            const storedIdocs = JSON.parse(localStorage.getItem('processedIdocs') || '[]');
+                                            storedIdocs.push(currentIdocNumber);
+                                            localStorage.setItem('processedIdocs', JSON.stringify(storedIdocs));
+                                        }
                                         setFilterData(pendingData);
                                         setShowConfirmModal(false);
                                         setPendingData([]);
