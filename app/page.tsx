@@ -497,8 +497,14 @@ export default function Home() {
         setPdfTotal(totalAmount);
         setMatchedItemsCount(matchedCount);
         setPendingData(filtered.sort((a, b) => {
-            if (b.rate !== a.rate) return b.rate - a.rate;
-            return a.particulars?.localeCompare(b.particulars || '') || 0;
+            if (a.particulars !== b.particulars) return a.particulars.localeCompare(b.particulars);
+            const sizeA = parseInt(a.size) || 0;
+            const sizeB = parseInt(b.size) || 0;
+            if (sizeA !== sizeB) return sizeB - sizeA;
+            const brandA = String(a.brandNumber);
+            const brandB = String(b.brandNumber);
+            if (brandA !== brandB) return brandA.localeCompare(brandB);
+            return b.rate - a.rate;
         }));
         setShowConfirmModal(true);
     }, [childData, filterData, currentIdocNumber, handlePdfReset]);
@@ -524,7 +530,17 @@ export default function Home() {
             if (!querySnapshot.empty) {
                 const data = querySnapshot.docs[0].data();
                 console.log('Loaded data:', data);
-                setFilterData(data.items || []);
+                const sortedItems = (data.items || []).sort((a: FilteredItem, b: FilteredItem) => {
+                    if (a.particulars !== b.particulars) return a.particulars.localeCompare(b.particulars);
+                    const sizeA = parseInt(a.size) || 0;
+                    const sizeB = parseInt(b.size) || 0;
+                    if (sizeA !== sizeB) return sizeB - sizeA;
+                    const brandA = String(a.brandNumber);
+                    const brandB = String(b.brandNumber);
+                    if (brandA !== brandB) return brandA.localeCompare(brandB);
+                    return b.rate - a.rate;
+                });
+                setFilterData(sortedItems);
                 setField1(data.field1 || '');
                 setField2(data.field2 || '');
                 setField3(data.field3 || '');
@@ -1645,6 +1661,7 @@ export default function Home() {
     // Update field1 when filterData changes (for real-time total sale calculation)
     useEffect(() => {
         if (filterData.length > 0) {
+            console.log('Main Sheet Data:', filterData);
             const newTotalSale = filterData.reduce((sum, item) => {
                 const amount = parseFloat(item.amount.replace('₹', '').replace(',', '')) || 0;
                 return sum + amount;
@@ -3028,7 +3045,31 @@ export default function Home() {
                                             storedIdocs.push(currentIdocNumber);
                                             localStorage.setItem('processedIdocs', JSON.stringify(storedIdocs));
                                         }
-                                        setFilterData(pendingData);
+                                        const mergedData = [...filterData];
+                                        pendingData.forEach(newItem => {
+                                            const existingIndex = mergedData.findIndex(
+                                                item => item.brandNumber === newItem.brandNumber &&
+                                                        item.particulars === newItem.particulars &&
+                                                        item.size === newItem.size &&
+                                                        item.rate === newItem.rate
+                                            );
+                                            if (existingIndex !== -1) {
+                                                mergedData[existingIndex].receipts += newItem.receipts;
+                                            } else {
+                                                mergedData.push(newItem);
+                                            }
+                                        });
+                                        const sortedData = mergedData.sort((a, b) => {
+                                            if (a.particulars !== b.particulars) return a.particulars.localeCompare(b.particulars);
+                                            const sizeA = parseInt(a.size) || 0;
+                                            const sizeB = parseInt(b.size) || 0;
+                                            if (sizeA !== sizeB) return sizeB - sizeA;
+                                            const brandA = String(a.brandNumber);
+                                            const brandB = String(b.brandNumber);
+                                            if (brandA !== brandB) return brandA.localeCompare(brandB);
+                                            return b.rate - a.rate;
+                                        });
+                                        setFilterData(sortedData);
                                         setShowConfirmModal(false);
                                         setPendingData([]);
                                         setChildData([]);
