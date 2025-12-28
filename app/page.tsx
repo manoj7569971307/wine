@@ -412,7 +412,7 @@ export default function Home() {
             }
         }
 
-        const filtered: FilteredItem[] = [...filterData];
+        const filtered: FilteredItem[] = [];
         let totalAmount = 0;
         let matchedCount = 0;
 
@@ -1979,26 +1979,30 @@ export default function Home() {
                                                     <input type="text" value={item.openingStock} className="w-16 sm:w-20 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500" readOnly />
                                                 </td>
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs sm:text-sm font-semibold text-blue-600">{item.receipts}</td>
-                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                    <input
-                                                        type="text"
-                                                        value={item.tranIn}
-                                                        onChange={(e) => handleTranInChange(index, e.target.value)}
-                                                        disabled={userRole === 'Admin'}
-                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                                                            }`}
-                                                    />
-                                                </td>
-                                                <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                                                    <input
-                                                        type="text"
-                                                        value={item.tranOut}
-                                                        onChange={(e) => handleTranOutChange(index, e.target.value)}
-                                                        disabled={userRole === 'Admin'}
-                                                        className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                                                            }`}
-                                                    />
-                                                </td>
+                                                {username !== username.toUpperCase() && (
+                                                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                        <input
+                                                            type="text"
+                                                            value={item.tranIn}
+                                                            onChange={(e) => handleTranInChange(index, e.target.value)}
+                                                            disabled={userRole === 'Admin'}
+                                                            className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                                                }`}
+                                                        />
+                                                    </td>
+                                                )}
+                                                {username !== username.toUpperCase() && (
+                                                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+                                                        <input
+                                                            type="text"
+                                                            value={item.tranOut}
+                                                            onChange={(e) => handleTranOutChange(index, e.target.value)}
+                                                            disabled={userRole === 'Admin'}
+                                                            className={`w-12 sm:w-16 px-2 py-1 text-center text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 text-gray-900 focus:ring-blue-500 ${userRole === 'Admin' ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                                                }`}
+                                                        />
+                                                    </td>
+                                                )}
                                                 <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                                                     <span className="text-purple-600 font-semibold text-xs sm:text-sm">
                                                         {(item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0)}
@@ -2046,12 +2050,16 @@ export default function Home() {
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-blue-600">
                                                 {filterData.reduce((sum, item) => sum + item.receipts, 0)}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
-                                                {filterData.reduce((sum, item) => sum + item.tranIn, 0)}
-                                            </td>
-                                            <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
-                                                {filterData.reduce((sum, item) => sum + item.tranOut, 0)}
-                                            </td>
+                                            {username !== username.toUpperCase() && (
+                                                <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
+                                                    {filterData.reduce((sum, item) => sum + item.tranIn, 0)}
+                                                </td>
+                                            )}
+                                            {username !== username.toUpperCase() && (
+                                                <td className="px-2 sm:px-4 py-3 text-center text-sm text-gray-900">
+                                                    {filterData.reduce((sum, item) => sum + item.tranOut, 0)}
+                                                </td>
+                                            )}
                                             <td className="px-2 sm:px-4 py-3 text-center text-sm text-purple-600">
                                                 {filterData.reduce((sum, item) => sum + (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0), 0)}
                                             </td>
@@ -3051,7 +3059,8 @@ export default function Home() {
                                                 item => item.brandNumber === newItem.brandNumber &&
                                                         item.particulars === newItem.particulars &&
                                                         item.size === newItem.size &&
-                                                        item.rate === newItem.rate
+                                                        item.rate === newItem.rate &&
+                                                        Math.abs(Number(item.issuePrice) - Number(newItem.issuePrice)) < 1
                                             );
                                             if (existingIndex !== -1) {
                                                 mergedData[existingIndex].receipts += newItem.receipts;
