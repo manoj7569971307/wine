@@ -3029,14 +3029,12 @@ export default function Home() {
             {/* PDF Confirmation Modal */}
             {showConfirmModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-2xl max-w-md w-full">
-                        <div className="bg-blue-600 text-white p-4 rounded-t-lg">
+                    <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="bg-blue-600 text-white p-4">
                             <h2 className="text-xl font-bold">Confirm PDF Data</h2>
+                            <p className="text-sm text-blue-100 mt-1">Review items before adding</p>
                         </div>
-                        <div className="p-6">
-                            <p className="text-gray-700 mb-4">
-                                PDF data processed successfully.
-                            </p>
+                        <div className="p-6 overflow-y-auto flex-1">
                             <div className="bg-blue-50 p-4 rounded-lg mb-4">
                                 <p className="font-semibold text-blue-800 mb-2">
                                     Items Found: {matchedItemsCount}
@@ -3045,60 +3043,100 @@ export default function Home() {
                                     Total Amount: ₹{pdfTotal.toFixed(2)}
                                 </p>
                             </div>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        if (currentIdocNumber) {
-                                            const storedIdocs = JSON.parse(localStorage.getItem('processedIdocs') || '[]');
-                                            storedIdocs.push(currentIdocNumber);
-                                            localStorage.setItem('processedIdocs', JSON.stringify(storedIdocs));
-                                        }
-                                        const mergedData = [...filterData];
-                                        pendingData.forEach(newItem => {
-                                            const existingIndex = mergedData.findIndex(
-                                                item => item.brandNumber === newItem.brandNumber &&
-                                                        item.particulars === newItem.particulars &&
-                                                        item.size === newItem.size &&
-                                                        item.rate === newItem.rate &&
-                                                        Math.abs(Number(item.issuePrice) - Number(newItem.issuePrice)) < 1
-                                            );
-                                            if (existingIndex !== -1) {
-                                                mergedData[existingIndex].receipts += newItem.receipts;
-                                            } else {
-                                                mergedData.push(newItem);
-                                            }
-                                        });
-                                        const sortedData = mergedData.sort((a, b) => {
-                                            if (a.particulars !== b.particulars) return a.particulars.localeCompare(b.particulars);
-                                            const sizeA = parseInt(a.size) || 0;
-                                            const sizeB = parseInt(b.size) || 0;
-                                            if (sizeA !== sizeB) return sizeB - sizeA;
-                                            const brandA = String(a.brandNumber);
-                                            const brandB = String(b.brandNumber);
-                                            if (brandA !== brandB) return brandA.localeCompare(brandB);
-                                            return b.rate - a.rate;
-                                        });
-                                        setFilterData(sortedData);
-                                        setShowConfirmModal(false);
-                                        setPendingData([]);
-                                        setChildData([]);
-                                        setPdfTotal(0);
-                                        setMatchedItemsCount(0);
-                                        handlePdfConfirm();
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
-                                >
-                                    Add
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        handlePdfReset();
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition"
-                                >
-                                    Cancel
-                                </button>
+                            
+                            <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-purple-50 border-b-2 border-purple-200">
+                                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Particulars</th>
+                                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Size</th>
+                                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Cases</th>
+                                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Bottles</th>
+                                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Total Receipts</th>
+                                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Rate</th>
+                                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Brand Number</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {pendingData.map((item, index) => {
+                                                const caseSize = parseInt(item.caseSize || item.size) || 1;
+                                                const cases = Math.floor(item.receipts / caseSize);
+                                                const bottles = item.receipts % caseSize;
+                                                return (
+                                                    <tr key={index} className="border-b border-gray-200 hover:bg-purple-50">
+                                                        <td className="px-4 py-3 text-sm text-gray-800">{item.particulars}</td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
+                                                                {item.size}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{cases}</td>
+                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-orange-600">{bottles}</td>
+                                                        <td className="px-4 py-3 text-center text-sm font-semibold text-blue-600">{item.receipts}</td>
+                                                        <td className="px-4 py-3 text-center text-sm text-gray-900">₹{item.rate}</td>
+                                                        <td className="px-4 py-3 text-center text-sm text-gray-600">{item.brandNumber}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 border-t flex gap-3">
+                            <button
+                                onClick={() => {
+                                    if (currentIdocNumber) {
+                                        const storedIdocs = JSON.parse(localStorage.getItem('processedIdocs') || '[]');
+                                        storedIdocs.push(currentIdocNumber);
+                                        localStorage.setItem('processedIdocs', JSON.stringify(storedIdocs));
+                                    }
+                                    const mergedData = [...filterData];
+                                    pendingData.forEach(newItem => {
+                                        const existingIndex = mergedData.findIndex(
+                                            item => item.brandNumber === newItem.brandNumber &&
+                                                    item.particulars === newItem.particulars &&
+                                                    item.size === newItem.size &&
+                                                    item.rate === newItem.rate &&
+                                                    Math.abs(Number(item.issuePrice) - Number(newItem.issuePrice)) < 1
+                                        );
+                                        if (existingIndex !== -1) {
+                                            mergedData[existingIndex].receipts += newItem.receipts;
+                                        } else {
+                                            mergedData.push(newItem);
+                                        }
+                                    });
+                                    const sortedData = mergedData.sort((a, b) => {
+                                        if (a.particulars !== b.particulars) return a.particulars.localeCompare(b.particulars);
+                                        const sizeA = parseInt(a.size) || 0;
+                                        const sizeB = parseInt(b.size) || 0;
+                                        if (sizeA !== sizeB) return sizeB - sizeA;
+                                        const brandA = String(a.brandNumber);
+                                        const brandB = String(b.brandNumber);
+                                        if (brandA !== brandB) return brandA.localeCompare(brandB);
+                                        return b.rate - a.rate;
+                                    });
+                                    setFilterData(sortedData);
+                                    setShowConfirmModal(false);
+                                    setPendingData([]);
+                                    setChildData([]);
+                                    setPdfTotal(0);
+                                    setMatchedItemsCount(0);
+                                    handlePdfConfirm();
+                                }}
+                                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                            >
+                                Add All Items
+                            </button>
+                            <button
+                                onClick={() => {
+                                    handlePdfReset();
+                                }}
+                                className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition"
+                            >
+                                Cancel
+                            </button>
                         </div>
                     </div>
                 </div>
