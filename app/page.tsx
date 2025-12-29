@@ -471,7 +471,7 @@ export default function Home() {
                         filtered.push({
                             particulars: wine['Product Name'],
                             category: row[3] || '',
-                            rate: wine['MRP'],
+                            rate: Number(wine['MRP']),
                             receiptDate: new Date().toISOString().split('T')[0],
                             openingStock: 0,
                             receipts: calculatedQuantity,
