@@ -34635,7 +34635,52 @@ const wineData3: Wine[] = [
             "Special Margin": 9.9,
             "MRP": 110,
             "Type": "Local"
-        }
+        },
+        {
+    "S.no": 3147,
+    "Brand Number": 2073,
+    "Size Code": "DD",
+    "Pack Type": "G",
+    "Product Name": "SEAGRAM'S XCLAMATION RESERVE WHISKY",
+    "Issue Price": 10408,
+    "Special Margin": 9.9,
+    "MRP": 160,
+    "Type": "Local"
+},
+{
+    "S.no": 3148,
+    "Brand Number": 2073,
+    "Size Code": "NN",
+    "Pack Type": "G",
+    "Product Name": "SEAGRAM'S XCLAMATION RESERVE WHISKY",
+    "Issue Price": 10404,
+    "Special Margin": 9.9,
+    "MRP": 300,
+    "Type": "Local"
+},
+{
+    "S.no": 3149,
+    "Brand Number": 2073,
+    "Size Code": "PP",
+    "Pack Type": "G",
+    "Product Name": "SEAGRAM'S XCLAMATION RESERVE WHISKY",
+    "Issue Price": 10602,
+    "Special Margin": 9.9,
+    "MRP": 600,
+    "Type": "Local"
+},
+{
+    "S.no": 3150,
+    "Brand Number": 2073,
+    "Size Code": "QQ",
+    "Pack Type": "G",
+    "Product Name": "SEAGRAM'S XCLAMATION RESERVE WHISKY",
+    "Issue Price": 10701,
+    "Special Margin": 9.9,
+    "MRP": 1200,
+    "Type": "Local"
+}
+
 ]
 
 
