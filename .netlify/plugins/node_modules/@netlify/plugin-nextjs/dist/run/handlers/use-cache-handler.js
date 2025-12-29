@@ -53,7 +53,6 @@ if (typeof AC === "undefined") {
   };
 }
 var shouldWarn = (code) => !warned.has(code);
-var TYPE = Symbol("type");
 var isPosInt = (n) => n && n === Math.floor(n) && n > 0 && isFinite(n);
 var getUintArray = (max) => !isPosInt(max) ? null : max <= Math.pow(2, 8) ? Uint8Array : max <= Math.pow(2, 16) ? Uint16Array : max <= Math.pow(2, 32) ? Uint32Array : max <= Number.MAX_SAFE_INTEGER ? ZeroArray : null;
 var ZeroArray = class extends Array {
@@ -1386,9 +1385,9 @@ import {
   markTagsAsStaleAndPurgeEdgeCache
 } from "./tags-handler.cjs";
 import { getTracer, withActiveSpan } from "./tracer.cjs";
-var LRU_CACHE_GLOBAL_KEY = Symbol.for("nf-use-cache-handler-lru-cache");
-var PENDING_SETS_GLOBAL_KEY = Symbol.for("nf-use-cache-handler-pending-sets");
-var cacheHandlersSymbol = Symbol.for("@next/cache-handlers");
+var LRU_CACHE_GLOBAL_KEY = /* @__PURE__ */ Symbol.for("nf-use-cache-handler-lru-cache");
+var PENDING_SETS_GLOBAL_KEY = /* @__PURE__ */ Symbol.for("nf-use-cache-handler-pending-sets");
+var cacheHandlersSymbol = /* @__PURE__ */ Symbol.for("@next/cache-handlers");
 var extendedGlobalThis = globalThis;
 function getLRUCache() {
   if (extendedGlobalThis[LRU_CACHE_GLOBAL_KEY]) {

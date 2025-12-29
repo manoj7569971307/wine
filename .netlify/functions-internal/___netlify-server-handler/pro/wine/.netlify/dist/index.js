@@ -7,7 +7,7 @@
 import {
   trace,
   wrapTracer
-} from "./esm-chunks/chunk-5V5HA6YA.js";
+} from "./esm-chunks/chunk-QCOH52QC.js";
 import "./esm-chunks/chunk-6BT4RYQJ.js";
 
 // src/index.ts

@@ -56,7 +56,8 @@ function shouldEnableSkewProtection(ctx) {
       enabledOrDisabledReason: "off-default" /* OPT_OUT_DEFAULT */
     };
   }
-  if ((!process.env.DEPLOY_ID || process.env.DEPLOY_ID === "0") && optInOptions.has(enabledOrDisabledReason)) {
+  const token = process.env.NETLIFY_SKEW_PROTECTION_TOKEN || process.env.DEPLOY_ID;
+  if ((!token || token === "0") && optInOptions.has(enabledOrDisabledReason)) {
     return {
       enabled: false,
       enabledOrDisabledReason: enabledOrDisabledReason === "on-env-var" /* OPT_IN_ENV_VAR */ && ctx.constants.IS_LOCAL ? (
@@ -66,16 +67,18 @@ function shouldEnableSkewProtection(ctx) {
         // this is silent disablement to avoid spam logs for users opted in via feature flag
         // that don't explicitly opt in via env var
         "off-no-valid-deploy-id" /* OPT_OUT_NO_VALID_DEPLOY_ID */
-      )
+      ),
+      token
     };
   }
   return {
     enabled: optInOptions.has(enabledOrDisabledReason),
-    enabledOrDisabledReason
+    enabledOrDisabledReason,
+    token
   };
 }
 var setSkewProtection = async (ctx, span) => {
-  const { enabled, enabledOrDisabledReason } = shouldEnableSkewProtection(ctx);
+  const { enabled, enabledOrDisabledReason, token } = shouldEnableSkewProtection(ctx);
   span.setAttribute("skewProtection", enabledOrDisabledReason);
   if (!enabled) {
     if (enabledOrDisabledReason === "off-no-valid-deploy-id-env-var" /* OPT_OUT_NO_VALID_DEPLOY_ID_ENV_VAR */) {
@@ -92,7 +95,7 @@ var setSkewProtection = async (ctx, span) => {
   } else {
     console.log("Setting up Next.js Skew Protection.");
   }
-  process.env.NEXT_DEPLOYMENT_ID = process.env.DEPLOY_ID;
+  process.env.NEXT_DEPLOYMENT_ID = token;
   await mkdir(dirname(ctx.skewProtectionConfigPath), {
     recursive: true
   });

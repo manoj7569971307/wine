@@ -24,7 +24,7 @@ __export(wait_until_exports, {
 });
 module.exports = __toCommonJS(wait_until_exports);
 var import_request_context = require("./request-context.cjs");
-var NEXT_REQUEST_CONTEXT_SYMBOL = Symbol.for("@next/request-context");
+var NEXT_REQUEST_CONTEXT_SYMBOL = /* @__PURE__ */ Symbol.for("@next/request-context");
 function setupWaitUntil() {
   ;
   globalThis[NEXT_REQUEST_CONTEXT_SYMBOL] = {

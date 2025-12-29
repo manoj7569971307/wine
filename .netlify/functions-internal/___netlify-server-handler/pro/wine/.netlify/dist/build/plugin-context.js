@@ -6,7 +6,7 @@
     
 import {
   require_semver
-} from "../esm-chunks/chunk-TVEBGDAB.js";
+} from "../esm-chunks/chunk-JNOKXHJS.js";
 import {
   __toESM
 } from "../esm-chunks/chunk-6BT4RYQJ.js";
@@ -16,7 +16,7 @@ var import_semver = __toESM(require_semver(), 1);
 import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { join as posixJoin, relative as posixRelative } from "node:path/posix";
 import { fileURLToPath } from "node:url";
 var MODULE_DIR = fileURLToPath(new URL(".", import.meta.url));
@@ -53,6 +53,25 @@ var PluginContext = class {
    */
   get relativeAppDir() {
     return this.requiredServerFiles.relativeAppDir ?? "";
+  }
+  /**
+   * The root directory for output file tracing. Paths inside standalone directory preserve paths of project, relative to this directory.
+   */
+  get outputFileTracingRoot() {
+    const outputFileTracingRootFromRequiredServerFiles = this.requiredServerFiles.config.outputFileTracingRoot ?? // fallback for older Next.js versions that don't have outputFileTracingRoot in the config, but had it in config.experimental
+    this.requiredServerFiles.config.experimental.outputFileTracingRoot;
+    if (outputFileTracingRootFromRequiredServerFiles) {
+      return outputFileTracingRootFromRequiredServerFiles;
+    }
+    if (!this.relativeAppDir.includes("..")) {
+      const depth = this.relativeAppDir === "" ? 0 : this.relativeAppDir.split(sep).length;
+      const computedOutputFileTracingRoot = resolve(
+        this.requiredServerFiles.appDir,
+        ...Array.from({ length: depth }).fill("..")
+      );
+      return computedOutputFileTracingRoot;
+    }
+    return process.cwd();
   }
   /**
    * The working directory inside the lambda that is used for monorepos to execute the serverless function

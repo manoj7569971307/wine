@@ -96,8 +96,8 @@ var SystemLogger = class _SystemLogger {
 var systemLogger = new SystemLogger();
 
 // src/run/handlers/request-context.cts
-var REQUEST_CONTEXT_GLOBAL_KEY = Symbol.for("nf-request-context-async-local-storage");
-var REQUEST_COUNTER_KEY = Symbol.for("nf-request-counter");
+var REQUEST_CONTEXT_GLOBAL_KEY = /* @__PURE__ */ Symbol.for("nf-request-context-async-local-storage");
+var REQUEST_COUNTER_KEY = /* @__PURE__ */ Symbol.for("nf-request-counter");
 var extendedGlobalThis = globalThis;
 function getFallbackRequestID() {
   const requestNumber = extendedGlobalThis[REQUEST_COUNTER_KEY] ?? 0;

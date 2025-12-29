@@ -117,7 +117,7 @@ var isCompatible = _makeCompatibilityCheck(VERSION);
 
 // node_modules/@netlify/otel/node_modules/@opentelemetry/api/build/esm/internal/global-utils.js
 var major = VERSION.split(".")[0];
-var GLOBAL_OPENTELEMETRY_API_KEY = Symbol.for("opentelemetry.js.api." + major);
+var GLOBAL_OPENTELEMETRY_API_KEY = /* @__PURE__ */ Symbol.for("opentelemetry.js.api." + major);
 var _global = _globalThis;
 function registerGlobal(type, instance, diag, allowOverride) {
   var _a;

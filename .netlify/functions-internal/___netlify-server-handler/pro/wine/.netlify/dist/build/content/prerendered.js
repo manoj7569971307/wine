@@ -7,13 +7,13 @@
 import {
   trace,
   wrapTracer
-} from "../../esm-chunks/chunk-5V5HA6YA.js";
+} from "../../esm-chunks/chunk-QCOH52QC.js";
 import {
   require_out
 } from "../../esm-chunks/chunk-YUXQHOYO.js";
 import {
   require_semver
-} from "../../esm-chunks/chunk-TVEBGDAB.js";
+} from "../../esm-chunks/chunk-JNOKXHJS.js";
 import {
   __toESM
 } from "../../esm-chunks/chunk-6BT4RYQJ.js";
@@ -192,7 +192,7 @@ var buildPagesCacheValue = async (path, initialRevalidateSeconds, shouldUseEnumK
 });
 var RSC_SEGMENTS_DIR_SUFFIX = ".segments";
 var RSC_SEGMENT_SUFFIX = ".segment.rsc";
-var buildAppCacheValue = async (path, shouldUseAppPageKind) => {
+var buildAppCacheValue = async (path, shouldUseAppPageKind, rscIsRequired = true) => {
   const meta = JSON.parse(await readFile(`${path}.meta`, "utf-8"));
   const html = await readFile(`${path}.html`, "utf-8");
   if (shouldUseAppPageKind) {
@@ -212,9 +212,12 @@ var buildAppCacheValue = async (path, shouldUseAppPageKind) => {
     return {
       kind: "APP_PAGE",
       html,
-      rscData: await readFile(`${path}.rsc`, "base64").catch(
-        () => readFile(`${path}.prefetch.rsc`, "base64")
-      ),
+      rscData: await readFile(`${path}.rsc`, "base64").catch(() => readFile(`${path}.prefetch.rsc`, "base64")).catch((error) => {
+        if (rscIsRequired) {
+          throw error;
+        }
+        return void 0;
+      }),
       segmentData,
       ...meta
     };
@@ -254,6 +257,7 @@ var copyPrerenderedContent = async (ctx) => {
       const shouldUseEnumKind = ctx.nextVersion ? (0, import_semver.satisfies)(ctx.nextVersion, ">=15.0.0-canary.114 <15.0.0-d || >15.0.0-rc.0", {
         includePrerelease: true
       }) : false;
+      let appRouterNotFoundDefinedInPrerenderManifest = false;
       await Promise.all([
         ...Object.entries(manifest.routes).map(
           ([route, meta]) => limitConcurrentPrerenderContentHandling(async () => {
@@ -277,8 +281,12 @@ var copyPrerenderedContent = async (ctx) => {
               case meta.dataRoute?.endsWith(".rsc"):
                 value = await buildAppCacheValue(
                   join(ctx.publishDir, "server/app", key),
-                  shouldUseAppPageKind
+                  shouldUseAppPageKind,
+                  meta.renderingMode !== "PARTIALLY_STATIC"
                 );
+                if (route === "/_not-found") {
+                  appRouterNotFoundDefinedInPrerenderManifest = true;
+                }
                 break;
               case meta.dataRoute === null:
                 value = await buildRouteCacheValue(
@@ -320,7 +328,7 @@ var copyPrerenderedContent = async (ctx) => {
           })
         )
       ]);
-      if (existsSync(join(ctx.publishDir, `server/app/_not-found.html`))) {
+      if (!appRouterNotFoundDefinedInPrerenderManifest && existsSync(join(ctx.publishDir, `server/app/_not-found.html`))) {
         const lastModified = Date.now();
         const key = "/404";
         const value = await buildAppCacheValue(

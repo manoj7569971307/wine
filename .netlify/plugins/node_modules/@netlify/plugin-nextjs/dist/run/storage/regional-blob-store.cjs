@@ -30,7 +30,23 @@ var getString = (input) => typeof input === "string" ? input : JSON.stringify(in
 var base64Decode = globalThis.Buffer ? (input) => Buffer.from(input, "base64").toString() : (input) => atob(input);
 var base64Encode = globalThis.Buffer ? (input) => Buffer.from(getString(input)).toString("base64") : (input) => btoa(getString(input));
 
-// node_modules/@netlify/blobs/dist/chunk-HN33TXZT.js
+// node_modules/@netlify/otel/dist/main.js
+var GET_TRACER = "__netlify__getTracer";
+var getTracer = (name, version) => {
+  return globalThis[GET_TRACER]?.(name, version);
+};
+function withActiveSpan(tracer, name, optionsOrFn, contextOrFn, fn) {
+  const func = typeof contextOrFn === "function" ? contextOrFn : typeof optionsOrFn === "function" ? optionsOrFn : fn;
+  if (!func) {
+    throw new Error("function to execute with active span is missing");
+  }
+  if (!tracer) {
+    return func();
+  }
+  return tracer.withActiveSpan(name, optionsOrFn, contextOrFn, func);
+}
+
+// node_modules/@netlify/blobs/dist/chunk-3OMJJ4EG.js
 var getEnvironment = () => {
   const { Deno, Netlify, process: process2 } = globalThis;
   return Netlify?.env ?? Deno?.env ?? {
@@ -123,6 +139,12 @@ var collectIterator = async (iterator) => {
   }
   return result;
 };
+function withSpan(span, name, fn) {
+  if (span) return fn(span);
+  return withActiveSpan(getTracer(), name, (span2) => {
+    return fn(span2);
+  });
+}
 var BlobsConsistencyError = class extends Error {
   constructor() {
     super(
@@ -337,22 +359,6 @@ var getClientOptions = (options, contextOverride) => {
   return clientOptions;
 };
 
-// node_modules/@netlify/otel/dist/main.js
-var GET_TRACER = "__netlify__getTracer";
-var getTracer = (name, version) => {
-  return globalThis[GET_TRACER]?.(name, version);
-};
-function withActiveSpan(tracer, name, optionsOrFn, contextOrFn, fn) {
-  const func = typeof contextOrFn === "function" ? contextOrFn : typeof optionsOrFn === "function" ? optionsOrFn : fn;
-  if (!func) {
-    throw new Error("function to execute with active span is missing");
-  }
-  if (!tracer) {
-    return func();
-  }
-  return tracer.withActiveSpan(name, optionsOrFn, contextOrFn, func);
-}
-
 // node_modules/@netlify/blobs/dist/main.js
 var DEPLOY_STORE_PREFIX = "deploy:";
 var LEGACY_STORE_INTERNAL_PREFIX = "netlify-internal/legacy-namespace/";
@@ -404,7 +410,7 @@ var Store = class _Store {
     };
   }
   async get(key, options) {
-    return withActiveSpan(getTracer(), "blobs.get", async (span) => {
+    return withSpan(options?.span, "blobs.get", async (span) => {
       const { consistency, type } = options ?? {};
       span?.setAttributes({
         "blobs.store": this.name,
@@ -447,15 +453,20 @@ var Store = class _Store {
       throw new BlobsInternalError(res);
     });
   }
-  async getMetadata(key, { consistency } = {}) {
-    return withActiveSpan(getTracer(), "blobs.getMetadata", async (span) => {
+  async getMetadata(key, options = {}) {
+    return withSpan(options?.span, "blobs.getMetadata", async (span) => {
       span?.setAttributes({
         "blobs.store": this.name,
         "blobs.key": key,
         "blobs.method": "HEAD",
-        "blobs.consistency": consistency
+        "blobs.consistency": options.consistency
       });
-      const res = await this.client.makeRequest({ consistency, key, method: "head", storeName: this.name });
+      const res = await this.client.makeRequest({
+        consistency: options.consistency,
+        key,
+        method: "head",
+        storeName: this.name
+      });
       span?.setAttributes({
         "blobs.response.status": res.status
       });
@@ -475,7 +486,7 @@ var Store = class _Store {
     });
   }
   async getWithMetadata(key, options) {
-    return withActiveSpan(getTracer(), "blobs.getWithMetadata", async (span) => {
+    return withSpan(options?.span, "blobs.getWithMetadata", async (span) => {
       const { consistency, etag: requestETag, type } = options ?? {};
       const headers = requestETag ? { "if-none-match": requestETag } : void 0;
       span?.setAttributes({
@@ -532,7 +543,7 @@ var Store = class _Store {
     });
   }
   list(options = {}) {
-    return withActiveSpan(getTracer(), "blobs.list", (span) => {
+    return withSpan(options.span, "blobs.list", (span) => {
       span?.setAttributes({
         "blobs.store": this.name,
         "blobs.method": "GET",
@@ -554,7 +565,7 @@ var Store = class _Store {
     });
   }
   async set(key, data, options = {}) {
-    return withActiveSpan(getTracer(), "blobs.set", async (span) => {
+    return withSpan(options.span, "blobs.set", async (span) => {
       span?.setAttributes({
         "blobs.store": this.name,
         "blobs.key": key,
@@ -591,7 +602,7 @@ var Store = class _Store {
     });
   }
   async setJSON(key, data, options = {}) {
-    return withActiveSpan(getTracer(), "blobs.setJSON", async (span) => {
+    return withSpan(options.span, "blobs.setJSON", async (span) => {
       span?.setAttributes({
         "blobs.store": this.name,
         "blobs.key": key,
@@ -707,7 +718,7 @@ var Store = class _Store {
         let done = false;
         return {
           async next() {
-            return withActiveSpan(getTracer(), "blobs.list.next", async (span) => {
+            return withSpan(options?.span, "blobs.list.next", async (span) => {
               span?.setAttributes({
                 "blobs.store": storeName,
                 "blobs.method": "GET",
@@ -786,7 +797,7 @@ var getDeployStore = (input = {}) => {
 };
 
 // src/run/storage/regional-blob-store.cts
-var FETCH_BEFORE_NEXT_PATCHED_IT = Symbol.for("nf-not-patched-fetch");
+var FETCH_BEFORE_NEXT_PATCHED_IT = /* @__PURE__ */ Symbol.for("nf-not-patched-fetch");
 var extendedGlobalThis = globalThis;
 function attemptToGetOriginalFetch(fetch) {
   return fetch._nextOriginalFetch ?? fetch;

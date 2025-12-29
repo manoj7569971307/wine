@@ -9,7 +9,7 @@ import "../esm-chunks/chunk-6BT4RYQJ.js";
 // src/run/headers.ts
 import { recordWarning } from "./handlers/tracer.cjs";
 import { getMemoizedKeyValueStoreBackedByRegionalBlobStore } from "./storage/storage.cjs";
-var ALL_VARIATIONS = Symbol.for("ALL_VARIATIONS");
+var ALL_VARIATIONS = /* @__PURE__ */ Symbol.for("ALL_VARIATIONS");
 var NetlifyVaryKeys = /* @__PURE__ */ new Set(["header", "language", "cookie", "query", "country"]);
 var isNetlifyVaryKey = (key) => NetlifyVaryKeys.has(key);
 var generateNetlifyVaryValues = ({

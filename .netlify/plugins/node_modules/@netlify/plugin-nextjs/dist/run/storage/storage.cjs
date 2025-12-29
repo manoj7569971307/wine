@@ -57,10 +57,11 @@ var getMemoizedKeyValueStoreBackedByRegionalBlobStore = (...args) => {
       const blobKey = await encodeBlobKey(key);
       const getPromise = (0, import_tracer.withActiveSpan)(tracer, otelSpanTitle, async (span) => {
         const { etag: previousEtag, globalValue: previousBlob } = memoizedValue?.conditional ? memoizedValue : {};
-        span?.setAttributes({ key, blobKey, previousEtag });
+        span?.setAttributes({ key });
         const result = await store.getWithMetadata(blobKey, {
           type: "json",
-          etag: previousEtag
+          etag: previousEtag,
+          span
         });
         const shouldReuseMemoizedBlob = result?.etag && previousEtag === result?.etag;
         const blob = shouldReuseMemoizedBlob ? previousBlob : result?.data;
@@ -72,11 +73,6 @@ var getMemoizedKeyValueStoreBackedByRegionalBlobStore = (...args) => {
         } else {
           inMemoryCache.set(key, blob);
         }
-        span?.setAttributes({
-          etag: result?.etag,
-          reusingPreviouslyFetchedBlob: shouldReuseMemoizedBlob,
-          status: blob ? shouldReuseMemoizedBlob ? "Hit, no change" : "Hit" : "Miss"
-        });
         return blob;
       });
       inMemoryCache.set(key, getPromise);
@@ -87,8 +83,8 @@ var getMemoizedKeyValueStoreBackedByRegionalBlobStore = (...args) => {
       inMemoryCache.set(key, value);
       const blobKey = await encodeBlobKey(key);
       return (0, import_tracer.withActiveSpan)(tracer, otelSpanTitle, async (span) => {
-        span?.setAttributes({ key, blobKey });
-        const writeResult = await store.setJSON(blobKey, value);
+        span?.setAttributes({ key });
+        const writeResult = await store.setJSON(blobKey, value, { span });
         if (writeResult?.etag) {
           inMemoryCache.set(key, {
             data: value,

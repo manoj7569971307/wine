@@ -70,7 +70,6 @@ if (typeof AC === "undefined") {
   };
 }
 var shouldWarn = (code) => !warned.has(code);
-var TYPE = Symbol("type");
 var isPosInt = (n) => n && n === Math.floor(n) && n > 0 && isFinite(n);
 var getUintArray = (max) => !isPosInt(max) ? null : max <= Math.pow(2, 8) ? Uint8Array : max <= Math.pow(2, 16) ? Uint16Array : max <= Math.pow(2, 32) ? Uint32Array : max <= Number.MAX_SAFE_INTEGER ? ZeroArray : null;
 var ZeroArray = class extends Array {
@@ -1399,12 +1398,12 @@ var LRUCache = class _LRUCache {
 var import_blob_types = require("../../shared/blob-types.cjs");
 var import_request_context = require("../handlers/request-context.cjs");
 var import_tracer = require("../handlers/tracer.cjs");
-var NullValue = Symbol.for("null-value");
+var NullValue = /* @__PURE__ */ Symbol.for("null-value");
 var isDataWithEtag = (value) => {
   return typeof value === "object" && value !== null && "data" in value && "etag" in value;
 };
-var IN_MEMORY_CACHE_MAX_SIZE = Symbol.for("nf-in-memory-cache-max-size");
-var IN_MEMORY_LRU_CACHE = Symbol.for("nf-in-memory-lru-cache");
+var IN_MEMORY_CACHE_MAX_SIZE = /* @__PURE__ */ Symbol.for("nf-in-memory-cache-max-size");
+var IN_MEMORY_LRU_CACHE = /* @__PURE__ */ Symbol.for("nf-in-memory-lru-cache");
 var extendedGlobalThis = globalThis;
 var DEFAULT_FALLBACK_MAX_SIZE = 50 * 1024 * 1024;
 function setInMemoryCacheMaxSizeFromNextConfig(size) {

@@ -1069,7 +1069,7 @@ var require_inspect = __commonJS({
           });
         }, 719: (t2) => {
           var e2 = /\u001b\[\d\d?m/g;
-          t2.exports = { customInspectSymbol: Symbol.for("nodejs.util.inspect.custom"), isError: function(t3) {
+          t2.exports = { customInspectSymbol: /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom"), isError: function(t3) {
             return t3 instanceof Error;
           }, join: Array.prototype.join.call.bind(Array.prototype.join), removeColors: function(t3) {
             return String.prototype.replace.call(t3, e2, "");
@@ -1438,7 +1438,7 @@ var require_inspect = __commonJS({
             for (var r3 = 0, n2 = new Array(e3); r3 < e3; r3++) n2[r3] = t3[r3];
             return n2;
           }
-          var l = r2(906), u = Symbol("kPending"), f = Symbol("kRejected");
+          var l = r2(906), u = /* @__PURE__ */ Symbol("kPending"), f = /* @__PURE__ */ Symbol("kRejected");
           t2.exports = { getOwnNonIndexProperties: function(t3) {
             for (var e3 = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 2, r3 = Object.getOwnPropertyDescriptors(t3), n2 = [], a2 = 0, c2 = Object.entries(r3); a2 < c2.length; a2++) {
               var l2 = i(c2[a2], 2), u2 = l2[0], f2 = l2[1];
@@ -1697,12 +1697,12 @@ var _c;
 var _d;
 var _e;
 var _f;
-var kHeaders = Symbol("kHeaders");
-var kHeadersDistinct = Symbol("kHeadersDistinct");
-var kHeadersCount = Symbol("kHeadersCount");
-var kTrailers = Symbol("kTrailers");
-var kTrailersDistinct = Symbol("kTrailersDistinct");
-var kTrailersCount = Symbol("kTrailersCount");
+var kHeaders = /* @__PURE__ */ Symbol("kHeaders");
+var kHeadersDistinct = /* @__PURE__ */ Symbol("kHeadersDistinct");
+var kHeadersCount = /* @__PURE__ */ Symbol("kHeadersCount");
+var kTrailers = /* @__PURE__ */ Symbol("kTrailers");
+var kTrailersDistinct = /* @__PURE__ */ Symbol("kTrailersDistinct");
+var kTrailersCount = /* @__PURE__ */ Symbol("kTrailersCount");
 var ComputeJsIncomingMessage = class extends Readable {
   constructor() {
     const streamOptions = {};
@@ -2008,8 +2008,8 @@ function isUint8Array(value) {
 }
 
 // node_modules/@fastly/http-compute-js/dist/http-compute-js/internal-http.js
-var kNeedDrain = Symbol("kNeedDrain");
-var kOutHeaders = Symbol("kOutHeaders");
+var kNeedDrain = /* @__PURE__ */ Symbol("kNeedDrain");
+var kOutHeaders = /* @__PURE__ */ Symbol("kOutHeaders");
 function utcDate() {
   return (/* @__PURE__ */ new Date()).toUTCString();
 }
@@ -2032,8 +2032,8 @@ var chunkExpression = /(?:^|\W)chunked(?:$|\W)/i;
 
 // node_modules/@fastly/http-compute-js/dist/http-compute-js/http-outgoing.js
 var _a2;
-var kCorked = Symbol("corked");
-var kUniqueHeaders = Symbol("kUniqueHeaders");
+var kCorked = /* @__PURE__ */ Symbol("corked");
+var kUniqueHeaders = /* @__PURE__ */ Symbol("kUniqueHeaders");
 function debug(format2) {
 }
 var nop = () => {
@@ -3091,6 +3091,7 @@ function toComputeResponse(res) {
 }
 
 // src/run/handlers/server.ts
+import { augmentNextResponse } from "../augment-next-response.js";
 import { getRunConfig, setRunConfig } from "../config.js";
 import {
   adjustDateHeader,
@@ -3099,7 +3100,6 @@ import {
   setCacheTagsHeaders,
   setVaryHeaders
 } from "../headers.js";
-import { nextResponseProxy } from "../revalidate.js";
 import { setFetchBeforeNextPatchedIt } from "../storage/storage.cjs";
 import { getLogger } from "./request-context.cjs";
 import { getTracer, recordWarning, withActiveSpan } from "./tracer.cjs";
@@ -3154,7 +3154,7 @@ var server_default = async (request, _context, topLevelSpan, requestContext) => 
       }
     });
     disableFaultyTransferEncodingHandling(res);
-    const resProxy = nextResponseProxy(res, requestContext);
+    const resProxy = augmentNextResponse(res, requestContext);
     const nextHandlerPromise = nextHandler(req, resProxy).catch((error) => {
       getLogger().withError(error).error("next handler error");
       console.error(error);

@@ -7,13 +7,13 @@
 import {
   trace,
   wrapTracer
-} from "../../esm-chunks/chunk-5V5HA6YA.js";
+} from "../../esm-chunks/chunk-QCOH52QC.js";
 import {
   require_out
 } from "../../esm-chunks/chunk-YUXQHOYO.js";
 import {
   require_semver
-} from "../../esm-chunks/chunk-TVEBGDAB.js";
+} from "../../esm-chunks/chunk-JNOKXHJS.js";
 import {
   __toESM
 } from "../../esm-chunks/chunk-6BT4RYQJ.js";
@@ -31,13 +31,13 @@ import {
   writeFile
 } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, join, resolve, sep } from "node:path";
-import { join as posixJoin, sep as posixSep } from "node:path/posix";
+import { dirname, join, sep } from "node:path";
+import { join as posixJoin, relative as posixRelative, sep as posixSep } from "node:path/posix";
 var import_fast_glob = __toESM(require_out(), 1);
 var import_semver = __toESM(require_semver(), 1);
 import { RUN_CONFIG_FILE } from "../../run/constants.js";
 var tracer = wrapTracer(trace.getTracer("Next runtime"));
-var toPosixPath = (path) => path.split(sep).join(posixSep);
+var toPosixPath = (path) => path.replace(/^\\+\?\\+/, "").split(sep).join(posixSep);
 function isError(error) {
   return error instanceof Error;
 }
@@ -98,29 +98,39 @@ var copyNextServerCode = async (ctx) => {
         extglob: true
       }
     );
-    await Promise.all(
-      paths.map(async (path) => {
-        const srcPath = join(srcDir, path);
-        const destPath = join(destDir, path);
-        if (path === "server/middleware-manifest.json") {
-          try {
-            await replaceMiddlewareManifest(srcPath, destPath);
-          } catch (error) {
-            throw new Error("Could not patch middleware manifest file", { cause: error });
-          }
-          return;
+    const promises = paths.map(async (path) => {
+      const srcPath = join(srcDir, path);
+      const destPath = join(destDir, path);
+      if (path === "server/middleware-manifest.json") {
+        try {
+          await replaceMiddlewareManifest(srcPath, destPath);
+        } catch (error) {
+          throw new Error("Could not patch middleware manifest file", { cause: error });
         }
-        if (path === "server/functions-config-manifest.json") {
-          try {
-            await replaceFunctionsConfigManifest(srcPath, destPath);
-          } catch (error) {
-            throw new Error("Could not patch functions config manifest file", { cause: error });
-          }
-          return;
+        return;
+      }
+      if (path === "server/functions-config-manifest.json") {
+        try {
+          await replaceFunctionsConfigManifest(srcPath, destPath);
+        } catch (error) {
+          throw new Error("Could not patch functions config manifest file", { cause: error });
         }
-        await cp(srcPath, destPath, { recursive: true, force: true });
-      })
-    );
+        return;
+      }
+      await cp(srcPath, destPath, { recursive: true, force: true });
+    });
+    if (existsSync(join(srcDir, "node_modules"))) {
+      const filter = ctx.constants.IS_LOCAL ? void 0 : nodeModulesFilter;
+      const src = join(srcDir, "node_modules");
+      const dest = join(destDir, "node_modules");
+      await cp(src, dest, {
+        recursive: true,
+        verbatimSymlinks: true,
+        force: true,
+        filter
+      });
+    }
+    await Promise.all(promises);
   });
 };
 async function recreateNodeModuleSymlinks(src, dest, org) {
@@ -188,32 +198,37 @@ async function patchNextModules(ctx, nextVersion, serverHandlerRequireResolve) {
 }
 var copyNextDependencies = async (ctx) => {
   await tracer.withActiveSpan("copyNextDependencies", async () => {
-    const entries = await readdir(ctx.standaloneDir);
-    const filter = ctx.constants.IS_LOCAL ? void 0 : nodeModulesFilter;
-    const promises = entries.map(async (entry) => {
-      if (entry === ctx.nextDistDir) {
-        return;
-      }
-      const src = join(ctx.standaloneDir, entry);
-      const dest = join(ctx.serverHandlerDir, entry);
-      await cp(src, dest, {
-        recursive: true,
-        verbatimSymlinks: true,
-        force: true,
-        filter
-      });
-      if (entry === "node_modules") {
-        await recreateNodeModuleSymlinks(ctx.resolveFromSiteDir("node_modules"), dest);
+    const promises = [];
+    const nodeModulesLocations = /* @__PURE__ */ new Set();
+    const commonFilter = ctx.constants.IS_LOCAL ? void 0 : nodeModulesFilter;
+    const dotNextDir = toPosixPath(join(ctx.standaloneDir, ctx.nextDistDir));
+    const standaloneRootDir = toPosixPath(ctx.standaloneRootDir);
+    const outputFileTracingRoot = toPosixPath(ctx.outputFileTracingRoot);
+    await cp(ctx.standaloneRootDir, ctx.serverHandlerRootDir, {
+      recursive: true,
+      verbatimSymlinks: true,
+      force: true,
+      filter: async (sourcePath, destination) => {
+        const posixSourcePath = toPosixPath(sourcePath);
+        if (posixSourcePath === dotNextDir) {
+          return false;
+        }
+        if (sourcePath.endsWith("node_modules")) {
+          nodeModulesLocations.add({
+            source: posixSourcePath,
+            destination: toPosixPath(destination)
+          });
+        }
+        return commonFilter?.(sourcePath) ?? true;
       }
     });
-    const rootSrcDir = join(ctx.standaloneRootDir, "node_modules");
-    const rootDestDir = join(ctx.serverHandlerRootDir, "node_modules");
-    if (existsSync(rootSrcDir) && ctx.standaloneRootDir !== ctx.standaloneDir) {
-      promises.push(
-        cp(rootSrcDir, rootDestDir, { recursive: true, verbatimSymlinks: true, filter }).then(
-          () => recreateNodeModuleSymlinks(resolve("node_modules"), rootDestDir)
-        )
-      );
+    for (const {
+      source: nodeModulesLocationInStandalone,
+      destination: locationInServerHandler
+    } of nodeModulesLocations) {
+      const relativeToRoot = posixRelative(standaloneRootDir, nodeModulesLocationInStandalone);
+      const locationInProject = posixJoin(outputFileTracingRoot, relativeToRoot);
+      promises.push(recreateNodeModuleSymlinks(locationInProject, locationInServerHandler));
     }
     await Promise.all(promises);
     const serverHandlerRequire = createRequire(posixJoin(ctx.serverHandlerDir, ":internal:"));
@@ -301,7 +316,7 @@ var verifyHandlerDirStructure = async (ctx) => {
     );
   }
 };
-var nodeModulesFilter = async (sourcePath) => {
+var nodeModulesFilter = (sourcePath) => {
   if (sourcePath.includes(".pnpm") && (sourcePath.includes("linuxmusl-x64") || sourcePath.includes("linux-x64-musl"))) {
     return false;
   }
