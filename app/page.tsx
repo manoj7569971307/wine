@@ -442,10 +442,10 @@ export default function Home() {
 
             if (isNaN(issuePrice)) continue;
 
-            const brandNumberFromChild = String(row[1]).trim();
+            const brandNumberFromChild = String(row[1]).trim().padStart(4, '0');
 
             for (const wine of sampleWinesData) {
-                const brandNumberFromSample = String(wine['Brand Number']).trim();
+                const brandNumberFromSample = String(wine['Brand Number']).trim().padStart(4, '0');
                 const sampleIssuePrice = Number(wine['Issue Price']);
 
                 if (brandNumberFromChild === brandNumberFromSample &&
