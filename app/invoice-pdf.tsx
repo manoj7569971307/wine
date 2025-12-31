@@ -173,7 +173,7 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                 continue;
             }
 
-            if (line.includes('TIN') || line.includes('Particulars') || line.includes('Invoice Qty')) {
+            if (line.includes('Invoice Qty') || line.includes('Particulars')) {
                 break;
             }
 
