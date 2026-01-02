@@ -484,7 +484,7 @@ export default function Home() {
                             size: secondIndex,
                             caseSize: firstIndex,
                             amount: '₹0',
-                            brandNumber: wine['Brand Number'],
+                            brandNumber: String(wine['Brand Number']).padStart(4, '0'),
                             issuePrice: issuePrice.toFixed(2),
                         });
                     }
@@ -530,7 +530,25 @@ export default function Home() {
             if (!querySnapshot.empty) {
                 const data = querySnapshot.docs[0].data();
                 console.log('Loaded data:', data);
-                const sortedItems = (data.items || []).sort((a: FilteredItem, b: FilteredItem) => {
+                
+                // Remove duplicates based on brandNumber, particulars, size, and rate
+                const uniqueItems = new Map();
+                (data.items || []).forEach((item: FilteredItem) => {
+                    const key = `${String(item.brandNumber).padStart(4, '0')}_${item.particulars}_${item.size}_${item.rate}`;
+                    if (!uniqueItems.has(key)) {
+                        uniqueItems.set(key, {
+                            ...item,
+                            brandNumber: String(item.brandNumber).padStart(4, '0')
+                        });
+                    } else {
+                        // Merge receipts if duplicate found
+                        const existing = uniqueItems.get(key);
+                        existing.receipts += item.receipts || 0;
+                        existing.openingStock += item.openingStock || 0;
+                    }
+                });
+                
+                const sortedItems = Array.from(uniqueItems.values()).sort((a: FilteredItem, b: FilteredItem) => {
                     if (a.particulars !== b.particulars) return a.particulars.localeCompare(b.particulars);
                     const sizeA = parseInt(a.size) || 0;
                     const sizeB = parseInt(b.size) || 0;

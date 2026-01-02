@@ -211,7 +211,7 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
 
                 currentItem = [
                     slNo,
-                    brandNo,
+                    brandNo.padStart(4, '0'),
                     brandName,
                     productType,
                     packType,
