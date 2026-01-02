@@ -518,6 +518,7 @@ export default function Home() {
         setIsLoading(true);
         try {
             const collectionName = getCollectionName();
+            const historyCollectionName = getHistoryCollectionName();
             console.log('Loading from collection:', collectionName);
 
             const q = query(
@@ -530,6 +531,18 @@ export default function Home() {
             if (!querySnapshot.empty) {
                 const data = querySnapshot.docs[0].data();
                 console.log('Loaded data:', data);
+                
+                const historyQuery = query(
+                    collection(db, historyCollectionName),
+                    orderBy('savedAt', 'desc'),
+                    limit(1)
+                );
+                const historySnapshot = await getDocs(historyQuery);
+                let openingBalance = data.field2 || '';
+                if (!historySnapshot.empty) {
+                    const lastHistory = historySnapshot.docs[0].data();
+                    openingBalance = lastHistory.field7 || '0';
+                }
                 
                 // Remove duplicates based on brandNumber, particulars, size, and rate
                 const uniqueItems = new Map();
@@ -560,7 +573,7 @@ export default function Home() {
                 });
                 setFilterData(sortedItems);
                 setField1(data.field1 || '');
-                setField2(data.field2 || '');
+                setField2(openingBalance);
                 setField3(data.field3 || '');
                 setField4(data.field4 || '');
                 setField5(data.field5 || '');
