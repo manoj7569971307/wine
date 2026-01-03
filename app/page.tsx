@@ -649,35 +649,40 @@ export default function Home() {
                 sheetToDate: sheetToDate
             });
 
-            let updatedData = filterData.map(item => {
-                if (item.closingStock > 0) {
-                    return {
-                        ...item,
-                        openingStock: item.closingStock,
-                        receipts: 0,
-                        tranIn: 0,
-                        tranOut: 0,
-                        closingStock: 0,
-                        closingStockCases: 0,
-                        closingStockBottles: 0,
-                        sales: 0,
-                        amount: '₹0',
-                    };
-                } else {
-                    return {
-                        ...item,
-                        openingStock: hasClosingStock ? item.openingStock + item.receipts : item.openingStock,
-                        receipts: hasClosingStock ? 0 : item.receipts,
-                        tranIn: 0,
-                        tranOut: 0,
-                        closingStock: 0,
-                        closingStockCases: 0,
-                        closingStockBottles: 0,
-                        sales: 0,
-                        amount: '₹0',
-                    };
-                }
-            });
+            let updatedData = filterData
+                .filter(item => {
+                    const total = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
+                    return total !== item.sales;
+                })
+                .map(item => {
+                    if (item.closingStock > 0) {
+                        return {
+                            ...item,
+                            openingStock: item.closingStock,
+                            receipts: 0,
+                            tranIn: 0,
+                            tranOut: 0,
+                            closingStock: 0,
+                            closingStockCases: 0,
+                            closingStockBottles: 0,
+                            sales: 0,
+                            amount: '₹0',
+                        };
+                    } else {
+                        return {
+                            ...item,
+                            openingStock: hasClosingStock ? item.openingStock + item.receipts : item.openingStock,
+                            receipts: hasClosingStock ? 0 : item.receipts,
+                            tranIn: 0,
+                            tranOut: 0,
+                            closingStock: 0,
+                            closingStockCases: 0,
+                            closingStockBottles: 0,
+                            sales: 0,
+                            amount: '₹0',
+                        };
+                    }
+                });
             const currentClosingBalance = field7Value;
             const docData = {
                 items: updatedData,
