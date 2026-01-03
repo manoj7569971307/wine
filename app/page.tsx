@@ -496,16 +496,35 @@ export default function Home() {
         console.log('Total PDF Amount:', totalAmount);
         setPdfTotal(totalAmount);
         setMatchedItemsCount(matchedCount);
-        setPendingData(filtered.sort((a, b) => {
-            if (a.particulars !== b.particulars) return a.particulars.localeCompare(b.particulars);
-            const sizeA = parseInt(a.size) || 0;
-            const sizeB = parseInt(b.size) || 0;
-            if (sizeA !== sizeB) return sizeB - sizeA;
-            const brandA = String(a.brandNumber);
-            const brandB = String(b.brandNumber);
-            if (brandA !== brandB) return brandA.localeCompare(brandB);
-            return b.rate - a.rate;
-        }));
+        setPendingData((() => {
+            const items = [...filtered];
+            const beers = items.filter(item => item.category?.toLowerCase().includes('beer'));
+            const nonBeers = items.filter(item => !item.category?.toLowerCase().includes('beer'));
+            
+            const sortItems = (arr: FilteredItem[]) => {
+                arr.sort((a, b) => b.rate - a.rate);
+                const result: FilteredItem[] = [];
+                const processed = new Set<number>();
+                arr.forEach(item => {
+                    const idx = arr.indexOf(item);
+                    if (processed.has(idx)) return;
+                    result.push(item);
+                    processed.add(idx);
+                    const sameBrand = arr.filter((x, i) => !processed.has(i) && String(x.brandNumber) === String(item.brandNumber));
+                    sameBrand.sort((a, b) => {
+                        if (a.rate !== b.rate) return b.rate - a.rate;
+                        return (parseInt(b.size) || 0) - (parseInt(a.size) || 0);
+                    });
+                    sameBrand.forEach(x => {
+                        result.push(x);
+                        processed.add(arr.indexOf(x));
+                    });
+                });
+                return result;
+            };
+            
+            return [...sortItems(nonBeers), ...sortItems(beers)];
+        })());
         setShowConfirmModal(true);
     }, [childData, filterData, currentIdocNumber, handlePdfReset]);
 
@@ -561,16 +580,35 @@ export default function Home() {
                     }
                 });
                 
-                const sortedItems = Array.from(uniqueItems.values()).sort((a: FilteredItem, b: FilteredItem) => {
-                    if (a.particulars !== b.particulars) return a.particulars.localeCompare(b.particulars);
-                    const sizeA = parseInt(a.size) || 0;
-                    const sizeB = parseInt(b.size) || 0;
-                    if (sizeA !== sizeB) return sizeB - sizeA;
-                    const brandA = String(a.brandNumber);
-                    const brandB = String(b.brandNumber);
-                    if (brandA !== brandB) return brandA.localeCompare(brandB);
-                    return b.rate - a.rate;
-                });
+                const sortedItems = (() => {
+                    const items = Array.from(uniqueItems.values());
+                    const beers = items.filter(item => item.category?.toLowerCase().includes('beer'));
+                    const nonBeers = items.filter(item => !item.category?.toLowerCase().includes('beer'));
+                    
+                    const sortItems = (arr: FilteredItem[]) => {
+                        arr.sort((a, b) => b.rate - a.rate);
+                        const result: FilteredItem[] = [];
+                        const processed = new Set<number>();
+                        arr.forEach(item => {
+                            const idx = arr.indexOf(item);
+                            if (processed.has(idx)) return;
+                            result.push(item);
+                            processed.add(idx);
+                            const sameBrand = arr.filter((x, i) => !processed.has(i) && String(x.brandNumber) === String(item.brandNumber));
+                            sameBrand.sort((a, b) => {
+                                if (a.rate !== b.rate) return b.rate - a.rate;
+                                return (parseInt(b.size) || 0) - (parseInt(a.size) || 0);
+                            });
+                            sameBrand.forEach(x => {
+                                result.push(x);
+                                processed.add(arr.indexOf(x));
+                            });
+                        });
+                        return result;
+                    };
+                    
+                    return [...sortItems(nonBeers), ...sortItems(beers)];
+                })();
                 setFilterData(sortedItems);
                 setField1(data.field1 || '');
                 setField2(openingBalance);
@@ -3143,16 +3181,35 @@ export default function Home() {
                                             mergedData.push(newItem);
                                         }
                                     });
-                                    const sortedData = mergedData.sort((a, b) => {
-                                        if (a.particulars !== b.particulars) return a.particulars.localeCompare(b.particulars);
-                                        const sizeA = parseInt(a.size) || 0;
-                                        const sizeB = parseInt(b.size) || 0;
-                                        if (sizeA !== sizeB) return sizeB - sizeA;
-                                        const brandA = String(a.brandNumber);
-                                        const brandB = String(b.brandNumber);
-                                        if (brandA !== brandB) return brandA.localeCompare(brandB);
-                                        return b.rate - a.rate;
-                                    });
+                                    const sortedData = (() => {
+                                        const items = [...mergedData];
+                                        const beers = items.filter(item => item.category?.toLowerCase().includes('beer'));
+                                        const nonBeers = items.filter(item => !item.category?.toLowerCase().includes('beer'));
+                                        
+                                        const sortItems = (arr: FilteredItem[]) => {
+                                            arr.sort((a, b) => b.rate - a.rate);
+                                            const result: FilteredItem[] = [];
+                                            const processed = new Set<number>();
+                                            arr.forEach(item => {
+                                                const idx = arr.indexOf(item);
+                                                if (processed.has(idx)) return;
+                                                result.push(item);
+                                                processed.add(idx);
+                                                const sameBrand = arr.filter((x, i) => !processed.has(i) && String(x.brandNumber) === String(item.brandNumber));
+                                                sameBrand.sort((a, b) => {
+                                                    if (a.rate !== b.rate) return b.rate - a.rate;
+                                                    return (parseInt(b.size) || 0) - (parseInt(a.size) || 0);
+                                                });
+                                                sameBrand.forEach(x => {
+                                                    result.push(x);
+                                                    processed.add(arr.indexOf(x));
+                                                });
+                                            });
+                                            return result;
+                                        };
+                                        
+                                        return [...sortItems(nonBeers), ...sortItems(beers)];
+                                    })();
                                     setFilterData(sortedData);
                                     setShowConfirmModal(false);
                                     setPendingData([]);
