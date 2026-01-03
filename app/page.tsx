@@ -428,7 +428,7 @@ export default function Home() {
                 : ['0', ''];
 
             let issuePrice: number;
-            let rawPrice = removeCommasAndDecimals(String(row[8]));
+            let rawPrice = removeCommasAndDecimals(String(row[10]) || String(row[8]));
 
             if (Number(row[7]) === 0) {
                 issuePrice = Number(rawPrice) / quantity;
@@ -437,7 +437,7 @@ export default function Home() {
                     (Number(rawPrice) / ((quantity * Number(firstIndex)) + Number(row[7]))) *
                     Number(firstIndex)
                 );
-                rawPrice = String(removeCommas(String(row[8])));
+                rawPrice = String(removeCommas(String(row[10]) || String(row[8])));
             }
 
             if (isNaN(issuePrice)) continue;
