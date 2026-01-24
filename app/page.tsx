@@ -279,7 +279,6 @@ export default function Home() {
             const newData = [...prevData];
             const item = newData[index];
             const caseSize = parseInt(item.caseSize || item.size) || 1;
-            if (newValue >= caseSize) return prevData;
             item.closingStockBottles = newValue;
             item.closingStock = ((item.closingStockCases || 0) * caseSize) + newValue;
             const openingStock = Number(item.openingStock) || 0;
@@ -1278,7 +1277,6 @@ export default function Home() {
             }
         } else if (field === 'closingStockBottles') {
             const caseSize = parseInt(item.size) || 1;
-            if (numValue >= caseSize) return;
             item.closingStockBottles = numValue;
             item.closingStock = ((item.closingStockCases || 0) * caseSize) + numValue;
             const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
