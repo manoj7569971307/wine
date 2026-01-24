@@ -122,12 +122,13 @@ export default function Home() {
     const [showClosingStockView, setShowClosingStockView] = useState(false);
     const [originalClosingStocks, setOriginalClosingStocks] = useState<{[key: string]: number}>({});
     const [showIdocList, setShowIdocList] = useState(false);
-    const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>>([]);
+    const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string, invoiceDate?: string}>>([]);
     const [showPdfItemsModal, setShowPdfItemsModal] = useState(false);
     const [selectedPdfItems, setSelectedPdfItems] = useState<any[]>([]);
     const [selectedIdocNumber, setSelectedIdocNumber] = useState('');
     const [currentIdocNumber, setCurrentIdocNumber] = useState('');
     const [currentPdfFileName, setCurrentPdfFileName] = useState('');
+    const [currentInvoiceDate, setCurrentInvoiceDate] = useState('');
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -383,6 +384,7 @@ export default function Home() {
         setShowConfirmModal(false);
         setCurrentIdocNumber('');
         setCurrentPdfFileName('');
+        setCurrentInvoiceDate('');
     }, []);
 
     const handlePdfConfirm = useCallback((): void => {
@@ -777,12 +779,14 @@ export default function Home() {
                 for (const idocNumber of storedIdocs) {
                     const itemsForThisIdoc = pdfItemsMap.get(idocNumber) || [];
                     console.log('Saving ICDC:', idocNumber);
+                    console.log('Invoice Date to save:', currentInvoiceDate);
                     console.log('Items for this ICDC:', itemsForThisIdoc);
                     await addDoc(collection(db, idocCollectionName), {
                         idocNumber: idocNumber,
                         processedAt: serverTimestamp(),
                         user: username,
-                        pdfItems: itemsForThisIdoc
+                        pdfItems: itemsForThisIdoc,
+                        invoiceDate: currentInvoiceDate
                     });
                 }
             }
@@ -797,6 +801,7 @@ export default function Home() {
             setPaymentData([{ phonepe: '', cash: '', amount: '', comments: '', date: '' }]);
             setCurrentIdocNumber('');
             setCurrentPdfFileName('');
+            setCurrentInvoiceDate('');
             if (sheetToDate) {
                 const parts = sheetToDate.split('/');
                 if (parts.length === 3) {
@@ -1893,9 +1898,10 @@ export default function Home() {
                             setIdocList(idocs);
                             setShowIdocList(true);
                         }}
-                        onIdocExtracted={(idoc, fileName) => {
+                        onIdocExtracted={(idoc, fileName, invoiceDate) => {
                             setCurrentIdocNumber(idoc);
                             setCurrentPdfFileName(fileName);
+                            setCurrentInvoiceDate(invoiceDate || '');
                         }}
                     />
                 </div>
@@ -1991,7 +1997,8 @@ export default function Home() {
                                                             id: doc.id,
                                                             idocNumber: doc.data().idocNumber,
                                                             fileName: '',
-                                                            timestamp: doc.data().timestamp || ''
+                                                            timestamp: doc.data().timestamp || '',
+                                                            invoiceDate: doc.data().invoiceDate
                                                         }));
                                                         setIdocList(idocs);
                                                         setShowIdocList(true);
@@ -2447,6 +2454,8 @@ export default function Home() {
                                         {allIdocs.map((idocNumber) => {
                                             const isSaved = savedIdocs.includes(idocNumber);
                                             const isPending = pendingIdocs.includes(idocNumber);
+                                            const idocData = idocList.find(item => item.idocNumber === idocNumber);
+                                            console.log('ICDC:', idocNumber, 'Data:', idocData, 'Invoice Date:', idocData?.invoiceDate);
                                             
                                             return (
                                                 <div 
@@ -2457,7 +2466,12 @@ export default function Home() {
                                                     onClick={() => isSaved && handleIdocClick(idocNumber)}
                                                 >
                                                     <div className="flex items-center justify-between">
-                                                        <p className="font-mono text-sm text-gray-800">{idocNumber}</p>
+                                                        <div className="flex-1">
+                                                            <p className="font-mono text-sm text-gray-800">{idocNumber}</p>
+                                                            {idocData?.invoiceDate && (
+                                                                <p className="text-xs text-gray-600 mt-1">Date: {idocData.invoiceDate}</p>
+                                                            )}
+                                                        </div>
                                                         <span className={`px-2 py-1 text-xs rounded-full ${
                                                             isSaved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                                                         }`}>

@@ -15,7 +15,7 @@ interface PDFToExcelConverterProps {
     saveAllowed: boolean;
     onReset?: () => void;
     onShowIdocs?: (idocs: Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>) => void;
-    onIdocExtracted?: (idoc: string, fileName: string) => void;
+    onIdocExtracted?: (idoc: string, fileName: string, invoiceDate: string) => void;
 }
 
 interface PDFToExcelConverterRef {
@@ -43,12 +43,13 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
     const [converted, setConverted] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [idocNumber, setIdocNumber] = useState<string>('');
+    const [invoiceDate, setInvoiceDate] = useState<string>('');
     const [processedIdocs, setProcessedIdocs] = useState<Set<string>>(new Set());
     const [showDuplicateModal, setShowDuplicateModal] = useState<boolean>(false);
     const [duplicateIdoc, setDuplicateIdoc] = useState<string>('');
     const [firebaseReady, setFirebaseReady] = useState<boolean>(false);
     const [showIdocList, setShowIdocList] = useState<boolean>(false);
-    const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>>([]);
+    const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string, invoiceDate?: string}>>([]);
 
 
 
@@ -329,6 +330,7 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
             }
 
             const fullText = allTextItems.map(item => item.text).join(' ');
+            console.log('Full PDF Text (first 500 chars):', fullText.substring(0, 500));
             const idocMatch = fullText.match(/\bICDC\d{15,20}\b/i);
 
             if (!idocMatch) {
@@ -340,6 +342,17 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
 
             const extractedIdoc = idocMatch[0];
             console.log('Extracted ICDC:', extractedIdoc);
+
+            // Extract invoice date
+            const dateMatch = fullText.match(/Invoice Date:\s*(\d{1,2}[-\/]\w{3}[-\/]\d{4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+            let extractedDate = '';
+            if (dateMatch) {
+                extractedDate = dateMatch[1];
+                console.log('Extracted Invoice Date:', extractedDate);
+            } else {
+                console.log('No invoice date found in PDF');
+            }
+            setInvoiceDate(extractedDate);
 
             // Check if duplicate in database
             const isDuplicate = await checkIdocInDatabase(extractedIdoc);
@@ -360,7 +373,7 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
             setConverted(true);
 
             if (onIdocExtracted) {
-                onIdocExtracted(extractedIdoc, file.name);
+                onIdocExtracted(extractedIdoc, file.name, extractedDate);
             }
         } catch (err) {
             setError('Failed to process PDF. Please try again or use a different file.');
@@ -404,6 +417,7 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
         setConverted(false);
         setError('');
         setIdocNumber('');
+        setInvoiceDate('');
         // Reset file input
         const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
         if (fileInput) {
@@ -434,7 +448,8 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                 id: doc.id,
                 idocNumber: doc.data().idocNumber,
                 fileName: doc.data().fileName,
-                timestamp: doc.data().timestamp
+                timestamp: doc.data().timestamp,
+                invoiceDate: doc.data().invoiceDate
             }));
 
             const existingIdocs = new Set<string>();
@@ -479,6 +494,11 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                                 {idocNumber && (
                                     <p className="text-green-600 text-sm">
                                         iDOC Number: <span className="font-mono">{idocNumber}</span>
+                                    </p>
+                                )}
+                                {invoiceDate && (
+                                    <p className="text-green-600 text-sm">
+                                        Invoice Date: <span className="font-mono">{invoiceDate}</span>
                                     </p>
                                 )}
                             </div>
@@ -537,6 +557,9 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                                     {idocList.map((item) => (
                                         <div key={item.id} className="p-2 hover:bg-purple-50 rounded">
                                             <p className="font-mono text-sm text-purple-700">{item.idocNumber}</p>
+                                            {item.invoiceDate && (
+                                                <p className="text-xs text-gray-600 mt-1">Date: {item.invoiceDate}</p>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
