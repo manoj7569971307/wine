@@ -106,6 +106,7 @@ export default function Home() {
     const [consolidatedData, setConsolidatedData] = useState<any>(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [pendingData, setPendingData] = useState<FilteredItem[]>([]);
+    const [pdfItemsMap, setPdfItemsMap] = useState<Map<string, FilteredItem[]>>(new Map());
     const [pdfTotal, setPdfTotal] = useState(0);
     const [matchedItemsCount, setMatchedItemsCount] = useState(0);
     const [sheetFromDate, setSheetFromDate] = useState('');
@@ -122,6 +123,9 @@ export default function Home() {
     const [originalClosingStocks, setOriginalClosingStocks] = useState<{[key: string]: number}>({});
     const [showIdocList, setShowIdocList] = useState(false);
     const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>>([]);
+    const [showPdfItemsModal, setShowPdfItemsModal] = useState(false);
+    const [selectedPdfItems, setSelectedPdfItems] = useState<any[]>([]);
+    const [selectedIdocNumber, setSelectedIdocNumber] = useState('');
     const [currentIdocNumber, setCurrentIdocNumber] = useState('');
     const [currentPdfFileName, setCurrentPdfFileName] = useState('');
 
@@ -385,6 +389,26 @@ export default function Home() {
         pdfConverterRef.current?.confirmProcessing();
     }, []);
 
+    const handleIdocClick = async (idocNumber: string) => {
+        try {
+            const idocCollectionName = `processedIdocs_${sanitizeShopName(username)}`;
+            const q = query(
+                collection(db, idocCollectionName),
+                where('idocNumber', '==', idocNumber)
+            );
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                const docData = querySnapshot.docs[0].data();
+                setSelectedPdfItems(docData.pdfItems || []);
+                setSelectedIdocNumber(idocNumber);
+                setShowPdfItemsModal(true);
+            }
+        } catch (error) {
+            console.error('Error fetching PDF items:', error);
+        }
+    };
+
     const filterWineData = useCallback(async (): Promise<void> => {
         if (currentIdocNumber) {
             const storedIdocs = JSON.parse(localStorage.getItem('processedIdocs') || '[]');
@@ -485,6 +509,7 @@ export default function Home() {
                             amount: '₹0',
                             brandNumber: String(wine['Brand Number']).padStart(4, '0'),
                             issuePrice: issuePrice.toFixed(2),
+                            idocNumber: currentIdocNumber,
                         });
                     }
                     break;
@@ -522,7 +547,11 @@ export default function Home() {
                 return result;
             };
             
-            return [...sortItems(nonBeers), ...sortItems(beers)];
+            const sortedItems = [...sortItems(nonBeers), ...sortItems(beers)];
+            if (currentIdocNumber) {
+                setPdfItemsMap(prev => new Map(prev).set(currentIdocNumber, sortedItems));
+            }
+            return sortedItems;
         })());
         setShowConfirmModal(true);
     }, [childData, filterData, currentIdocNumber, handlePdfReset]);
@@ -746,10 +775,14 @@ export default function Home() {
             if (storedIdocs.length > 0) {
                 const idocCollectionName = `processedIdocs_${sanitizeShopName(username)}`;
                 for (const idocNumber of storedIdocs) {
+                    const itemsForThisIdoc = pdfItemsMap.get(idocNumber) || [];
+                    console.log('Saving ICDC:', idocNumber);
+                    console.log('Items for this ICDC:', itemsForThisIdoc);
                     await addDoc(collection(db, idocCollectionName), {
                         idocNumber: idocNumber,
                         processedAt: serverTimestamp(),
-                        user: username
+                        user: username,
+                        pdfItems: itemsForThisIdoc
                     });
                 }
             }
@@ -2416,9 +2449,13 @@ export default function Home() {
                                             const isPending = pendingIdocs.includes(idocNumber);
                                             
                                             return (
-                                                <div key={idocNumber} className={`p-3 rounded-lg border ${
-                                                    isSaved ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
-                                                }`}>
+                                                <div 
+                                                    key={idocNumber} 
+                                                    className={`p-3 rounded-lg border cursor-pointer hover:shadow-md transition ${
+                                                        isSaved ? 'bg-green-50 border-green-200 hover:bg-green-100' : 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'
+                                                    }`}
+                                                    onClick={() => isSaved && handleIdocClick(idocNumber)}
+                                                >
                                                     <div className="flex items-center justify-between">
                                                         <p className="font-mono text-sm text-gray-800">{idocNumber}</p>
                                                         <span className={`px-2 py-1 text-xs rounded-full ${
@@ -2433,6 +2470,67 @@ export default function Home() {
                                     </div>
                                 );
                             })()}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* History Modal */}
+            {showPdfItemsModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+                        <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+                            <h2 className="text-xl font-bold">PDF Items - {selectedIdocNumber}</h2>
+                            <button
+                                onClick={() => setShowPdfItemsModal(false)}
+                                className="text-white hover:bg-blue-700 rounded-full p-2 transition"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {selectedPdfItems.length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">No items found</p>
+                            ) : (
+                                <>
+                                    <div className="mb-4 flex gap-4 text-sm">
+                                        <div className="bg-blue-500 px-4 py-2 rounded">
+                                            <span className="font-semibold text-black">Total Items: </span>
+                                            <span className="text-black">{selectedPdfItems.length}</span>
+                                        </div>
+                                        <div className="bg-green-500 px-4 py-2 rounded">
+                                            <span className="font-semibold text-black">Total Amount: </span>
+                                            <span className="text-black">₹{selectedPdfItems.reduce((sum, item) => sum + (Number(item.receipts) * Number(item.issuePrice) / Number(item.caseSize || 1)), 0).toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Brand No</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Particulars</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Receipts</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rate</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Issue Price</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {selectedPdfItems.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td className="px-4 py-3 text-sm text-gray-900">{item.brandNumber}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-900">{item.particulars}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-900">{item.size}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-900 text-right">{item.receipts}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-900 text-right">₹{item.rate}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-900 text-right">₹{item.issuePrice}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
