@@ -1625,7 +1625,8 @@ export default function Home() {
                                 caseSize: item.caseSize || '',
                                 amount: '₹0.00',
                                 brandNumber: item.brandNumber || '',
-                                issuePrice: item.issuePrice || ''
+                                issuePrice: item.issuePrice || '',
+                                idocNumber: item.idocNumber || ''
                             };
                         }
                         // Set closing stock from the last sheet
