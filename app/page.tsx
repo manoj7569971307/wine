@@ -1601,21 +1601,41 @@ export default function Home() {
             const consolidatedItems: { [key: string]: FilteredItem } = {};
             const allPaymentData: any[] = [];
 
-            // Initialize with particulars from last sheet
-            if (lastSheet.items && Array.isArray(lastSheet.items)) {
-                lastSheet.items.forEach((item: FilteredItem) => {
-                    const key = `${item.particulars}_${item.rate}`;
-                    consolidatedItems[key] = {
-                        ...item,
-                        openingStock: 0, // Will be set from first sheet
-                        receipts: 0, // Will be summed from all sheets
-                        tranIn: 0, // Will be summed from all sheets
-                        tranOut: 0, // Will be summed from all sheets
-                        closingStock: item.closingStock || 0, // From last sheet
-                        sales: 0 // Will be summed from all sheets
-                    };
-                });
-            }
+            // Initialize with particulars from all sheets to capture wines that were fully sold in earlier periods
+            sortedRecords.forEach((record: any) => {
+                if (record.items && Array.isArray(record.items)) {
+                    record.items.forEach((item: FilteredItem) => {
+                        const key = `${item.particulars}_${item.rate}`;
+                        if (!consolidatedItems[key]) {
+                            consolidatedItems[key] = {
+                                particulars: item.particulars,
+                                category: item.category || '',
+                                rate: item.rate,
+                                receiptDate: item.receiptDate || '',
+                                openingStock: 0, // Will be set from first sheet
+                                receipts: 0, // Will be summed from all sheets
+                                tranIn: 0, // Will be summed from all sheets
+                                tranOut: 0, // Will be summed from all sheets
+                                sales: 0, // Will be summed from all sheets
+                                closingStock: 0, // Will be set from last sheet
+                                closingStockCases: 0,
+                                closingStockBottles: 0,
+                                size: item.size || '',
+                                caseSize: item.caseSize || '',
+                                amount: '₹0.00',
+                                brandNumber: item.brandNumber || '',
+                                issuePrice: item.issuePrice || ''
+                            };
+                        }
+                        // Set closing stock from the last sheet
+                        if (record === lastSheet) {
+                            consolidatedItems[key].closingStock = item.closingStock || 0;
+                            consolidatedItems[key].closingStockCases = item.closingStockCases || 0;
+                            consolidatedItems[key].closingStockBottles = item.closingStockBottles || 0;
+                        }
+                    });
+                }
+            });
 
             // Set opening stock from first sheet
             if (firstSheet.items && Array.isArray(firstSheet.items)) {
