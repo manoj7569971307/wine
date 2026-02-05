@@ -511,7 +511,6 @@ export default function Home() {
                             amount: '₹0',
                             brandNumber: String(wine['Brand Number']).padStart(4, '0'),
                             issuePrice: issuePrice.toFixed(2),
-                            idocNumber: currentIdocNumber,
                         });
                     }
                     break;
@@ -1569,10 +1568,8 @@ export default function Home() {
                 return dateStr;
             };
 
-            // Filter records that have closing stock and overlap with the selected date range
+            // Filter records that overlap with the selected date range (include all records, not just those with closing stock)
             const matchingRecords = historyData.filter((record: any) => {
-                if (!record.hasClosingStock) return false;
-
                 const sheetStart = parseDate(record.sheetFromDate);
                 const sheetEnd = parseDate(record.sheetToDate);
 
@@ -1587,6 +1584,18 @@ export default function Home() {
                 return;
             }
 
+            console.log('Sheets to consolidate:', matchingRecords.length, 'sheets');
+            console.log('Sheets:', matchingRecords.map(r => `${r.sheetFromDate} to ${r.sheetToDate}`));
+            console.log('Sheets data:', matchingRecords.map(r => ({
+                dateRange: `${r.sheetFromDate} to ${r.sheetToDate}`,
+                itemsCount: r.items?.length || 0,
+                hasClosingStock: r.hasClosingStock,
+                field1: r.field1,
+                field2: r.field2,
+                field3: r.field3,
+                items: r.items
+            })));
+
             // Sort records by date to get first and last sheets
             const sortedRecords = matchingRecords.sort((a: any, b: any) => {
                 const dateA = parseDate(a.sheetToDate) || '0';
@@ -1597,41 +1606,51 @@ export default function Home() {
             const firstSheet = sortedRecords[0];
             const lastSheet = sortedRecords[sortedRecords.length - 1];
 
-            // Get particulars from the last sheet
+            // Get all unique items from all sheets (both closed and non-closed)
             const consolidatedItems: { [key: string]: FilteredItem } = {};
             const allPaymentData: any[] = [];
+            const allUniqueItems = new Map<string, FilteredItem>();
 
-            // Initialize with particulars from last sheet
-            if (lastSheet.items && Array.isArray(lastSheet.items)) {
-                lastSheet.items.forEach((item: FilteredItem) => {
-                    const key = `${item.particulars}_${item.rate}`;
-                    consolidatedItems[key] = {
-                        ...item,
-                        openingStock: 0, // Will be set from first sheet
-                        receipts: 0, // Will be summed from all sheets
-                        tranIn: 0, // Will be summed from all sheets
-                        tranOut: 0, // Will be summed from all sheets
-                        closingStock: item.closingStock || 0, // From last sheet
-                        sales: 0 // Will be summed from all sheets
-                    };
-                });
-            }
+            // Collect all unique items from all sheets
+            sortedRecords.forEach((record: any) => {
+                if (record.items && Array.isArray(record.items)) {
+                    record.items.forEach((item: FilteredItem) => {
+                        const key = `${item.particulars}_${item.rate}_${item.size || ''}`;
+                        if (!allUniqueItems.has(key)) {
+                            allUniqueItems.set(key, {
+                                ...item,
+                                openingStock: 0, // Will be set from first sheet
+                                receipts: 0, // Will be summed from all sheets
+                                tranIn: 0, // Will be summed from all sheets
+                                tranOut: 0, // Will be summed from all sheets
+                                closingStock: 0, // Will be set from last sheet
+                                sales: 0 // Will be summed from all sheets
+                            });
+                        }
+                    });
+                }
+            });
+
+            // Initialize consolidated items with all unique items
+            allUniqueItems.forEach((item, key) => {
+                consolidatedItems[key] = { ...item };
+            });
 
             // Set opening stock from first sheet
             if (firstSheet.items && Array.isArray(firstSheet.items)) {
                 firstSheet.items.forEach((item: FilteredItem) => {
-                    const key = `${item.particulars}_${item.rate}`;
+                    const key = `${item.particulars}_${item.rate}_${item.size || ''}`;
                     if (consolidatedItems[key]) {
                         consolidatedItems[key].openingStock = item.openingStock || 0;
                     }
                 });
             }
 
-            // Sum receipts, tranIn, tranOut, and sales from all sheets
-            sortedRecords.forEach((record: any) => {
+            // Set closing stock from last sheet and sum other values from all sheets
+            sortedRecords.forEach((record: any, recordIndex: number) => {
                 if (record.items && Array.isArray(record.items)) {
                     record.items.forEach((item: FilteredItem) => {
-                        const key = `${item.particulars}_${item.rate}`;
+                        const key = `${item.particulars}_${item.rate}_${item.size || ''}`;
 
                         if (consolidatedItems[key]) {
                             // Sum these values from all sheets
@@ -1639,6 +1658,11 @@ export default function Home() {
                             consolidatedItems[key].tranIn += item.tranIn || 0;
                             consolidatedItems[key].tranOut += item.tranOut || 0;
                             consolidatedItems[key].sales += item.sales || 0;
+
+                            // Set closing stock from the last sheet (highest index)
+                            if (recordIndex === sortedRecords.length - 1) {
+                                consolidatedItems[key].closingStock = item.closingStock || 0;
+                            }
 
                             // Recalculate amount based on total sales
                             const totalSales = consolidatedItems[key].sales;
@@ -1703,6 +1727,26 @@ export default function Home() {
                 startDate,
                 endDate,
                 recordCount: matchingRecords.length
+            });
+
+            // Log consolidated data
+            console.log('Consolidated data:', {
+                dateRange: `${startDate} to ${endDate}`,
+                sheetsCount: matchingRecords.length,
+                itemsCount: consolidatedItemsArray.length,
+                paymentRecordsCount: allPaymentData.length,
+                fields: {
+                    field1: totalField1,
+                    field2: totalField2,
+                    field3: totalField3,
+                    field4: totalField4,
+                    field5: totalField5,
+                    field6: totalField6,
+                    field7: totalField7
+                },
+                consolidatedItems: consolidatedItemsArray,
+                paymentData: allPaymentData,
+                fullRecord: consolidatedRecord
             });
 
             // Show the consolidated record
