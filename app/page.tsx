@@ -29,6 +29,7 @@ interface FilteredItem {
     amount: string;
     brandNumber: string | number;
     issuePrice: string;
+    idocNumber: string
 }
 
 type ChildData = string[][];
