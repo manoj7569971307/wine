@@ -343,13 +343,28 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
             const extractedIdoc = idocMatch[0];
             console.log('Extracted ICDC:', extractedIdoc);
 
-            // Extract invoice date
-            const dateMatch = fullText.match(/Invoice Date:\s*(\d{1,2}[-\/]\w{3}[-\/]\d{4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+            // Extract invoice date - improved pattern matching
             let extractedDate = '';
-            if (dateMatch) {
-                extractedDate = dateMatch[1];
-                console.log('Extracted Invoice Date:', extractedDate);
-            } else {
+            // Try multiple date patterns
+            const datePatterns = [
+                /Invoice Date[:\s]*(\d{1,2}[-\/]\w{3}[-\/]\d{4})/i,  // 01-Jan-2024
+                /Invoice Date[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i,  // 01/01/2024 or 01-01-24
+                /Date[:\s]*(\d{1,2}[-\/]\w{3}[-\/]\d{4})/i,  // Date: 01-Jan-2024
+                /Date[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i,  // Date: 01/01/2024
+                /(\d{1,2}[-\/]\w{3}[-\/]\d{4})/,  // Just the date pattern
+                /(\d{1,2}[-\/]\d{1,2}[-\/]\d{4})/  // Just numeric date
+            ];
+            
+            for (const pattern of datePatterns) {
+                const dateMatch = fullText.match(pattern);
+                if (dateMatch) {
+                    extractedDate = dateMatch[1] || dateMatch[0];
+                    console.log('Extracted Invoice Date:', extractedDate);
+                    break;
+                }
+            }
+            
+            if (!extractedDate) {
                 console.log('No invoice date found in PDF');
             }
             setInvoiceDate(extractedDate);

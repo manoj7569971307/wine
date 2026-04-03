@@ -268,6 +268,7 @@ export default function Home() {
             if (item.closingStock > totalColumn) {
                 item.closingStockCases = 0;
                 item.closingStock = item.closingStockBottles || 0;
+                alert(`Closing stock cannot exceed available stock (${totalColumn})`);
                 return prevData;
             }
             item.sales = openingStock + receipts + tranIn - item.closingStock - tranOut;
@@ -296,6 +297,7 @@ export default function Home() {
             if (item.closingStock > totalColumn) {
                 item.closingStockBottles = 0;
                 item.closingStock = (item.closingStockCases || 0) * caseSize;
+                alert(`Closing stock cannot exceed available stock (${totalColumn})`);
                 return prevData;
             }
             item.sales = openingStock + receipts + tranIn - item.closingStock - tranOut;
@@ -552,7 +554,11 @@ export default function Home() {
             
             const sortedItems = [...sortItems(nonBeers), ...sortItems(beers)];
             if (currentIdocNumber) {
-                setPdfItemsMap(prev => new Map(prev).set(currentIdocNumber, sortedItems));
+                setPdfItemsMap(prev => {
+                    const newMap = new Map(prev).set(currentIdocNumber, sortedItems);
+                    localStorage.setItem('pdfItemsMap', JSON.stringify(Object.fromEntries(newMap)));
+                    return newMap;
+                });
             }
             return sortedItems;
         })());
@@ -724,33 +730,18 @@ export default function Home() {
                     return total !== item.sales;
                 })
                 .map(item => {
-                    if (item.closingStock > 0) {
-                        return {
-                            ...item,
-                            openingStock: item.closingStock,
-                            receipts: 0,
-                            tranIn: 0,
-                            tranOut: 0,
-                            closingStock: 0,
-                            closingStockCases: 0,
-                            closingStockBottles: 0,
-                            sales: 0,
-                            amount: '₹0',
-                        };
-                    } else {
-                        return {
-                            ...item,
-                            openingStock: hasClosingStock ? item.openingStock + item.receipts : item.openingStock,
-                            receipts: hasClosingStock ? 0 : item.receipts,
-                            tranIn: 0,
-                            tranOut: 0,
-                            closingStock: 0,
-                            closingStockCases: 0,
-                            closingStockBottles: 0,
-                            sales: 0,
-                            amount: '₹0',
-                        };
-                    }
+                    return {
+                        ...item,
+                        openingStock: item.closingStock > 0 ? item.closingStock : item.openingStock,
+                        receipts: 0,
+                        tranIn: 0,
+                        tranOut: 0,
+                        closingStock: 0,
+                        closingStockCases: 0,
+                        closingStockBottles: 0,
+                        sales: 0,
+                        amount: '₹0',
+                    };
                 });
             const currentClosingBalance = field7Value;
             const docData = {
@@ -792,6 +783,8 @@ export default function Home() {
                 }
             }
             localStorage.removeItem('processedIdocs');
+            localStorage.removeItem('pdfItemsMap');
+            setPdfItemsMap(new Map());
 
             setSaveStatus('success');
             setSaveMessage(`Successfully saved ${filterData.length} items`);
@@ -1762,6 +1755,15 @@ export default function Home() {
                 if (selectedShop) setSelectedShop(selectedShop);
             } else {
                 localStorage.removeItem('wineAppLogin');
+            }
+        }
+        const storedPdfItemsMap = localStorage.getItem('pdfItemsMap');
+        if (storedPdfItemsMap) {
+            try {
+                const parsed = JSON.parse(storedPdfItemsMap);
+                setPdfItemsMap(new Map(Object.entries(parsed)));
+            } catch (e) {
+                console.error('Error loading pdfItemsMap:', e);
             }
         }
     }, []);
