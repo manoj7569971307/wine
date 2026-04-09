@@ -2529,7 +2529,7 @@ export default function Home() {
                                                             }`}>
                                                                 {isSaved ? 'Saved' : 'Pending'}
                                                             </span>
-                                                            {isSaved && (
+                                                            {isSaved && userRole === 'Admin' && (
                                                                 <button
                                                                     onClick={(e) => handleDeleteIdoc(idocNumber, e)}
                                                                     className="p-1.5 text-red-600 hover:bg-red-100 rounded transition"
