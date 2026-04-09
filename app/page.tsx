@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where, doc, updateDoc } from 'firebase/firestore';
-import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil, Settings } from 'lucide-react';
+import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil, Settings, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
@@ -409,6 +409,35 @@ export default function Home() {
             }
         } catch (error) {
             console.error('Error fetching PDF items:', error);
+        }
+    };
+
+    const handleDeleteIdoc = async (idocNumber: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        
+        if (!confirm(`Are you sure you want to delete ICDC ${idocNumber}?`)) {
+            return;
+        }
+
+        try {
+            const idocCollectionName = `processedIdocs_${sanitizeShopName(username)}`;
+            const q = query(
+                collection(db, idocCollectionName),
+                where('idocNumber', '==', idocNumber)
+            );
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                await deleteDoc(querySnapshot.docs[0].ref);
+                
+                const updatedList = idocList.filter(item => item.idocNumber !== idocNumber);
+                setIdocList(updatedList);
+                
+                alert(`ICDC ${idocNumber} deleted successfully`);
+            }
+        } catch (error) {
+            console.error('Error deleting ICDC:', error);
+            alert('Failed to delete ICDC. Please try again.');
         }
     };
 
@@ -2487,18 +2516,29 @@ export default function Home() {
                                                     }`}
                                                     onClick={() => isSaved && handleIdocClick(idocNumber)}
                                                 >
-                                                    <div className="flex items-center justify-between">
+                                                    <div className="flex items-center justify-between gap-2">
                                                         <div className="flex-1">
                                                             <p className="font-mono text-sm text-gray-800">{idocNumber}</p>
                                                             {idocData?.invoiceDate && (
                                                                 <p className="text-xs text-gray-600 mt-1">Date: {idocData.invoiceDate}</p>
                                                             )}
                                                         </div>
-                                                        <span className={`px-2 py-1 text-xs rounded-full ${
-                                                            isSaved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                                        }`}>
-                                                            {isSaved ? 'Saved' : 'Pending'}
-                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`px-2 py-1 text-xs rounded-full ${
+                                                                isSaved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                                            }`}>
+                                                                {isSaved ? 'Saved' : 'Pending'}
+                                                            </span>
+                                                            {isSaved && (
+                                                                <button
+                                                                    onClick={(e) => handleDeleteIdoc(idocNumber, e)}
+                                                                    className="p-1.5 text-red-600 hover:bg-red-100 rounded transition"
+                                                                    title="Delete ICDC"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
