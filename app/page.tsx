@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil, Settings, Trash2 } from 'lucide-react';
+import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil, Settings, Trash2, BookOpen } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
@@ -130,6 +130,11 @@ export default function Home() {
     const [currentIdocNumber, setCurrentIdocNumber] = useState('');
     const [currentPdfFileName, setCurrentPdfFileName] = useState('');
     const [currentInvoiceDate, setCurrentInvoiceDate] = useState('');
+    const [isPdfFallback, setIsPdfFallback] = useState(false);
+    const [winesData, setWinesData] = useState<any[]>([]);
+    const [isUploadingWines, setIsUploadingWines] = useState(false);
+    const [winesUploadStatus, setWinesUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [winesUploadMessage, setWinesUploadMessage] = useState('');
 
     // Calculate field values
     const totalSaleAmount = filterData.reduce((sum, item) => {
@@ -386,6 +391,7 @@ export default function Home() {
         setCurrentIdocNumber('');
         setCurrentPdfFileName('');
         setCurrentInvoiceDate('');
+        setIsPdfFallback(false);
     }, []);
 
     const handlePdfConfirm = useCallback((): void => {
@@ -467,6 +473,15 @@ export default function Home() {
             }
         }
 
+        const activeWinesData = winesData.length > 0 ? winesData.map((w: any) => ({
+            'Brand Number': w.brandNumber,
+            'Product Name': w.productName,
+            'Issue Price': w.issuePrice,
+            'MRP': w.mrp,
+        })) : sampleWinesData;
+
+        console.log('Using wines data source:', winesData.length > 0 ? `Firebase (${winesData.length} entries)` : `sampleWinesData (${sampleWinesData.length} entries)`);
+
         const filtered: FilteredItem[] = [];
         let totalAmount = 0;
         let matchedCount = 0;
@@ -499,7 +514,7 @@ export default function Home() {
 
             const brandNumberFromChild = String(row[1]).trim().padStart(4, '0');
 
-            for (const wine of sampleWinesData) {
+            for (const wine of activeWinesData) {
                 const brandNumberFromSample = String(wine['Brand Number']).trim().padStart(4, '0');
                 const sampleIssuePrice = Number(wine['Issue Price']);
 
@@ -869,6 +884,7 @@ export default function Home() {
             loadAvailableShops();
             setShowShopSelection(true);
         }
+        loadWinesFromFirebase();
     };
 
     const loadAvailableShops = async () => {
@@ -879,6 +895,70 @@ export default function Home() {
         } catch (error) {
             console.error('Error loading shops:', error);
             setAvailableShops([]);
+        }
+    };
+
+    const loadWinesFromFirebase = async () => {
+        try {
+            const q = query(collection(db, 'winesData'), orderBy('uploadedAt', 'desc'), limit(1));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                const data = snapshot.docs[0].data();
+                setWinesData(data.wines || []);
+                console.log('Loaded wines from Firebase:', data.wines?.length, 'entries');
+            }
+        } catch (error) {
+            console.error('Error loading wines from Firebase:', error);
+        }
+    };
+
+    const handleWinesPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+
+        setIsUploadingWines(true);
+        setWinesUploadStatus('idle');
+        setWinesUploadMessage('');
+
+        try {
+            const formData = new FormData();
+            formData.append('pdf', file);
+
+            const response = await fetch('/api/extract-wines', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to extract wines data');
+            }
+
+            const result = await response.json();
+            const wines = result.wines || [];
+
+            console.log('Extracted wines from PDF:', wines.length, 'entries');
+            console.log('Wines data:', JSON.stringify(wines, null, 2));
+
+            await addDoc(collection(db, 'winesData'), {
+                wines,
+                uploadedAt: serverTimestamp(),
+                fileName: file.name,
+                totalEntries: wines.length,
+                uploadedBy: username,
+            });
+
+            setWinesData(wines);
+            setWinesUploadStatus('success');
+            setWinesUploadMessage(`Saved ${wines.length} wines from ${file.name}`);
+        } catch (error: any) {
+            console.error('Wines upload error:', error);
+            setWinesUploadStatus('error');
+            setWinesUploadMessage(error.message || 'Upload failed');
+        } finally {
+            setIsUploadingWines(false);
+            setTimeout(() => setWinesUploadStatus('idle'), 4000);
         }
     };
 
@@ -1907,6 +1987,19 @@ export default function Home() {
                             </button>
                         )}
                         {userRole === 'Admin' && (
+                            <label className={`flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex-1 sm:flex-initial cursor-pointer ${isUploadingWines ? 'bg-yellow-200 text-yellow-700' : winesUploadStatus === 'success' ? 'bg-green-100 text-green-700' : winesUploadStatus === 'error' ? 'bg-red-100 text-red-700' : winesData.length > 0 ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-white text-purple-600 hover:bg-purple-50'}`}>
+                                <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
+                                {isUploadingWines ? 'Extracting...' : winesUploadStatus === 'success' ? winesUploadMessage : winesUploadStatus === 'error' ? 'Upload Failed' : winesData.length > 0 ? `Wines (${winesData.length})` : 'Upload Wines PDF'}
+                                <input
+                                    type="file"
+                                    accept=".pdf"
+                                    onChange={handleWinesPdfUpload}
+                                    disabled={isUploadingWines}
+                                    className="hidden"
+                                />
+                            </label>
+                        )}
+                        {userRole === 'Admin' && (
                             <button
                                 onClick={() => {
                                     setShowAdminPanel(true);
@@ -1927,6 +2020,20 @@ export default function Home() {
                     </div>
                 </div>
             </header>
+
+            {/* Full-screen loader for Claude AI processing */}
+            {isUploadingWines && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full mx-4">
+                        <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                        <p className="text-gray-800 font-bold text-lg text-center">Extracting Wines Data</p>
+                        <p className="text-gray-500 text-sm text-center">Claude AI is reading the PDF and extracting all wine entries...</p>
+                        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                            <div className="h-2 bg-purple-500 rounded-full animate-pulse w-3/4"></div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <main className="container mx-auto p-2 sm:p-4 md:p-6">
                 <div className="bg-white shadow-lg rounded-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
@@ -1949,10 +2056,11 @@ export default function Home() {
                             setIdocList(idocs);
                             setShowIdocList(true);
                         }}
-                        onIdocExtracted={(idoc, fileName, invoiceDate) => {
+                        onIdocExtracted={(idoc, fileName, invoiceDate, usedFallback) => {
                             setCurrentIdocNumber(idoc);
                             setCurrentPdfFileName(fileName);
                             setCurrentInvoiceDate(invoiceDate || '');
+                            setIsPdfFallback(usedFallback || false);
                         }}
                     />
                 </div>
@@ -3281,6 +3389,15 @@ export default function Home() {
                             <p className="text-sm text-blue-100 mt-1">Review items before adding</p>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
+                            {isPdfFallback && (
+                                <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4 mb-4 flex items-start gap-3">
+                                    <span className="text-2xl flex-shrink-0">🚩</span>
+                                    <div>
+                                        <p className="font-bold text-red-700 text-sm">AI extraction failed — data extracted using fallback method</p>
+                                        <p className="text-red-600 text-xs mt-1">These items were NOT extracted by Claude AI. Please check each item carefully — brand numbers, quantities and prices may be inaccurate.</p>
+                                    </div>
+                                </div>
+                            )}
                             <div className="bg-blue-50 p-4 rounded-lg mb-4">
                                 <p className="font-semibold text-blue-800 mb-2">
                                     Items Found: {matchedItemsCount}

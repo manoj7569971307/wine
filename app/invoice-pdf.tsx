@@ -3,19 +3,12 @@
 import { useEffect, useState, useCallback, ChangeEvent, useImperativeHandle, forwardRef } from 'react';
 import { AlertCircle, CheckCircle, X } from 'lucide-react';
 
-interface TextItem {
-    text: string;
-    x: number;
-    y: number;
-    page: number;
-}
-
 interface PDFToExcelConverterProps {
     sendDataToParent: (data: string[][]) => void;
     saveAllowed: boolean;
     onReset?: () => void;
     onShowIdocs?: (idocs: Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>) => void;
-    onIdocExtracted?: (idoc: string, fileName: string, invoiceDate: string) => void;
+    onIdocExtracted?: (idoc: string, fileName: string, invoiceDate: string, usedFallback?: boolean) => void;
 }
 
 interface PDFToExcelConverterRef {
@@ -51,40 +44,32 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
     const [showIdocList, setShowIdocList] = useState<boolean>(false);
     const [idocList, setIdocList] = useState<Array<{id: string, idocNumber: string, fileName: string, timestamp: string, invoiceDate?: string}>>([]);
 
-
-
     useEffect(() => {
         const loadFirebase = async () => {
             try {
-                // Load Firebase App
                 const appScript = document.createElement('script');
                 appScript.src = 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js';
-
                 await new Promise<void>((resolve, reject) => {
                     appScript.onload = () => resolve();
                     appScript.onerror = () => reject(new Error('Failed to load Firebase App'));
                     document.head.appendChild(appScript);
                 });
 
-                // Load Firebase Firestore
                 const firestoreScript = document.createElement('script');
                 firestoreScript.src = 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js';
-
                 await new Promise<void>((resolve, reject) => {
                     firestoreScript.onload = () => resolve();
                     firestoreScript.onerror = () => reject(new Error('Failed to load Firebase Firestore'));
                     document.head.appendChild(firestoreScript);
                 });
 
-                // Initialize Firebase
                 const firebase = (window as any).firebase;
                 if (!firebase.apps.length) {
                     firebase.initializeApp(firebaseConfig);
                 }
 
                 setFirebaseReady(true);
-                
-                // Load existing idocs into memory
+
                 const db = firebase.firestore();
                 const querySnapshot = await db.collection('processedIdocs').get();
                 const existingIdocs = new Set<string>();
@@ -92,7 +77,6 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                     existingIdocs.add(doc.data().idocNumber);
                 });
                 setProcessedIdocs(existingIdocs);
-                console.log('Loaded', existingIdocs.size, 'processed ICDCs from database');
             } catch (err) {
                 console.error('Error loading Firebase:', err);
             }
@@ -111,276 +95,199 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
         try {
             const firebase = (window as any).firebase;
             const db = firebase.firestore();
-
             const querySnapshot = await db.collection('processedIdocs')
                 .where('idocNumber', '==', idoc)
                 .get();
-
-            const exists = !querySnapshot.empty;
-            console.log('ICDC check:', idoc, 'exists:', exists);
-            return exists;
+            return !querySnapshot.empty;
         } catch (err) {
             console.error('Error checking iDOC in database:', err);
             return false;
         }
     };
 
-    const saveIdocToDatabase = async (idoc: string, fileName: string) => {
-        try {
-            const firebase = (window as any).firebase;
-            const db = firebase.firestore();
-
-            await db.collection('processedIdocs').add({
-                idocNumber: idoc,
-                fileName: fileName,
-                processedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                timestamp: new Date().toISOString()
-            });
-
-            return true;
-        } catch (err) {
-            console.error('Error saving to database:', err);
-            return false;
-        }
-    };
-
     const parseInvoiceText = useCallback((rows: string[]): TableData => {
-        const headers = [
-            'Sl.No.',
-            'Brand Number',
-            'Brand Name',
-            'Product Type',
-            'Pack Type',
-            'Pack Qty/Size',
-            'Qty(Cases)',
-            'Qty(Bottles)',
-            'Rate/Case',
-            'Unit Rate/Btl',
-            'Total'
-        ];
-
+        const headers = ['Sl.No.', 'Brand Number', 'Brand Name', 'Product Type', 'Pack Type', 'Pack Qty/Size', 'Qty(Cases)', 'Qty(Bottles)', 'Rate/Case', 'Unit Rate/Btl', 'Total'];
         const tableData: TableData = [headers];
         let currentItem: string[] | null = null;
         let foundTableStart = false;
 
         for (let i = 0; i < rows.length; i++) {
             const line = rows[i].trim();
-
             if (!foundTableStart) {
-                if (line.includes('Sl.No') && line.includes('Brand')) {
-                    foundTableStart = true;
-                    continue;
-                }
+                if (line.includes('Sl.No') && line.includes('Brand')) { foundTableStart = true; }
                 continue;
             }
-
-            if (line.includes('Invoice Qty') || line.includes('Particulars')) {
-                break;
-            }
+            if (line.includes('Invoice Qty') || line.includes('Particulars')) break;
 
             const match = line.match(/^(\d{1,2})\s+(\d{3,5})\s+(.+)/);
-
             if (match) {
-                if (currentItem) {
-                    tableData.push(currentItem);
-                }
-
+                if (currentItem) tableData.push(currentItem);
                 const [, slNo, brandNo, restOfLine] = match;
                 const productTypeMatch = restOfLine.match(/(IML|Beer|Duty Paid)/);
-
-                let brandName = '';
-                let remaining = '';
-
+                let brandName = '', remaining = '';
                 if (productTypeMatch) {
                     brandName = restOfLine.substring(0, productTypeMatch.index).trim();
                     remaining = restOfLine.substring(productTypeMatch.index!).trim();
-                } else {
-                    brandName = restOfLine;
-                }
-
+                } else { brandName = restOfLine; }
                 const parts = remaining.split(/\s+/);
-                const productType = parts[0] || '';
-                const packType = parts[1] || '';
-
                 const packQtyMatch = remaining.match(/(\d+\s*\/\s*\d+\s*ml)/);
                 const packQty = packQtyMatch ? packQtyMatch[1] : '';
-                const afterPackQty = packQtyMatch
-                    ? remaining.substring(remaining.indexOf(packQtyMatch[1]) + packQtyMatch[1].length).trim()
-                    : remaining;
-
+                const afterPackQty = packQtyMatch ? remaining.substring(remaining.indexOf(packQtyMatch[1]) + packQtyMatch[1].length).trim() : remaining;
                 const numbers = afterPackQty.match(/[\d,]+\.?\d*/g) || [];
-
-                currentItem = [
-                    slNo,
-                    brandNo.padStart(4, '0'),
-                    brandName,
-                    productType,
-                    packType,
-                    packQty,
-                    numbers[0] || '',
-                    numbers[1] || '',
-                    numbers[2] || '',
-                    numbers[3] || '',
-                    numbers[4] || ''
-                ];
+                currentItem = [slNo, brandNo.padStart(4, '0'), brandName, parts[0] || '', parts[1] || '', packQty, numbers[0] || '', numbers[1] || '', numbers[2] || '', numbers[3] || '', numbers[4] || ''];
             } else if (currentItem) {
                 const hasProductType = /IML|Beer|Duty Paid/.test(line);
                 const startsWithNumber = /^\d/.test(line);
                 const isURL = /https?:\/\/|www\./.test(line);
-
                 if (!hasProductType && !startsWithNumber && !isURL && line.length < 100) {
                     currentItem[2] += ' ' + line;
                 } else if (hasProductType && !currentItem[3]) {
                     const parts = line.split(/\s+/);
-
                     if (!currentItem[3]) currentItem[3] = parts[0] || '';
                     if (!currentItem[4]) currentItem[4] = parts[1] || '';
-
                     const packMatch = line.match(/(\d+\s*\/\s*\d+\s*ml)/);
-                    if (packMatch && !currentItem[5]) {
-                        currentItem[5] = packMatch[1];
-                    }
-
+                    if (packMatch && !currentItem[5]) currentItem[5] = packMatch[1];
                     const nums = line.match(/[\d,]+\.?\d*/g) || [];
                     let numIndex = 0;
                     for (let j = 6; j < 11; j++) {
-                        if (!currentItem[j] && nums[numIndex]) {
-                            currentItem[j] = nums[numIndex];
-                            numIndex++;
-                        }
+                        if (!currentItem[j] && nums[numIndex]) { currentItem[j] = nums[numIndex]; numIndex++; }
                     }
                 }
             }
         }
-
-        if (currentItem) {
-            tableData.push(currentItem);
-        }
-
-        if (tableData.length === 1) {
-            tableData.push(['', '', 'No invoice data found in PDF', '', '', '', '', '', '', '', '']);
-        }
-
+        if (currentItem) tableData.push(currentItem);
+        if (tableData.length === 1) tableData.push(['', '', 'No invoice data found in PDF', '', '', '', '', '', '', '', '']);
         return tableData;
     }, []);
 
-    const extractTextFromPDF = useCallback(async (file: File): Promise<void> => {
+    const extractWithPdfJs = useCallback(async (file: File): Promise<{ idocNumber: string; invoiceDate: string; tableData: TableData }> => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        await new Promise<void>((resolve, reject) => {
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error('Failed to load PDF.js'));
+            document.head.appendChild(script);
+        });
+
+        const pdfjsLib = (window as any)['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const allTextItems: { text: string; x: number; y: number; page: number }[] = [];
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            textContent.items.forEach((item: any) => {
+                if (item.str && item.str.trim()) {
+                    allTextItems.push({ text: item.str, x: item.transform[4], y: item.transform[5], page: i });
+                }
+            });
+        }
+
+        allTextItems.sort((a, b) => {
+            if (a.page !== b.page) return a.page - b.page;
+            if (Math.abs(a.y - b.y) > 5) return b.y - a.y;
+            return a.x - b.x;
+        });
+
+        const rows: string[] = [];
+        let currentRow: typeof allTextItems = [];
+        let lastY = allTextItems[0]?.y;
+        allTextItems.forEach(item => {
+            if (Math.abs(item.y - lastY) > 5) {
+                if (currentRow.length > 0) { rows.push(currentRow.map(r => r.text).join(' ')); currentRow = []; }
+                lastY = item.y;
+            }
+            currentRow.push(item);
+        });
+        if (currentRow.length > 0) rows.push(currentRow.map(r => r.text).join(' '));
+
+        const fullText = allTextItems.map(item => item.text).join(' ');
+        const idocMatch = fullText.match(/\bICDC\d{15,20}\b/i);
+        const idocNumber = idocMatch ? idocMatch[0] : '';
+        const dateMatch = fullText.match(/Invoice Date:\s*(\d{1,2}[-\/]\w{3}[-\/]\d{4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+        const invoiceDate = dateMatch ? dateMatch[1] : '';
+        const tableData = parseInvoiceText(rows);
+
+        return { idocNumber, invoiceDate, tableData };
+    }, [parseInvoiceText]);
+
+    const extractFromPDF = useCallback(async (file: File): Promise<void> => {
         setLoading(true);
         setConverted(false);
         setError('');
 
+        let extractedIdoc = '';
+        let extractedDate = '';
+        let extractedTable: TableData = [];
+        let usedFallback = false;
+
         try {
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            // Try Claude API first
+            const formData = new FormData();
+            formData.append('pdf', file);
+            const response = await fetch('/api/extract-pdf', { method: 'POST', body: formData });
 
-            await new Promise<void>((resolve, reject) => {
-                script.onload = () => resolve();
-                script.onerror = () => reject(new Error('Failed to load PDF.js'));
-                document.head.appendChild(script);
-            });
-
-            const pdfjsLib = (window as any)['pdfjs-dist/build/pdf'];
-            pdfjsLib.GlobalWorkerOptions.workerSrc =
-                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-            const allTextItems: TextItem[] = [];
-
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-
-                textContent.items.forEach((item: any) => {
-                    if (item.str && item.str.trim()) {
-                        allTextItems.push({
-                            text: item.str,
-                            x: item.transform[4],
-                            y: item.transform[5],
-                            page: i
-                        });
-                    }
-                });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'API failed');
             }
 
-            allTextItems.sort((a, b) => {
-                if (a.page !== b.page) return a.page - b.page;
-                if (Math.abs(a.y - b.y) > 5) return b.y - a.y;
-                return a.x - b.x;
-            });
-
-            const rows: string[] = [];
-            let currentRow: TextItem[] = [];
-            let lastY = allTextItems[0]?.y;
-
-            allTextItems.forEach(item => {
-                if (Math.abs(item.y - lastY) > 5) {
-                    if (currentRow.length > 0) {
-                        rows.push(currentRow.map(r => r.text).join(' '));
-                        currentRow = [];
-                    }
-                    lastY = item.y;
-                }
-                currentRow.push(item);
-            });
-
-            if (currentRow.length > 0) {
-                rows.push(currentRow.map(r => r.text).join(' '));
-            }
-
-            const fullText = allTextItems.map(item => item.text).join(' ');
-            console.log('Full PDF Text (first 500 chars):', fullText.substring(0, 500));
-            const idocMatch = fullText.match(/\bICDC\d{15,20}\b/i);
-
-            if (!idocMatch) {
-                setError('No iDOC number found in this PDF');
+            const result = await response.json();
+            extractedIdoc = result.idocNumber || '';
+            extractedDate = result.invoiceDate || '';
+            extractedTable = result.tableData || [];
+            console.log('Claude API extraction success');
+        } catch (apiErr: any) {
+            // Claude API failed — fall back to pdf.js
+            console.warn('Claude API failed, falling back to pdf.js:', apiErr.message);
+            usedFallback = true;
+            try {
+                const fallback = await extractWithPdfJs(file);
+                extractedIdoc = fallback.idocNumber;
+                extractedDate = fallback.invoiceDate;
+                extractedTable = fallback.tableData;
+                console.log('pdf.js fallback extraction success');
+            } catch (fallbackErr: any) {
+                setError('Failed to process PDF. Please try again.');
                 setLoading(false);
-                resetPdfState();
                 return;
             }
-
-            const extractedIdoc = idocMatch[0];
-            console.log('Extracted ICDC:', extractedIdoc);
-
-            // Extract invoice date
-            const dateMatch = fullText.match(/Invoice Date:\s*(\d{1,2}[-\/]\w{3}[-\/]\d{4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
-            let extractedDate = '';
-            if (dateMatch) {
-                extractedDate = dateMatch[1];
-                console.log('Extracted Invoice Date:', extractedDate);
-            } else {
-                console.log('No invoice date found in PDF');
-            }
-            setInvoiceDate(extractedDate);
-
-            // Check if duplicate in database
-            const isDuplicate = await checkIdocInDatabase(extractedIdoc);
-            if (isDuplicate) {
-                console.log('Duplicate ICDC detected:', extractedIdoc);
-                setDuplicateIdoc(extractedIdoc);
-                setShowDuplicateModal(true);
-                setLoading(false);
-                resetPdfState();
-                return;
-            }
-
-            console.log('ICDC is unique, proceeding...');
-            setIdocNumber(extractedIdoc);
-
-            const parsedData = parseInvoiceText(rows);
-            setTableData(parsedData);
-            setConverted(true);
-
-            if (onIdocExtracted) {
-                onIdocExtracted(extractedIdoc, file.name, extractedDate);
-            }
-        } catch (err) {
-            setError('Failed to process PDF. Please try again or use a different file.');
-        } finally {
-            setLoading(false);
         }
-    }, [processedIdocs, parseInvoiceText, firebaseReady]);
+
+        if (!extractedIdoc) {
+            setError('No ICDC number found in this PDF');
+            setLoading(false);
+            resetPdfState();
+            return;
+        }
+
+        console.log('Extracted ICDC:', extractedIdoc, usedFallback ? '(via pdf.js fallback)' : '(via Claude API)');
+        console.log('Extracted Date:', extractedDate);
+        console.log('Extracted Table rows:', extractedTable.length);
+
+        const isDuplicate = await checkIdocInDatabase(extractedIdoc);
+        if (isDuplicate) {
+            setDuplicateIdoc(extractedIdoc);
+            setShowDuplicateModal(true);
+            setLoading(false);
+            resetPdfState();
+            return;
+        }
+
+        setIdocNumber(extractedIdoc);
+        setInvoiceDate(extractedDate);
+        setTableData(extractedTable);
+        setConverted(true);
+
+        if (onIdocExtracted) {
+            onIdocExtracted(extractedIdoc, file.name, extractedDate, usedFallback);
+        }
+
+        setLoading(false);
+    }, [processedIdocs, firebaseReady, extractWithPdfJs]);
 
     const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
         const file = e.target.files?.[0];
@@ -400,7 +307,7 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
 
         setPdfFile(file);
         setTableData([]);
-        await extractTextFromPDF(file);
+        await extractFromPDF(file);
         e.target.value = '';
     };
 
@@ -418,15 +325,9 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
         setError('');
         setIdocNumber('');
         setInvoiceDate('');
-        // Reset file input
         const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-        if (fileInput) {
-            fileInput.value = '';
-        }
-        // Call parent reset if provided
-        if (onReset) {
-            onReset();
-        }
+        if (fileInput) fileInput.value = '';
+        if (onReset) onReset();
     };
 
     const confirmProcessing = (): void => {
@@ -439,7 +340,6 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
         try {
             const firebase = (window as any).firebase;
             const db = firebase.firestore();
-
             const querySnapshot = await db.collection('processedIdocs')
                 .orderBy('timestamp', 'desc')
                 .get();
@@ -457,8 +357,8 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                 existingIdocs.add(doc.data().idocNumber);
             });
             setProcessedIdocs(existingIdocs);
-
             setIdocList(idocs);
+
             if (onShowIdocs) {
                 onShowIdocs(idocs);
             } else {
@@ -476,6 +376,21 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
     }));
 
     return (
+        <>
+        {/* Full-screen loader while Claude is processing invoice PDF */}
+        {loading && (
+            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+                <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full mx-4">
+                    <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                    <p className="text-gray-800 font-bold text-lg text-center">Reading Invoice PDF</p>
+                    <p className="text-gray-500 text-sm text-center">Claude AI is extracting table data, ICDC number and invoice date...</p>
+                    <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div className="h-2 bg-blue-500 rounded-full animate-pulse w-2/3"></div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="bg-gradient-to-br from-green-50 to-blue-100 sm:p-6 md:p-8">
             <div className="max-w-4xl mx-auto">
                 <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8">
@@ -515,7 +430,7 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                     {!firebaseReady && (
                         <div className="mb-6 bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4 flex items-center gap-3">
                             <div className="w-5 h-5 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin"></div>
-                            <p className="text-yellow-700 font-semibold">Initializing Firebase... Please wait</p>
+                            <p className="text-yellow-700 font-semibold">Initializing... Please wait</p>
                         </div>
                     )}
 
@@ -526,11 +441,11 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                                 type="file"
                                 accept=".pdf"
                                 onChange={handleFileUpload}
-                                disabled={!firebaseReady}
-                                className={`mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold ${firebaseReady ? 'file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100' : 'file:bg-gray-200 file:text-gray-400 cursor-not-allowed'}`}
+                                disabled={!firebaseReady || loading}
+                                className={`mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold ${firebaseReady && !loading ? 'file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100' : 'file:bg-gray-200 file:text-gray-400 cursor-not-allowed'}`}
                             />
                             {!firebaseReady && (
-                                <p className="mt-2 text-xs text-gray-500">File upload will be enabled once Firebase is ready</p>
+                                <p className="mt-2 text-xs text-gray-500">File upload will be enabled once ready</p>
                             )}
                         </label>
                     </div>
@@ -571,39 +486,32 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
 
             {showDuplicateModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-3 bg-red-100 rounded-full">
                                     <AlertCircle className="w-8 h-8 text-red-600" />
                                 </div>
-                                <div>
-                                    <h2 className="text-2xl font-bold text-gray-800">Duplicate PDF Detected</h2>
-                                </div>
+                                <h2 className="text-2xl font-bold text-gray-800">Duplicate PDF Detected</h2>
                             </div>
                             <button
                                 onClick={closeDuplicateModal}
                                 className="text-gray-400 hover:text-gray-600 transition-colors"
-                                aria-label="Close modal"
                             >
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
-
                         <div className="mb-6">
                             <p className="text-gray-700 mb-4">
                                 This PDF has already been processed. The iDOC number already exists:
                             </p>
                             <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
-                                <p className="font-mono text-lg font-bold text-red-700 text-center">
-                                    {duplicateIdoc}
-                                </p>
+                                <p className="font-mono text-lg font-bold text-red-700 text-center">{duplicateIdoc}</p>
                             </div>
                             <p className="text-sm text-gray-600 mt-4">
                                 Please upload a different PDF with a unique iDOC number.
                             </p>
                         </div>
-
                         <button
                             onClick={closeDuplicateModal}
                             className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
@@ -613,23 +521,8 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
                     </div>
                 </div>
             )}
-
-            <style jsx>{`
-        @keyframes scale-in {
-          from {
-            transform: scale(0.9);
-            opacity: 0;
-          }
-          to {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-        .animate-scale-in {
-          animation: scale-in 0.2s ease-out;
-        }
-      `}</style>
         </div>
+        </>
     );
 });
 
