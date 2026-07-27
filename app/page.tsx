@@ -1416,7 +1416,7 @@ export default function Home() {
 
         if (field === 'closingStockCases') {
             item.closingStockCases = numValue;
-            const caseSize = parseInt(item.size) || 1;
+            const caseSize = parseInt(item.caseSize || item.size) || 1;
             item.closingStock = (numValue * caseSize) + (item.closingStockBottles || 0);
             const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
             if (item.closingStock > availableStock) {
@@ -1424,7 +1424,7 @@ export default function Home() {
                 item.closingStock = item.closingStockBottles || 0;
             }
         } else if (field === 'closingStockBottles') {
-            const caseSize = parseInt(item.size) || 1;
+            const caseSize = parseInt(item.caseSize || item.size) || 1;
             item.closingStockBottles = numValue;
             item.closingStock = ((item.closingStockCases || 0) * caseSize) + numValue;
             const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
