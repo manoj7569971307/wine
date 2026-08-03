@@ -5554,9 +5554,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "ABSENTE 49",
-    "Issue Price": 20251,
+    "Issue Price": 21801,
     "Special Margin": 9.8,
-    "MRP": 4220,
+    "MRP": 4530,
     "Type": "Duty Paid"
   },
   {
@@ -5576,9 +5576,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "RON DIPLOMATICO RESERVA EXLUSIVA",
-    "Issue Price": 32201,
+    "Issue Price": 32351,
     "Special Margin": 9.8,
-    "MRP": 6610,
+    "MRP": 6640,
     "Type": "Duty Paid"
   },
   {
@@ -6434,9 +6434,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "MONTE PACIFICO CHARDONNAY",
-    "Issue Price": 36901,
+    "Issue Price": 37201,
     "Special Margin": 9.9,
-    "MRP": 3860,
+    "MRP": 3890,
     "Type": "Duty Paid"
   },
   {
@@ -6456,9 +6456,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "MONTE PACIFICO MERLOT",
-    "Issue Price": 36901,
+    "Issue Price": 37201,
     "Special Margin": 9.9,
-    "MRP": 3860,
+    "MRP": 3890,
     "Type": "Duty Paid"
   },
   {
@@ -6522,9 +6522,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "JOHN BARR RESERVE BLENDED SCOTCH WHISKY",
-    "Issue Price": 24501,
+    "Issue Price": 24901,
     "Special Margin": 9.9,
-    "MRP": 2620,
+    "MRP": 2660,
     "Type": "Duty Paid"
   },
   {
@@ -7171,9 +7171,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "CASACA PREMIUM CABERNET SAUVIGNON",
-    "Issue Price": 28601,
+    "Issue Price": 29001,
     "Special Margin": 9.9,
-    "MRP": 3030,
+    "MRP": 3070,
     "Type": "Duty Paid"
   },
   {
@@ -8249,9 +8249,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "CASTELLO DI BOSSI BERARDENGA CHIANTI CLASSICO",
-    "Issue Price": 37751,
+    "Issue Price": 39301,
     "Special Margin": 9.8,
-    "MRP": 7720,
+    "MRP": 8030,
     "Type": "Duty Paid"
   },
   {
@@ -8359,9 +8359,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "BUSH BALLAD CHARDONNAY",
-    "Issue Price": 27101,
+    "Issue Price": 27401,
     "Special Margin": 9.9,
-    "MRP": 2880,
+    "MRP": 2910,
     "Type": "Duty Paid"
   },
   {
@@ -9118,9 +9118,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "GRANTS TRIPLE WOOD BLENDED SCOTCH WHISKY",
-    "Issue Price": 26401,
+    "Issue Price": 26901,
     "Special Margin": 9.9,
-    "MRP": 2810,
+    "MRP": 2860,
     "Type": "Duty Paid"
   },
   {
@@ -9635,9 +9635,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "AULTMORE OF THE FOGGIE MOSS SPEYSIDE SINGLE MALT SCOTCH WHISKY AGED 12 YEARS",
-    "Issue Price": 39951,
+    "Issue Price": 41001,
     "Special Margin": 9.8,
-    "MRP": 8160,
+    "MRP": 8370,
     "Type": "Duty Paid"
   },
   {
@@ -9701,9 +9701,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "CASILLERO DEL DIABLO MERLOT",
-    "Issue Price": 36501,
+    "Issue Price": 37101,
     "Special Margin": 9.9,
-    "MRP": 3820,
+    "MRP": 3880,
     "Type": "Duty Paid"
   },
   {
@@ -9899,9 +9899,9 @@ const wineData1: Wine[] = [
     "Size Code": "CP",
     "Pack Type": "G",
     "Product Name": "HENKELL TROCKEN FINEST SPARKLING",
-    "Issue Price": 25402,
+    "Issue Price": 25802,
     "Special Margin": 9.9,
-    "MRP": 1320,
+    "MRP": 1340,
     "Type": "Duty Paid"
   },
   {
@@ -9921,9 +9921,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "HENKELL TROCKEN FINEST SPARKLING",
-    "Issue Price": 18451,
+    "Issue Price": 18801,
     "Special Margin": 9.8,
-    "MRP": 3860,
+    "MRP": 3930,
     "Type": "Duty Paid"
   },
   {
@@ -10966,9 +10966,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "1800 TEQUILA ANEJO",
-    "Issue Price": 47701,
+    "Issue Price": 48401,
     "Special Margin": 9.8,
-    "MRP": 9710,
+    "MRP": 9850,
     "Type": "Duty Paid"
   },
   {
@@ -10988,9 +10988,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "1800 TEQUILA SILVER",
-    "Issue Price": 81601,
+    "Issue Price": 82501,
     "Special Margin": 9.9,
-    "MRP": 8330,
+    "MRP": 8420,
     "Type": "Duty Paid"
   },
   {
@@ -11010,9 +11010,9 @@ const wineData1: Wine[] = [
     "Size Code": "LQ",
     "Pack Type": "G",
     "Product Name": "JOSE CUERVO ESPECIAL BLUE AGAVE SILVER TEQUILA",
-    "Issue Price": 50901,
+    "Issue Price": 51401,
     "Special Margin": 9.9,
-    "MRP": 5340,
+    "MRP": 5390,
     "Type": "Duty Paid"
   },
   {
@@ -11032,9 +11032,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "JOSE CUERVO ESPECIAL BLUE AGAVE SILVER TEQUILA",
-    "Issue Price": 40201,
+    "Issue Price": 40501,
     "Special Margin": 9.9,
-    "MRP": 4190,
+    "MRP": 4220,
     "Type": "Duty Paid"
   },
   {
@@ -11054,9 +11054,9 @@ const wineData1: Wine[] = [
     "Size Code": "LQ",
     "Pack Type": "G",
     "Product Name": "JOSE CUERVO ESPECIAL BLUE AGAVE REPOSADO TEQUILA",
-    "Issue Price": 53401,
+    "Issue Price": 54101,
     "Special Margin": 9.9,
-    "MRP": 5590,
+    "MRP": 5660,
     "Type": "Duty Paid"
   },
   {
@@ -11076,9 +11076,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "JOSE CUERVO ESPECIAL BLUE AGAVE REPOSADO TEQUILA",
-    "Issue Price": 42101,
+    "Issue Price": 42401,
     "Special Margin": 9.9,
-    "MRP": 4380,
+    "MRP": 4410,
     "Type": "Duty Paid"
   },
   {
@@ -11098,9 +11098,9 @@ const wineData1: Wine[] = [
     "Size Code": "QR",
     "Pack Type": "G",
     "Product Name": "JOSE CUERVO RESERVA DE LA FAMILIA EXTRA ANEJO",
-    "Issue Price": 65076,
+    "Issue Price": 65801,
     "Special Margin": 9.6,
-    "MRP": 26200,
+    "MRP": 26490,
     "Type": "Duty Paid"
   },
   {
@@ -11142,9 +11142,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "LUCIFER'S GOLD WHISKY",
-    "Issue Price": 14201,
+    "Issue Price": 14501,
     "Special Margin": 9.8,
-    "MRP": 3010,
+    "MRP": 3070,
     "Type": "Duty Paid"
   },
   {
@@ -11164,9 +11164,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "BUSHMILLS 12 YEARS SINGLE MALT IRISH WHISKY",
-    "Issue Price": 48351,
+    "Issue Price": 48801,
     "Special Margin": 9.8,
-    "MRP": 9840,
+    "MRP": 9930,
     "Type": "Duty Paid"
   },
   {
@@ -11307,9 +11307,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "FANTINI PINOT GRIGIO",
-    "Issue Price": 45401,
+    "Issue Price": 47201,
     "Special Margin": 9.9,
-    "MRP": 4710,
+    "MRP": 4890,
     "Type": "Duty Paid"
   },
   {
@@ -11329,9 +11329,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "PRIMO MALVASIA CHARDONNAY",
-    "Issue Price": 35701,
+    "Issue Price": 37001,
     "Special Margin": 9.9,
-    "MRP": 3740,
+    "MRP": 3870,
     "Type": "Duty Paid"
   },
   {
@@ -11417,9 +11417,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "OUTBACK JACK CHARDONNAY",
-    "Issue Price": 31901,
+    "Issue Price": 32001,
     "Special Margin": 9.9,
-    "MRP": 3360,
+    "MRP": 3370,
     "Type": "Duty Paid"
   },
   {
@@ -11439,9 +11439,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "OUTBACK JACK SHIRAZ",
-    "Issue Price": 30701,
+    "Issue Price": 31201,
     "Special Margin": 9.9,
-    "MRP": 3240,
+    "MRP": 3290,
     "Type": "Duty Paid"
   },
   {
@@ -11461,9 +11461,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "OUTBACK JACK CABERNET MERLOT",
-    "Issue Price": 30701,
+    "Issue Price": 31101,
     "Special Margin": 9.9,
-    "MRP": 3240,
+    "MRP": 3280,
     "Type": "Duty Paid"
   },
   {
@@ -12077,9 +12077,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "VECCHIA ROMAGNA 1820 CLASICCA BRANDY",
-    "Issue Price": 17151,
+    "Issue Price": 17801,
     "Special Margin": 9.8,
-    "MRP": 3600,
+    "MRP": 3730,
     "Type": "Duty Paid"
   },
   {
@@ -12121,9 +12121,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "AMARO MONTENEGRO LIQUEUR",
-    "Issue Price": 24251,
+    "Issue Price": 25001,
     "Special Margin": 9.8,
-    "MRP": 5020,
+    "MRP": 5170,
     "Type": "Duty Paid"
   },
   {
@@ -12187,9 +12187,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "JURA AGED 12 YEARS SINGLE MALT SCOTCH WHISKY",
-    "Issue Price": 46501,
+    "Issue Price": 47801,
     "Special Margin": 9.8,
-    "MRP": 9470,
+    "MRP": 9730,
     "Type": "Duty Paid"
   },
   {
@@ -14112,9 +14112,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "TENJAKU WHISKY PURE MALT",
-    "Issue Price": 85901,
+    "Issue Price": 88301,
     "Special Margin": 9.9,
-    "MRP": 8760,
+    "MRP": 9000,
     "Type": "Duty Paid"
   },
   {
@@ -14310,9 +14310,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "SOMA ANARKALI POMEGRANATE OFF DRY",
-    "Issue Price": 20101,
+    "Issue Price": 21901,
     "Special Margin": 9.9,
-    "MRP": 2140,
+    "MRP": 2320,
     "Type": "Local"
   },
   {
@@ -14596,9 +14596,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "Bushmills Original",
-    "Issue Price": 30301,
+    "Issue Price": 30701,
     "Special Margin": 9.9,
-    "MRP": 3200,
+    "MRP": 3240,
     "Type": "Duty Paid"
   },
   {
@@ -14618,9 +14618,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "Creyente Mezcal",
-    "Issue Price": 41951,
+    "Issue Price": 43701,
     "Special Margin": 9.8,
-    "MRP": 8560,
+    "MRP": 8910,
     "Type": "Duty Paid"
   },
   {
@@ -15927,9 +15927,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "Renieri Brunello di Montalcino DOCG",
-    "Issue Price": 121401,
+    "Issue Price": 128001,
     "Special Margin": 9.8,
-    "MRP": 24450,
+    "MRP": 25770,
     "Type": "Duty Paid"
   },
   {
@@ -15949,9 +15949,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "Les Legendes Bordeaux Blanc",
-    "Issue Price": 54201,
+    "Issue Price": 56301,
     "Special Margin": 9.9,
-    "MRP": 5590,
+    "MRP": 5800,
     "Type": "Duty Paid"
   },
   {
@@ -18523,9 +18523,9 @@ const wineData1: Wine[] = [
     "Size Code": "PP",
     "Pack Type": "G",
     "Product Name": "LA VIEILLES FERME VIN DE FRANCE BLANC",
-    "Issue Price": 38002,
+    "Issue Price": 39002,
     "Special Margin": 9.9,
-    "MRP": 1990,
+    "MRP": 2040,
     "Type": "Duty Paid"
   },
   {
@@ -18545,9 +18545,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "LA VIEILLES FERME VIN DE FRANCE BLANC",
-    "Issue Price": 34501,
+    "Issue Price": 35301,
     "Special Margin": 9.9,
-    "MRP": 3620,
+    "MRP": 3700,
     "Type": "Duty Paid"
   },
   {
@@ -18567,9 +18567,9 @@ const wineData1: Wine[] = [
     "Size Code": "PP",
     "Pack Type": "G",
     "Product Name": "LA VIEILLES FERME VIN DE FRANCE ROUGE",
-    "Issue Price": 36202,
+    "Issue Price": 37202,
     "Special Margin": 9.9,
-    "MRP": 1900,
+    "MRP": 1950,
     "Type": "Duty Paid"
   },
   {
@@ -18589,9 +18589,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "LA VIEILLES FERME VIN DE FRANCE ROUGE",
-    "Issue Price": 34501,
+    "Issue Price": 35301,
     "Special Margin": 9.9,
-    "MRP": 3620,
+    "MRP": 3700,
     "Type": "Duty Paid"
   },
   {
@@ -18611,9 +18611,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "LA VIEILLES FERME VIN DE FRANCE ROSE",
-    "Issue Price": 34501,
+    "Issue Price": 35301,
     "Special Margin": 9.9,
-    "MRP": 3620,
+    "MRP": 3700,
     "Type": "Duty Paid"
   },
   {
@@ -18633,9 +18633,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "MICHEL LYNCH AOC BORDEAUX ROUGE",
-    "Issue Price": 53201,
+    "Issue Price": 54101,
     "Special Margin": 9.9,
-    "MRP": 5490,
+    "MRP": 5580,
     "Type": "Duty Paid"
   },
   {
@@ -18655,9 +18655,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "HUGEL ET FILS GENTIL ALSACE BLEND",
-    "Issue Price": 56501,
+    "Issue Price": 57701,
     "Special Margin": 9.9,
-    "MRP": 5820,
+    "MRP": 5940,
     "Type": "Duty Paid"
   },
   {
@@ -18809,9 +18809,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "CASTELLO DI FONTERUTOLI FONTERUTOLI CHIANTI CLASSICO",
-    "Issue Price": 42601,
+    "Issue Price": 43151,
     "Special Margin": 9.8,
-    "MRP": 8690,
+    "MRP": 8800,
     "Type": "Duty Paid"
   },
   {
@@ -18831,9 +18831,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "PASQUA CHIANTI DOCG",
-    "Issue Price": 41801,
+    "Issue Price": 42501,
     "Special Margin": 9.9,
-    "MRP": 4350,
+    "MRP": 4420,
     "Type": "Duty Paid"
   },
   {
@@ -18919,9 +18919,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "BEX NAHE RIESLING QBA",
-    "Issue Price": 42301,
+    "Issue Price": 43701,
     "Special Margin": 9.9,
-    "MRP": 4400,
+    "MRP": 4540,
     "Type": "Duty Paid"
   },
   {
@@ -18985,9 +18985,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "FIVE RESERVE PINOTAGE",
-    "Issue Price": 13751,
+    "Issue Price": 13901,
     "Special Margin": 9.8,
-    "MRP": 2920,
+    "MRP": 2950,
     "Type": "Duty Paid"
   },
   {
@@ -19007,9 +19007,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "FIVE RESERVE CABERNET SAUVIGNON",
-    "Issue Price": 13751,
+    "Issue Price": 13901,
     "Special Margin": 9.8,
-    "MRP": 2920,
+    "MRP": 2950,
     "Type": "Duty Paid"
   },
   {
@@ -19029,9 +19029,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "FIVE RESERVE CHENIN BLANC",
-    "Issue Price": 13751,
+    "Issue Price": 13901,
     "Special Margin": 9.8,
-    "MRP": 2920,
+    "MRP": 2950,
     "Type": "Duty Paid"
   },
   {
@@ -19073,9 +19073,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "GRAHAMS FINE RUBY PORT",
-    "Issue Price": 28251,
+    "Issue Price": 28951,
     "Special Margin": 9.8,
-    "MRP": 5820,
+    "MRP": 5960,
     "Type": "Duty Paid"
   },
   {
@@ -19161,9 +19161,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "SAINT LOUIS PURE GRAPE BRANDY VSOP",
-    "Issue Price": 41301,
+    "Issue Price": 41501,
     "Special Margin": 9.9,
-    "MRP": 4300,
+    "MRP": 4320,
     "Type": "Duty Paid"
   },
   {
@@ -19535,9 +19535,9 @@ const wineData1: Wine[] = [
     "Size Code": "CP",
     "Pack Type": "G",
     "Product Name": "CASA BOTTEGA PROSECCO ROSE",
-    "Issue Price": 32002,
+    "Issue Price": 33402,
     "Special Margin": 9.9,
-    "MRP": 1650,
+    "MRP": 1720,
     "Type": "Duty Paid"
   },
   {
@@ -19557,9 +19557,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "CASA BOTTEGA PROSECCO ROSE",
-    "Issue Price": 29451,
+    "Issue Price": 30751,
     "Special Margin": 9.8,
-    "MRP": 6060,
+    "MRP": 6320,
     "Type": "Duty Paid"
   },
   {
@@ -19645,9 +19645,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "RESERVE MONT REDON COTES DU RHONE ROUGE WINE",
-    "Issue Price": 49901,
+    "Issue Price": 51301,
     "Special Margin": 9.9,
-    "MRP": 5160,
+    "MRP": 5300,
     "Type": "Duty Paid"
   },
   {
@@ -19667,9 +19667,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "RESERVE MONT REDON COTES DU RHONE BLANC WINE",
-    "Issue Price": 51201,
+    "Issue Price": 52901,
     "Special Margin": 9.9,
-    "MRP": 5290,
+    "MRP": 5460,
     "Type": "Duty Paid"
   },
   {
@@ -19711,9 +19711,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "WARWICK THE FIRST LADY CABERNET SAUVIGNON WINE",
-    "Issue Price": 17501,
+    "Issue Price": 17901,
     "Special Margin": 9.8,
-    "MRP": 3670,
+    "MRP": 3750,
     "Type": "Duty Paid"
   },
   {
@@ -19733,9 +19733,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "ALTA VISTA VIVE MALBEC WINE",
-    "Issue Price": 35001,
+    "Issue Price": 35701,
     "Special Margin": 9.9,
-    "MRP": 3670,
+    "MRP": 3740,
     "Type": "Duty Paid"
   },
   {
@@ -20899,9 +20899,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "THE SINGLETON SINGLE MALT SCOTCH WHISKY LUSCIOUS NECTAR 12 YEARS OLD DUFFTOWN DISTILLERY",
-    "Issue Price": 37851,
+    "Issue Price": 37901,
     "Special Margin": 9.8,
-    "MRP": 7740,
+    "MRP": 7750,
     "Type": "Duty Paid"
   },
   {
@@ -21031,9 +21031,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "GOLDEN SPARROW PINOT GRIGIO DELLE VENEZIE",
-    "Issue Price": 36801,
+    "Issue Price": 37801,
     "Special Margin": 9.9,
-    "MRP": 3850,
+    "MRP": 3950,
     "Type": "Duty Paid"
   },
   {
@@ -21053,9 +21053,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "GOLDEN SPARROW CELLAR COLLECTION CHARDONNAY RUBICONE",
-    "Issue Price": 33901,
+    "Issue Price": 34401,
     "Special Margin": 9.9,
-    "MRP": 3560,
+    "MRP": 3610,
     "Type": "Duty Paid"
   },
   {
@@ -21350,9 +21350,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "JURA 18 YEARS SINGLE MALT SCOTCH WHISKY",
-    "Issue Price": 91351,
+    "Issue Price": 94251,
     "Special Margin": 9.8,
-    "MRP": 18440,
+    "MRP": 19020,
     "Type": "Duty Paid"
   },
   {
@@ -21394,9 +21394,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "M CHAPOUTIER BELLERUCHE COTES DU RHONE ROUGE",
-    "Issue Price": 29751,
+    "Issue Price": 29901,
     "Special Margin": 9.8,
-    "MRP": 6120,
+    "MRP": 6150,
     "Type": "Duty Paid"
   },
   {
@@ -21933,9 +21933,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "EMPERADOR BRANDY",
-    "Issue Price": 19501,
+    "Issue Price": 19801,
     "Special Margin": 9.9,
-    "MRP": 2120,
+    "MRP": 2150,
     "Type": "Duty Paid"
   },
   {
@@ -22065,9 +22065,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "SILVER SWAN VODKA 1688",
-    "Issue Price": 22601,
+    "Issue Price": 23101,
     "Special Margin": 9.9,
-    "MRP": 2430,
+    "MRP": 2480,
     "Type": "Duty Paid"
   },
   {
@@ -22241,9 +22241,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "VIU MANENT RESERVA MERLOT",
-    "Issue Price": 24201,
+    "Issue Price": 24401,
     "Special Margin": 9.9,
-    "MRP": 2590,
+    "MRP": 2610,
     "Type": "Duty Paid"
   },
   {
@@ -22263,9 +22263,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "VIU MANENT RESERVA SAUVIGNON BLANC",
-    "Issue Price": 24201,
+    "Issue Price": 24401,
     "Special Margin": 9.9,
-    "MRP": 2590,
+    "MRP": 2610,
     "Type": "Duty Paid"
   },
   {
@@ -22285,9 +22285,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "VIU MANENT RESERVA MALBEC ROSE",
-    "Issue Price": 24201,
+    "Issue Price": 24401,
     "Special Margin": 9.9,
-    "MRP": 2590,
+    "MRP": 2610,
     "Type": "Duty Paid"
   },
   {
@@ -22307,9 +22307,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "ROCHE MAZET CHARDONNAY PAYS DOC",
-    "Issue Price": 10701,
+    "Issue Price": 10951,
     "Special Margin": 9.8,
-    "MRP": 2310,
+    "MRP": 2360,
     "Type": "Duty Paid"
   },
   {
@@ -22329,9 +22329,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "ROCHE MAZET PINOT NOIR PAYS DOC",
-    "Issue Price": 10751,
+    "Issue Price": 11001,
     "Special Margin": 9.8,
-    "MRP": 2320,
+    "MRP": 2370,
     "Type": "Duty Paid"
   },
   {
@@ -22351,9 +22351,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "ROCHE MAZET SYRAH BRUT ROSE",
-    "Issue Price": 13551,
+    "Issue Price": 13851,
     "Special Margin": 9.8,
-    "MRP": 2880,
+    "MRP": 2940,
     "Type": "Duty Paid"
   },
   {
@@ -22835,9 +22835,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "WHAT THE FOX MERLOT",
-    "Issue Price": 47001,
+    "Issue Price": 47701,
     "Special Margin": 9.9,
-    "MRP": 4870,
+    "MRP": 4940,
     "Type": "Duty Paid"
   },
   {
@@ -22857,9 +22857,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "WHAT THE FOX CABERNET SAUVIGNON",
-    "Issue Price": 47001,
+    "Issue Price": 47701,
     "Special Margin": 9.9,
-    "MRP": 4870,
+    "MRP": 4940,
     "Type": "Duty Paid"
   },
   {
@@ -22879,9 +22879,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "WHAT THE FOX BRUT SPARKLING WINE",
-    "Issue Price": 52101,
+    "Issue Price": 52901,
     "Special Margin": 9.9,
-    "MRP": 5380,
+    "MRP": 5460,
     "Type": "Duty Paid"
   },
   {
@@ -22901,9 +22901,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "MEUKOW VS COGNAC",
-    "Issue Price": 53101,
+    "Issue Price": 55201,
     "Special Margin": 9.8,
-    "MRP": 10790,
+    "MRP": 11210,
     "Type": "Duty Paid"
   },
   {
@@ -22923,9 +22923,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "MEUKOW VSOP COGNAC",
-    "Issue Price": 65151,
+    "Issue Price": 66301,
     "Special Margin": 9.8,
-    "MRP": 13200,
+    "MRP": 13430,
     "Type": "Duty Paid"
   },
   {
@@ -23011,9 +23011,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "HENKELL ROSE FINEST SPARKLING",
-    "Issue Price": 18401,
+    "Issue Price": 18851,
     "Special Margin": 9.8,
-    "MRP": 3850,
+    "MRP": 3940,
     "Type": "Duty Paid"
   },
   {
@@ -23407,9 +23407,9 @@ const wineData1: Wine[] = [
     "Size Code": "DD",
     "Pack Type": "P",
     "Product Name": "GK GOLDEN KEY VSOP BRANDY",
-    "Issue Price": 4808,
+    "Issue Price": 4008,
     "Special Margin": 9.9,
-    "MRP": 80,
+    "MRP": 60,
     "Type": "Local"
   },
   {
@@ -23429,9 +23429,9 @@ const wineData1: Wine[] = [
     "Size Code": "NN",
     "Pack Type": "P",
     "Product Name": "GK GOLDEN KEY VSOP BRANDY",
-    "Issue Price": 4404,
+    "Issue Price": 3784,
     "Special Margin": 9.9,
-    "MRP": 140,
+    "MRP": 110,
     "Type": "Local"
   },
   {
@@ -23605,9 +23605,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "BUSH BALLAD SHIRAZ CABERNET",
-    "Issue Price": 26801,
+    "Issue Price": 27301,
     "Special Margin": 9.9,
-    "MRP": 2850,
+    "MRP": 2900,
     "Type": "Duty Paid"
   },
   {
@@ -23990,9 +23990,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "CASACA CLASSIC SHIRAZ",
-    "Issue Price": 25201,
+    "Issue Price": 25701,
     "Special Margin": 9.9,
-    "MRP": 2690,
+    "MRP": 2740,
     "Type": "Duty Paid"
   },
   {
@@ -24012,9 +24012,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "CASACA CLASSIC CABERNET SAUVIGNON",
-    "Issue Price": 25201,
+    "Issue Price": 25701,
     "Special Margin": 9.9,
-    "MRP": 2690,
+    "MRP": 2740,
     "Type": "Duty Paid"
   },
   {
@@ -24199,9 +24199,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "WARRE'S HERITAGE RUBY PORT",
-    "Issue Price": 24301,
+    "Issue Price": 24501,
     "Special Margin": 9.8,
-    "MRP": 5030,
+    "MRP": 5070,
     "Type": "Duty Paid"
   },
   {
@@ -24276,9 +24276,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "DON JULIO REPOSADO",
-    "Issue Price": 63701,
+    "Issue Price": 63951,
     "Special Margin": 9.8,
-    "MRP": 12910,
+    "MRP": 12960,
     "Type": "Duty Paid"
   },
   {
@@ -25398,9 +25398,9 @@ const wineData1: Wine[] = [
     "Size Code": "QR",
     "Pack Type": "G",
     "Product Name": "1800 TEQUILA MILENIO",
-    "Issue Price": 124976,
+    "Issue Price": 126251,
     "Special Margin": 9.6,
-    "MRP": 50160,
+    "MRP": 50670,
     "Type": "Duty Paid"
   },
   {
@@ -25497,9 +25497,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "1800 TEQUILA CRISTALINO",
-    "Issue Price": 79951,
+    "Issue Price": 82201,
     "Special Margin": 9.8,
-    "MRP": 16160,
+    "MRP": 16610,
     "Type": "Duty Paid"
   },
   {
@@ -25530,9 +25530,9 @@ const wineData1: Wine[] = [
     "Size Code": "BS",
     "Pack Type": "G",
     "Product Name": "CHOYA GOLDEN UME FRUIT",
-    "Issue Price": 49601,
+    "Issue Price": 49901,
     "Special Margin": 9.9,
-    "MRP": 5130,
+    "MRP": 5160,
     "Type": "Duty Paid"
   },
   {
@@ -25552,9 +25552,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "GIN MARE",
-    "Issue Price": 36201,
+    "Issue Price": 36751,
     "Special Margin": 9.8,
-    "MRP": 7410,
+    "MRP": 7520,
     "Type": "Duty Paid"
   },
   {
@@ -25640,9 +25640,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "VILLA SANDI IL FRESCO PROSECCO",
-    "Issue Price": 20601,
+    "Issue Price": 21251,
     "Special Margin": 9.8,
-    "MRP": 4290,
+    "MRP": 4420,
     "Type": "Duty Paid"
   },
   {
@@ -25684,9 +25684,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "METAL LABEL ROSE",
-    "Issue Price": 25701,
+    "Issue Price": 25851,
     "Special Margin": 9.8,
-    "MRP": 5310,
+    "MRP": 5340,
     "Type": "Duty Paid"
   },
   {
@@ -25750,9 +25750,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "GOLDEN SPARROW CELLAR COLLECTON MONTEPULCIANO",
-    "Issue Price": 36701,
+    "Issue Price": 37401,
     "Special Margin": 9.9,
-    "MRP": 3840,
+    "MRP": 3910,
     "Type": "Duty Paid"
   },
   {
@@ -25816,9 +25816,9 @@ const wineData1: Wine[] = [
     "Size Code": "LQ",
     "Pack Type": "G",
     "Product Name": "VICTOR FAUCONNIER TRIPLE SEC",
-    "Issue Price": 33101,
+    "Issue Price": 33901,
     "Special Margin": 9.9,
-    "MRP": 3560,
+    "MRP": 3640,
     "Type": "Duty Paid"
   },
   {
@@ -26124,9 +26124,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "JURA BOURBON CASK SINGLE MALT SCOTCH WHISKY",
-    "Issue Price": 36651,
+    "Issue Price": 37301,
     "Special Margin": 9.8,
-    "MRP": 7500,
+    "MRP": 7630,
     "Type": "Duty Paid"
   },
   {
@@ -26146,9 +26146,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "TAMNAVULIN DOUBLE CASK SPEYSIDE SINGLE MALT SCOTCH WHISKY",
-    "Issue Price": 36651,
+    "Issue Price": 37651,
     "Special Margin": 9.8,
-    "MRP": 7500,
+    "MRP": 7700,
     "Type": "Duty Paid"
   },
   {
@@ -26190,9 +26190,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "TEQUILA RESERVA DE DON JULIO ANEJO",
-    "Issue Price": 76301,
+    "Issue Price": 76501,
     "Special Margin": 9.8,
-    "MRP": 15430,
+    "MRP": 15470,
     "Type": "Duty Paid"
   },
   {
@@ -27598,9 +27598,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "ESPANIA TEMPRANILLO GARNACHA",
-    "Issue Price": 14201,
+    "Issue Price": 14501,
     "Special Margin": 9.8,
-    "MRP": 3010,
+    "MRP": 3070,
     "Type": "Duty Paid"
   },
   {
@@ -27620,9 +27620,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "ESPANIA MACABEO SAUVIGNON BLANC",
-    "Issue Price": 14201,
+    "Issue Price": 14501,
     "Special Margin": 9.8,
-    "MRP": 3010,
+    "MRP": 3070,
     "Type": "Duty Paid"
   },
   {
@@ -27642,9 +27642,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "WARWICK THE FIRST LADY CHARDONNAY",
-    "Issue Price": 17751,
+    "Issue Price": 17901,
     "Special Margin": 9.8,
-    "MRP": 3720,
+    "MRP": 3750,
     "Type": "Duty Paid"
   },
   {
@@ -27664,9 +27664,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "MG ESTATE BY MONTGRAS CARMENERE",
-    "Issue Price": 32901,
+    "Issue Price": 33201,
     "Special Margin": 9.9,
-    "MRP": 3460,
+    "MRP": 3490,
     "Type": "Duty Paid"
   },
   {
@@ -27686,9 +27686,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "MG ESTATE BY MONTGRAS SAUVIGNON BLANC",
-    "Issue Price": 33101,
+    "Issue Price": 33501,
     "Special Margin": 9.9,
-    "MRP": 3480,
+    "MRP": 3520,
     "Type": "Duty Paid"
   },
   {
@@ -27708,9 +27708,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "GRAN SELLO TEMPRANILLO SYRAH",
-    "Issue Price": 19501,
+    "Issue Price": 19701,
     "Special Margin": 9.8,
-    "MRP": 4070,
+    "MRP": 4110,
     "Type": "Duty Paid"
   },
   {
@@ -27730,9 +27730,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "CASA BOTTEGA PROSECCO BRUT",
-    "Issue Price": 30151,
+    "Issue Price": 30251,
     "Special Margin": 9.8,
-    "MRP": 6200,
+    "MRP": 6220,
     "Type": "Duty Paid"
   },
   {
@@ -27840,9 +27840,9 @@ const wineData1: Wine[] = [
     "Size Code": "JR",
     "Pack Type": "G",
     "Product Name": "LOUIS XIII GRANDE CHAMPAGNE COGNAC",
-    "Issue Price": 1639926,
+    "Issue Price": 1703951,
     "Special Margin": 9.6,
-    "MRP": 656140,
+    "MRP": 681750,
     "Type": "Duty Paid"
   },
   {
@@ -27873,9 +27873,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "ST REMY VSOP FRENCH BRANDY FRANCAIS",
-    "Issue Price": 33201,
+    "Issue Price": 34301,
     "Special Margin": 9.9,
-    "MRP": 3490,
+    "MRP": 3600,
     "Type": "Duty Paid"
   },
   {
@@ -27895,9 +27895,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "ST REMY EXTRA OLD XO FRENCH BRANDY FRANCAIS",
-    "Issue Price": 49601,
+    "Issue Price": 50801,
     "Special Margin": 9.9,
-    "MRP": 5130,
+    "MRP": 5250,
     "Type": "Duty Paid"
   },
   {
@@ -28071,9 +28071,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "STOLI VODKA",
-    "Issue Price": 32801,
+    "Issue Price": 33101,
     "Special Margin": 9.9,
-    "MRP": 3450,
+    "MRP": 3480,
     "Type": "Duty Paid"
   },
   {
@@ -28093,9 +28093,9 @@ const wineData1: Wine[] = [
     "Size Code": "JM",
     "Pack Type": "G",
     "Product Name": "STOLI SALTED CARAMEL VODKA",
-    "Issue Price": 19201,
+    "Issue Price": 19501,
     "Special Margin": 9.8,
-    "MRP": 4010,
+    "MRP": 4070,
     "Type": "Duty Paid"
   },
   {
@@ -29358,9 +29358,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "COINTREAU LIQUEUR",
-    "Issue Price": 51401,
+    "Issue Price": 53001,
     "Special Margin": 9.9,
-    "MRP": 5310,
+    "MRP": 5470,
     "Type": "Duty Paid"
   },
   {
@@ -29380,9 +29380,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "REMY MARTIN COGNAC FINE CHAMPAGNE VSOP",
-    "Issue Price": 165001,
+    "Issue Price": 169801,
     "Special Margin": 9.9,
-    "MRP": 16670,
+    "MRP": 17150,
     "Type": "Duty Paid"
   },
   {
@@ -29413,9 +29413,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "HARDYS STAMP CHARDONNAY SEMILLON 2023",
-    "Issue Price": 16201,
+    "Issue Price": 16301,
     "Special Margin": 9.9,
-    "MRP": 1790,
+    "MRP": 1800,
     "Type": "Duty Free"
   },
   {
@@ -29435,9 +29435,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "HARDYS STAMP CABERNET MERLOT 2023",
-    "Issue Price": 15901,
+    "Issue Price": 16001,
     "Special Margin": 9.9,
-    "MRP": 1760,
+    "MRP": 1770,
     "Type": "Duty Free"
   },
   {
@@ -31261,9 +31261,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "RIUNITE LAMBRUSCO EMILI A",
-    "Issue Price": 23601,
+    "Issue Price": 24201,
     "Special Margin": 9.9,
-    "MRP": 2530,
+    "MRP": 2590,
     "Type": "Duty Paid"
   },
   {
@@ -32757,9 +32757,9 @@ const wineData1: Wine[] = [
     "Size Code": "AP",
     "Pack Type": "C",
     "Product Name": "ORIGINAL OETTINGER EXPORT",
-    "Issue Price": 8602,
+    "Issue Price": 8802,
     "Special Margin": 9.9,
-    "MRP": 450,
+    "MRP": 460,
     "Type": "Duty Paid"
   },
   {
@@ -32779,9 +32779,9 @@ const wineData1: Wine[] = [
     "Size Code": "AP",
     "Pack Type": "C",
     "Product Name": "ORIGINAL OETTINGER WEISSBIER",
-    "Issue Price": 8402,
+    "Issue Price": 8602,
     "Special Margin": 9.9,
-    "MRP": 440,
+    "MRP": 450,
     "Type": "Duty Paid"
   },
   {
@@ -33208,9 +33208,9 @@ const wineData1: Wine[] = [
     "Size Code": "BD",
     "Pack Type": "C",
     "Product Name": "BITBURGER PREMIUM PILS",
-    "Issue Price": 10417,
+    "Issue Price": 10534,
     "Special Margin": 9.4,
-    "MRP": 6270,
+    "MRP": 6340,
     "Type": "Duty Paid"
   },
   {
@@ -33230,9 +33230,9 @@ const wineData1: Wine[] = [
     "Size Code": "UP",
     "Pack Type": "G",
     "Product Name": "BITBURGER PREMIUM PILS",
-    "Issue Price": 8002,
+    "Issue Price": 8402,
     "Special Margin": 9.9,
-    "MRP": 420,
+    "MRP": 440,
     "Type": "Duty Paid"
   },
   {
@@ -33527,9 +33527,9 @@ const wineData1: Wine[] = [
     "Size Code": "BP",
     "Pack Type": "C",
     "Product Name": "SINGHA THE ORIGINAL THAI BEER",
-    "Issue Price": 4101,
+    "Issue Price": 4201,
     "Special Margin": 9.9,
-    "MRP": 430,
+    "MRP": 440,
     "Type": "Duty Paid"
   },
   {
@@ -33549,9 +33549,9 @@ const wineData1: Wine[] = [
     "Size Code": "UP",
     "Pack Type": "C",
     "Product Name": "SINGHA THE ORIGINAL THAI BEER",
-    "Issue Price": 6002,
+    "Issue Price": 6202,
     "Special Margin": 9.9,
-    "MRP": 320,
+    "MRP": 330,
     "Type": "Duty Paid"
   },
   {
@@ -33571,9 +33571,9 @@ const wineData1: Wine[] = [
     "Size Code": "UP",
     "Pack Type": "G",
     "Product Name": "SINGHA THE ORIGINAL THAI BEER",
-    "Issue Price": 6602,
+    "Issue Price": 6802,
     "Special Margin": 9.9,
-    "MRP": 350,
+    "MRP": 360,
     "Type": "Duty Paid"
   },
   {
@@ -33692,9 +33692,9 @@ const wineData1: Wine[] = [
     "Size Code": "AP",
     "Pack Type": "C",
     "Product Name": "OETTINGER BLACK BEER",
-    "Issue Price": 9202,
+    "Issue Price": 9402,
     "Special Margin": 9.9,
-    "MRP": 480,
+    "MRP": 490,
     "Type": "Duty Paid"
   },
   {
@@ -34033,9 +34033,9 @@ const wineData1: Wine[] = [
     "Size Code": "KK",
     "Pack Type": "B",
     "Product Name": "LA DIVINE BEER",
-    "Issue Price": 14692,
+    "Issue Price": 15150,
     "Special Margin": 9.6,
-    "MRP": 18564,
+    "MRP": 19104,
     "Type": "Duty Paid"
   },
   {
@@ -35694,9 +35694,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "BOMBAY SAPPHIRE LONDON DRY GIN",
-    "Issue Price": 23201,
+    "Issue Price": 23301,
     "Special Margin": 9.9,
-    "MRP": 2490,
+    "MRP": 2500,
     "Type": "Duty Paid"
   },
   {
@@ -35738,9 +35738,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "ABSOLUT VODKA",
-    "Issue Price": 23301,
+    "Issue Price": 23401,
     "Special Margin": 9.9,
-    "MRP": 2500,
+    "MRP": 2510,
     "Type": "Duty Paid"
   },
   {
@@ -35826,9 +35826,9 @@ const wineData1: Wine[] = [
     "Size Code": "CT",
     "Pack Type": "G",
     "Product Name": "JAMESON IRISH WHISKY",
-    "Issue Price": 18003,
+    "Issue Price": 18253,
     "Special Margin": 9.88,
-    "MRP": 770,
+    "MRP": 780,
     "Type": "Duty Paid"
   },
   {
@@ -35848,9 +35848,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "JAMESON IRISH WHISKY",
-    "Issue Price": 25901,
+    "Issue Price": 26101,
     "Special Margin": 9.9,
-    "MRP": 2760,
+    "MRP": 2780,
     "Type": "Duty Paid"
   },
   {
@@ -36002,9 +36002,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "GLENFIDDICH SINGLE MALT SCOTCH WHISKY 15 YRS OLD",
-    "Issue Price": 93301,
+    "Issue Price": 93701,
     "Special Margin": 9.9,
-    "MRP": 9500,
+    "MRP": 9540,
     "Type": "Duty Paid"
   },
   {
@@ -36178,9 +36178,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "KETEL ONE VODKA",
-    "Issue Price": 26501,
+    "Issue Price": 26601,
     "Special Margin": 9.9,
-    "MRP": 2820,
+    "MRP": 2830,
     "Type": "Duty Paid"
   },
   {
@@ -36266,9 +36266,9 @@ const wineData1: Wine[] = [
     "Size Code": "JQ",
     "Pack Type": "G",
     "Product Name": "GLENFIDDICH SINGLE MALT SCOTCH WHISKY 12 YRS OLD",
-    "Issue Price": 68601,
+    "Issue Price": 70501,
     "Special Margin": 9.9,
-    "MRP": 7030,
+    "MRP": 7220,
     "Type": "Duty Paid"
   },
   {
@@ -36508,9 +36508,9 @@ const wineData1: Wine[] = [
     "Size Code": "AC",
     "Pack Type": "G",
     "Product Name": "JAGERMEISTER",
-    "Issue Price": 39010,
+    "Issue Price": 41010,
     "Special Margin": 9.9,
-    "MRP": 420,
+    "MRP": 440,
     "Type": "Duty Paid"
   },
   {
@@ -36530,9 +36530,9 @@ const wineData1: Wine[] = [
     "Size Code": "LQ",
     "Pack Type": "G",
     "Product Name": "JAGERMEISTER",
-    "Issue Price": 61901,
+    "Issue Price": 63001,
     "Special Margin": 9.9,
-    "MRP": 6440,
+    "MRP": 6550,
     "Type": "Duty Paid"
   },
   {
@@ -36552,9 +36552,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "JAGERMEISTER",
-    "Issue Price": 48801,
+    "Issue Price": 50101,
     "Special Margin": 9.9,
-    "MRP": 5050,
+    "MRP": 5180,
     "Type": "Duty Paid"
   },
   {
@@ -36574,9 +36574,9 @@ const wineData1: Wine[] = [
     "Size Code": "WQ",
     "Pack Type": "G",
     "Product Name": "JAGERMEISTER",
-    "Issue Price": 25201,
+    "Issue Price": 26001,
     "Special Margin": 9.9,
-    "MRP": 2610,
+    "MRP": 2690,
     "Type": "Duty Paid"
   },
   {
@@ -36629,9 +36629,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "ROBERTO CAVALLI VODKA",
-    "Issue Price": 47801,
+    "Issue Price": 49551,
     "Special Margin": 9.8,
-    "MRP": 9730,
+    "MRP": 10080,
     "Type": "Duty Paid"
   },
   {
@@ -36651,9 +36651,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "GREY GOOSE VODKA",
-    "Issue Price": 19851,
+    "Issue Price": 20101,
     "Special Margin": 9.8,
-    "MRP": 4140,
+    "MRP": 4190,
     "Type": "Duty Paid"
   },
   {
@@ -36717,9 +36717,9 @@ const wineData1: Wine[] = [
     "Size Code": "QM",
     "Pack Type": "G",
     "Product Name": "CHIVAS REGAL AGED 18 YEARS BLENDED SCOTCH WHISKY",
-    "Issue Price": 44601,
+    "Issue Price": 44751,
     "Special Margin": 9.8,
-    "MRP": 9090,
+    "MRP": 9120,
     "Type": "Duty Paid"
   },
   {
@@ -36739,9 +36739,9 @@ const wineData1: Wine[] = [
     "Size Code": "QQ",
     "Pack Type": "G",
     "Product Name": "CHIVAS REGAL AGED 12 YRS OLD BLENDED SCOTCH WHISKY",
-    "Issue Price": 44201,
+    "Issue Price": 44501,
     "Special Margin": 9.9,
-    "MRP": 4590,
+    "MRP": 4620,
     "Type": "Duty Paid"
   },
   {
@@ -41055,6 +41055,127 @@ const wineData1: Wine[] = [
     "Special Margin": 9.9,
     "MRP": 260,
     "Type": "Local"
+  },
+  {
+    "S.no": 3731,
+    "Brand Number": 713,
+    "Size Code": "LM",
+    "Pack Type": "G",
+    "Product Name": "TOMINTOUL SPEYSIDE GLENLIVET SINGLE MALT SCOTCH WHISKY AGED 16 YEARS",
+    "Issue Price": 49151,
+    "Special Margin": 9.8,
+    "MRP": 10080,
+    "Type": "Duty Free"
+  },
+  {
+    "S.no": 3732,
+    "Brand Number": 735,
+    "Size Code": "LM",
+    "Pack Type": "G",
+    "Product Name": "TOMINTOUL SPEYSIDE GLENLIVET SINGLE PEATED MALT SCOTCH WHISKY",
+    "Issue Price": 28551,
+    "Special Margin": 9.8,
+    "MRP": 5960,
+    "Type": "Duty Free"
+  },
+  {
+    "S.no": 3733,
+    "Brand Number": 736,
+    "Size Code": "LM",
+    "Pack Type": "G",
+    "Product Name": "TOMINTOUL TLATH SPEYSIDE GLENLIVET SINGLE MALT SCOTCH WHISKY",
+    "Issue Price": 27051,
+    "Special Margin": 9.8,
+    "MRP": 5660,
+    "Type": "Duty Free"
+  },
+  {
+    "S.no": 3734,
+    "Brand Number": 850,
+    "Size Code": "JM",
+    "Pack Type": "G",
+    "Product Name": "THE BOTANIST ISLAY DRY GIN",
+    "Issue Price": 31301,
+    "Special Margin": 9.8,
+    "MRP": 6430,
+    "Type": "Duty Free"
+  },
+  {
+    "S.no": 3735,
+    "Brand Number": 850,
+    "Size Code": "JM",
+    "Pack Type": "G",
+    "Product Name": "THE BOTANIST ISLAY DRY GIN",
+    "Issue Price": 40651,
+    "Special Margin": 9.8,
+    "MRP": 8300,
+    "Type": "Duty Paid"
+  },
+  {
+    "S.no": 3736,
+    "Brand Number": 1173,
+    "Size Code": "QQ",
+    "Pack Type": "G",
+    "Product Name": "FANTINI CERASUOLO D'ABRUZZO ROSE",
+    "Issue Price": 45001,
+    "Special Margin": 9.9,
+    "MRP": 4670,
+    "Type": "Duty Paid"
+  },
+  {
+    "S.no": 3737,
+    "Brand Number": 1681,
+    "Size Code": "LQ",
+    "Pack Type": "G",
+    "Product Name": "GLEN GARVIE BLENDED SCOTCH WHISKY",
+    "Issue Price": 28001,
+    "Special Margin": 9.9,
+    "MRP": 3050,
+    "Type": "Duty Free"
+  },
+  {
+    "S.no": 3738,
+    "Brand Number": 2054,
+    "Size Code": "JR",
+    "Pack Type": "G",
+    "Product Name": "LOUIS XIII GRANDE CHAMPAGNE COGNAC",
+    "Issue Price": 1218776,
+    "Special Margin": 9.6,
+    "MRP": 487680,
+    "Type": "Duty Free"
+  },
+  {
+    "S.no": 3739,
+    "Brand Number": 2062,
+    "Size Code": "JM",
+    "Pack Type": "G",
+    "Product Name": "MOUT GAY BARBADOS RUM BLACK BARREL DOUBLE CASK BLEND",
+    "Issue Price": 50551,
+    "Special Margin": 9.8,
+    "MRP": 10280,
+    "Type": "Duty Free"
+  },
+  {
+    "S.no": 3740,
+    "Brand Number": 2063,
+    "Size Code": "JM",
+    "Pack Type": "G",
+    "Product Name": "MOUNT GAY BARBADOS RUM ECLIPSE HERITAGE BLEND",
+    "Issue Price": 19501,
+    "Special Margin": 9.8,
+    "MRP": 4070,
+    "Type": "Duty Free"
+  },
+  {
+    "S.no": 3741,
+    "Brand Number": 7514,
+    "Size Code": "JM",
+    "Pack Type": "G",
+    "Product Name": "MONKEY SHOULDER BLENDED MALT SCOTCH WHISKY",
+    "Issue Price": 29051,
+    "Special Margin": 9.8,
+    "MRP": 5980,
+    "Type": "Duty Paid"
   }
 
 ]
