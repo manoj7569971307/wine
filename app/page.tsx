@@ -32,6 +32,17 @@ interface FilteredItem {
     idocNumber: string
 }
 
+interface MissedItem {
+    slNo: string;
+    brandNumber: string;
+    brandName: string;
+    size: string;
+    cases: string;
+    bottles: string;
+    invoicePrice: string;
+    reason: string;
+}
+
 type ChildData = string[][];
 
 const removeCommasAndDecimals = (value: string): string =>
@@ -110,6 +121,7 @@ export default function Home() {
     const [pdfItemsMap, setPdfItemsMap] = useState<Map<string, FilteredItem[]>>(new Map());
     const [pdfTotal, setPdfTotal] = useState(0);
     const [matchedItemsCount, setMatchedItemsCount] = useState(0);
+    const [missedItems, setMissedItems] = useState<MissedItem[]>([]);
     const [sheetFromDate, setSheetFromDate] = useState('');
     const [sheetToDate, setSheetToDate] = useState('');
     const [lastSavedToDate, setLastSavedToDate] = useState('');
@@ -387,6 +399,7 @@ export default function Home() {
         setPendingData([]);
         setPdfTotal(0);
         setMatchedItemsCount(0);
+        setMissedItems([]);
         setShowConfirmModal(false);
         setCurrentIdocNumber('');
         setCurrentPdfFileName('');
@@ -483,12 +496,28 @@ export default function Home() {
         console.log('Using wines data source:', winesData.length > 0 ? `Firebase (${winesData.length} entries)` : `sampleWinesData (${sampleWinesData.length} entries)`);
 
         const filtered: FilteredItem[] = [];
+        const missed: MissedItem[] = [];
         let totalAmount = 0;
         let matchedCount = 0;
 
+        const buildMissedItem = (row: string[], invoicePrice: string, reason: string): MissedItem => ({
+            slNo: String(row[0] || '').trim(),
+            brandNumber: String(row[1] || '').trim(),
+            brandName: String(row[2] || '').trim(),
+            size: String(row[5] || '').trim(),
+            cases: String(row[6] || '').trim(),
+            bottles: String(row[7] || '').trim(),
+            invoicePrice,
+            reason,
+        });
+
         for (let j = 1; j < childData.length; j++) {
             const row = childData[j];
-            if (!row?.[8] || !row[6] || !row[1]) continue;
+            if (!row?.[8] || !row[6] || !row[1]) {
+                const hasAnyValue = row?.some(cell => String(cell ?? '').trim() !== '');
+                if (hasAnyValue) missed.push(buildMissedItem(row, '-', 'Incomplete data'));
+                continue;
+            }
 
             const quantity = Number(row[6]);
 
@@ -510,9 +539,13 @@ export default function Home() {
                 rawPrice = String(removeCommas(String(row[10]) || String(row[8])));
             }
 
-            if (isNaN(issuePrice)) continue;
+            if (isNaN(issuePrice)) {
+                missed.push(buildMissedItem(row, '-', 'Invalid price'));
+                continue;
+            }
 
             const brandNumberFromChild = String(row[1]).trim().padStart(4, '0');
+            let isMatched = false;
 
             for (const wine of activeWinesData) {
                 const brandNumberFromSample = String(wine['Brand Number']).trim().padStart(4, '0');
@@ -522,6 +555,7 @@ export default function Home() {
                     Math.abs(issuePrice - sampleIssuePrice) < 1) {
 
                     matchedCount++;
+                    isMatched = true;
 
                     const calculatedQuantity = firstIndex
                         ? (Number(firstIndex) * quantity) + Number(row[7])
@@ -562,11 +596,25 @@ export default function Home() {
                     break;
                 }
             }
+
+            if (!isMatched) {
+                const listPrices = activeWinesData
+                    .filter(wine => String(wine['Brand Number']).trim().padStart(4, '0') === brandNumberFromChild)
+                    .map(wine => Number(wine['Issue Price']).toFixed(2));
+
+                const reason = listPrices.length > 0
+                    ? `Price mismatch (list: ₹${[...new Set(listPrices)].join(' / ₹')})`
+                    : 'Brand not in list';
+
+                missed.push(buildMissedItem(row, issuePrice.toFixed(2), reason));
+            }
         }
 
         console.log('Total PDF Amount:', totalAmount);
+        console.log('Missed items:', missed);
         setPdfTotal(totalAmount);
         setMatchedItemsCount(matchedCount);
+        setMissedItems(missed);
         setPendingData((() => {
             const items = [...filtered];
             const beers = items.filter(item => item.category?.toLowerCase().includes('beer'));
@@ -3405,6 +3453,11 @@ export default function Home() {
                                 <p className="font-semibold text-blue-800">
                                     Total Amount: ₹{pdfTotal.toFixed(2)}
                                 </p>
+                                {missedItems.length > 0 && (
+                                    <p className="font-semibold text-red-700 mt-2">
+                                        Missed Items: {missedItems.length}
+                                    </p>
+                                )}
                             </div>
                             
                             <div className="bg-white shadow-lg rounded-lg overflow-hidden">
@@ -3446,6 +3499,49 @@ export default function Home() {
                                     </table>
                                 </div>
                             </div>
+
+                            {missedItems.length > 0 && (
+                                <div className="mt-6 border-2 border-red-300 rounded-lg overflow-hidden">
+                                    <div className="bg-red-50 px-4 py-3 border-b-2 border-red-200">
+                                        <p className="font-bold text-red-700 text-sm">
+                                            ⚠ Missed Items ({missedItems.length}) — these will NOT be added to the sheet
+                                        </p>
+                                        <p className="text-red-600 text-xs mt-1">
+                                            These invoice rows did not match the wines list. Check the brand number or price and update the wines list if needed.
+                                        </p>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="bg-red-50 border-b border-red-200">
+                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Sl</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Brand No</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Brand Name</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Size</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Cases</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Bottles</th>
+                                                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-700">Invoice ₹</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Reason</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {missedItems.map((item, index) => (
+                                                    <tr key={index} className="border-b border-red-100 hover:bg-red-50">
+                                                        <td className="px-3 py-2 text-sm text-gray-600">{item.slNo || '-'}</td>
+                                                        <td className="px-3 py-2 text-sm text-gray-800 font-mono">{item.brandNumber || '-'}</td>
+                                                        <td className="px-3 py-2 text-sm text-gray-800">{item.brandName || '-'}</td>
+                                                        <td className="px-3 py-2 text-center text-sm text-gray-600">{item.size || '-'}</td>
+                                                        <td className="px-3 py-2 text-center text-sm text-gray-600">{item.cases || '-'}</td>
+                                                        <td className="px-3 py-2 text-center text-sm text-gray-600">{item.bottles || '-'}</td>
+                                                        <td className="px-3 py-2 text-center text-sm text-gray-800">{item.invoicePrice}</td>
+                                                        <td className="px-3 py-2 text-sm text-red-700 font-medium">{item.reason}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="p-4 bg-gray-50 border-t flex gap-3">
                             <button
@@ -3505,6 +3601,7 @@ export default function Home() {
                                     setChildData([]);
                                     setPdfTotal(0);
                                     setMatchedItemsCount(0);
+                                    setMissedItems([]);
                                     handlePdfConfirm();
                                 }}
                                 className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
