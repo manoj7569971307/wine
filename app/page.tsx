@@ -10,6 +10,7 @@ import LoginForm from "@/app/login";
 import FeedbackButton from "@/app/components/FeedbackButton";
 import AdminPanel from "@/app/admin";
 import { db } from './lib/firebase';
+import { rowTotal, recalcRow, backfillClosingEntered } from './lib/stock';
 
 interface FilteredItem {
     particulars: string;
@@ -24,6 +25,7 @@ interface FilteredItem {
     closingStock: number;
     closingStockCases: number;
     closingStockBottles: number;
+    closingEntered?: boolean;
     size: string;
     caseSize: string;
     amount: string;
@@ -53,6 +55,7 @@ const removeCommas = (value: string): number =>
 
 const calcBalance = (f1?: string, f2?: string, f4?: string, f6?: string): string =>
     ((+(f1 || '0')) + (+(f2 || '0')) + (+(f4 || '0')) - (+(f6 || '0'))).toString();
+
 
 // Date format helpers
 const formatDateForDisplay = (dateStr: string): string => {
@@ -170,6 +173,11 @@ export default function Home() {
     // Check if this is the latest sheet (no saved sheet after current to date)
     const isLatestSheet = !sheetToDate || !lastSavedToDate || sheetToDate >= lastSavedToDate;
 
+    // Once counting has begun, a new invoice would make every count already taken stale,
+    // so invoice upload is locked until the closing stock is reverted.
+    const closingEnteredCount = filterData.filter(item => item.closingEntered).length;
+    const isClosingStockStarted = closingEnteredCount > 0;
+
     // Auto-save function for real-time updates
     const autoSaveToFirebase = async (updatedData: FilteredItem[]) => {
         if (!username || updatedData.length === 0) return;
@@ -271,24 +279,17 @@ export default function Home() {
         if (newValue < 0) return;
 
         setFilterData(prevData => {
-            const newData = [...prevData];
-            const item = newData[index];
-            item.closingStockCases = newValue;
+            const item = prevData[index];
             const caseSize = parseInt(item.caseSize || item.size) || 1;
-            item.closingStock = (item.closingStockCases * caseSize) + (item.closingStockBottles || 0);
-            const openingStock = Number(item.openingStock) || 0;
-            const receipts = Number(item.receipts) || 0;
-            const tranIn = Number(item.tranIn) || 0;
-            const tranOut = Number(item.tranOut) || 0;
-            const rate = Number(item.rate) || 0;
-            const totalColumn = openingStock + receipts + tranIn - tranOut;
-            if (item.closingStock > totalColumn) {
-                item.closingStockCases = 0;
-                item.closingStock = item.closingStockBottles || 0;
-                return prevData;
-            }
-            item.sales = openingStock + receipts + tranIn - item.closingStock - tranOut;
-            item.amount = `₹${(item.sales * rate).toFixed(2)}`;
+            const closingStock = (newValue * caseSize) + (item.closingStockBottles || 0);
+            // Reject a count larger than the stock available, leaving the row untouched.
+            // The old code half-applied the rejected value here and skipped the recalc.
+            if (closingStock > rowTotal(item)) return prevData;
+
+            const newData = [...prevData];
+            newData[index] = recalcRow({
+                ...item, closingStockCases: newValue, closingStock, closingEntered: true
+            });
             setTimeout(() => autoSaveToFirebase(newData), 100);
             return newData;
         });
@@ -299,24 +300,36 @@ export default function Home() {
         if (newValue < 0) return;
 
         setFilterData(prevData => {
-            const newData = [...prevData];
-            const item = newData[index];
+            const item = prevData[index];
             const caseSize = parseInt(item.caseSize || item.size) || 1;
-            item.closingStockBottles = newValue;
-            item.closingStock = ((item.closingStockCases || 0) * caseSize) + newValue;
-            const openingStock = Number(item.openingStock) || 0;
-            const receipts = Number(item.receipts) || 0;
-            const tranIn = Number(item.tranIn) || 0;
-            const tranOut = Number(item.tranOut) || 0;
-            const rate = Number(item.rate) || 0;
-            const totalColumn = openingStock + receipts + tranIn - tranOut;
-            if (item.closingStock > totalColumn) {
-                item.closingStockBottles = 0;
-                item.closingStock = (item.closingStockCases || 0) * caseSize;
-                return prevData;
-            }
-            item.sales = openingStock + receipts + tranIn - item.closingStock - tranOut;
-            item.amount = `₹${(item.sales * rate).toFixed(2)}`;
+            const closingStock = ((item.closingStockCases || 0) * caseSize) + newValue;
+            if (closingStock > rowTotal(item)) return prevData;
+
+            const newData = [...prevData];
+            newData[index] = recalcRow({
+                ...item, closingStockBottles: newValue, closingStock, closingEntered: true
+            });
+            setTimeout(() => autoSaveToFirebase(newData), 100);
+            return newData;
+        });
+    };
+
+    // Clears every closing stock count so a new invoice can be merged. The counts are
+    // taken before the new stock arrived, so they have to be redone either way.
+    const handleRevertClosingStock = () => {
+        if (!isClosingStockStarted) return;
+        if (!confirm(
+            `Khachitanga na?\n\nEe sheet lo ${closingEnteredCount} items ki meeru vesina closing stock motham clear avutundi. Ee pani tirigi teeyalemu.`
+        )) return;
+
+        setFilterData(prevData => {
+            const newData = prevData.map(item => recalcRow({
+                ...item,
+                closingStockCases: 0,
+                closingStockBottles: 0,
+                closingStock: 0,
+                closingEntered: false,
+            }));
             setTimeout(() => autoSaveToFirebase(newData), 100);
             return newData;
         });
@@ -329,16 +342,7 @@ export default function Home() {
 
         setFilterData(prevData => {
             const newData = [...prevData];
-            const item = newData[index];
-            item.tranIn = newValue;
-            const openingStock = Number(item.openingStock) || 0;
-            const receipts = Number(item.receipts) || 0;
-            const tranOut = Number(item.tranOut) || 0;
-            const closingStock = Number(item.closingStock) || 0;
-            const rate = Number(item.rate) || 0;
-            item.sales = openingStock + receipts + newValue - closingStock - tranOut;
-            item.amount = `₹${(item.sales * rate).toFixed(2)}`;
-
+            newData[index] = recalcRow({ ...prevData[index], tranIn: newValue });
             return newData;
         });
     };
@@ -350,19 +354,13 @@ export default function Home() {
         if (newValue < 0) return;
 
         setFilterData(prevData => {
-            const newData = [...prevData];
-            const item = newData[index];
-            const openingStock = Number(item.openingStock) || 0;
-            const receipts = Number(item.receipts) || 0;
-            const tranIn = Number(item.tranIn) || 0;
-            const closingStock = Number(item.closingStock) || 0;
-            const rate = Number(item.rate) || 0;
-            const availableForTranOut = openingStock + receipts + tranIn;
+            const item = prevData[index];
+            const availableForTranOut = (Number(item.openingStock) || 0)
+                + (Number(item.receipts) || 0) + (Number(item.tranIn) || 0);
             if (newValue > availableForTranOut) return prevData;
-            item.tranOut = newValue;
-            item.sales = openingStock + receipts + tranIn - closingStock - newValue;
-            item.amount = `₹${(item.sales * rate).toFixed(2)}`;
 
+            const newData = [...prevData];
+            newData[index] = recalcRow({ ...item, tranOut: newValue });
             return newData;
         });
     };
@@ -571,6 +569,7 @@ export default function Home() {
 
                     if (existingItemIndex !== -1) {
                         filtered[existingItemIndex].receipts += calculatedQuantity;
+                        recalcRow(filtered[existingItemIndex]);
                     } else {
                         filtered.push({
                             particulars: wine['Product Name'],
@@ -585,6 +584,7 @@ export default function Home() {
                             closingStock: 0,
                             closingStockCases: 0,
                             closingStockBottles: 0,
+                            closingEntered: false,
                             size: secondIndex,
                             caseSize: firstIndex,
                             amount: '₹0',
@@ -691,15 +691,16 @@ export default function Home() {
                 (data.items || []).forEach((item: FilteredItem) => {
                     const key = `${String(item.brandNumber).padStart(4, '0')}_${item.particulars}_${item.size}_${item.rate}`;
                     if (!uniqueItems.has(key)) {
-                        uniqueItems.set(key, {
+                        uniqueItems.set(key, backfillClosingEntered({
                             ...item,
                             brandNumber: String(item.brandNumber).padStart(4, '0')
-                        });
+                        }));
                     } else {
                         // Merge receipts if duplicate found
                         const existing = uniqueItems.get(key);
                         existing.receipts += item.receipts || 0;
                         existing.openingStock += item.openingStock || 0;
+                        recalcRow(existing);
                     }
                 });
                 
@@ -826,6 +827,7 @@ export default function Home() {
                             closingStock: 0,
                             closingStockCases: 0,
                             closingStockBottles: 0,
+                            closingEntered: false,
                             sales: 0,
                             amount: '₹0',
                         };
@@ -839,6 +841,7 @@ export default function Home() {
                             closingStock: 0,
                             closingStockCases: 0,
                             closingStockBottles: 0,
+                            closingEntered: false,
                             sales: 0,
                             amount: '₹0',
                         };
@@ -1427,7 +1430,9 @@ export default function Home() {
     const startEditHistory = (record: any) => {
         setEditingHistory(record);
         // Deep copy the items to avoid mutating the original
-        setEditedHistoryData(JSON.parse(JSON.stringify(record.items || [])));
+        setEditedHistoryData(
+            JSON.parse(JSON.stringify(record.items || [])).map(backfillClosingEntered)
+        );
         // Initialize edited payment data
         setEditedPaymentData(JSON.parse(JSON.stringify(record.paymentData || [])));
         // Initialize edited additional info
@@ -1464,6 +1469,7 @@ export default function Home() {
 
         if (field === 'closingStockCases') {
             item.closingStockCases = numValue;
+            item.closingEntered = true;
             const caseSize = parseInt(item.caseSize || item.size) || 1;
             item.closingStock = (numValue * caseSize) + (item.closingStockBottles || 0);
             const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
@@ -1474,6 +1480,7 @@ export default function Home() {
         } else if (field === 'closingStockBottles') {
             const caseSize = parseInt(item.caseSize || item.size) || 1;
             item.closingStockBottles = numValue;
+            item.closingEntered = true;
             item.closingStock = ((item.closingStockCases || 0) * caseSize) + numValue;
             const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
             if (item.closingStock > availableStock) {
@@ -1483,6 +1490,7 @@ export default function Home() {
         } else if (field === 'closingStock') {
             const availableStock = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0) - (item.tranOut || 0);
             item.closingStock = Math.min(numValue, availableStock);
+            item.closingEntered = true;
         } else if (field === 'tranIn') {
             item.tranIn = numValue;
         } else if (field === 'tranOut') {
@@ -1494,11 +1502,7 @@ export default function Home() {
             item.receipts = numValue;
         }
 
-        const total = (item.openingStock || 0) + (item.receipts || 0) + (item.tranIn || 0);
-        item.sales = Math.max(0, total - (item.closingStock || 0) - (item.tranOut || 0));
-
-        const amount = (item.sales || 0) * (item.rate || 0);
-        item.amount = `₹${amount.toFixed(2)}`;
+        recalcRow(item);
 
         setEditedHistoryData(updatedData);
 
@@ -1642,6 +1646,7 @@ export default function Home() {
                             if (mainItemIndex !== -1) {
                                 // Update opening stock in main sheet with new closing stock
                                 updatedMainItems[mainItemIndex].openingStock = newClosingStock;
+                                recalcRow(backfillClosingEntered(updatedMainItems[mainItemIndex]));
                                 hasChanges = true;
                             }
                         }
@@ -2099,6 +2104,9 @@ export default function Home() {
                         ref={pdfConverterRef}
                         sendDataToParent={handleDataFromChild}
                         saveAllowed={saveAllowed}
+                        uploadLocked={isClosingStockStarted}
+                        lockedCount={closingEnteredCount}
+                        onRevertClosingStock={handleRevertClosingStock}
                         onReset={handlePdfReset}
                         onShowIdocs={(idocs) => {
                             setIdocList(idocs);
@@ -3546,6 +3554,11 @@ export default function Home() {
                         <div className="p-4 bg-gray-50 border-t flex gap-3">
                             <button
                                 onClick={() => {
+                                    // Closing stock may have been started after this file was parsed.
+                                    if (isClosingStockStarted) {
+                                        alert('Closing stock enter chestunnaru. Ee invoice merge cheyyalante, modata closing stock revert cheyyandi.');
+                                        return;
+                                    }
                                     if (currentIdocNumber) {
                                         const storedIdocs = JSON.parse(localStorage.getItem('processedIdocs') || '[]');
                                         storedIdocs.push(currentIdocNumber);
@@ -3562,6 +3575,7 @@ export default function Home() {
                                         );
                                         if (existingIndex !== -1) {
                                             mergedData[existingIndex].receipts += newItem.receipts;
+                                            recalcRow(mergedData[existingIndex]);
                                         } else {
                                             mergedData.push(newItem);
                                         }

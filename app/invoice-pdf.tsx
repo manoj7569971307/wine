@@ -6,6 +6,9 @@ import { AlertCircle, CheckCircle, X } from 'lucide-react';
 interface PDFToExcelConverterProps {
     sendDataToParent: (data: string[][]) => void;
     saveAllowed: boolean;
+    uploadLocked?: boolean;
+    lockedCount?: number;
+    onRevertClosingStock?: () => void;
     onReset?: () => void;
     onShowIdocs?: (idocs: Array<{id: string, idocNumber: string, fileName: string, timestamp: string}>) => void;
     onIdocExtracted?: (idoc: string, fileName: string, invoiceDate: string, usedFallback?: boolean) => void;
@@ -29,7 +32,7 @@ const firebaseConfig = {
     measurementId: "G-C8JCT3DNNH"
 };
 
-const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConverterProps>(({ sendDataToParent, saveAllowed, onReset, onShowIdocs, onIdocExtracted }, ref) => {
+const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConverterProps>(({ sendDataToParent, saveAllowed, uploadLocked = false, lockedCount = 0, onRevertClosingStock, onReset, onShowIdocs, onIdocExtracted }, ref) => {
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [tableData, setTableData] = useState<TableData>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -436,18 +439,39 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
 
                     <div className="space-y-4">
                         <label className="block">
-                            <span className="text-gray-700 font-medium">Upload Invoice PDF</span>
+                            <span className="text-gray-700 font-medium">
+                                {uploadLocked ? '🔒 Upload Invoice PDF' : 'Upload Invoice PDF'}
+                            </span>
                             <input
                                 type="file"
                                 accept=".pdf"
                                 onChange={handleFileUpload}
-                                disabled={!firebaseReady || loading}
-                                className={`mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold ${firebaseReady && !loading ? 'file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100' : 'file:bg-gray-200 file:text-gray-400 cursor-not-allowed'}`}
+                                disabled={!firebaseReady || loading || uploadLocked}
+                                className={`mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold ${firebaseReady && !loading && !uploadLocked ? 'file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100' : 'file:bg-gray-200 file:text-gray-400 cursor-not-allowed'}`}
                             />
                             {!firebaseReady && (
                                 <p className="mt-2 text-xs text-gray-500">File upload will be enabled once ready</p>
                             )}
                         </label>
+
+                        {uploadLocked && (
+                            <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
+                                <p className="text-sm text-amber-800 font-semibold">
+                                    Closing stock enter chestunnaru ({lockedCount} items ayindi).
+                                </p>
+                                <p className="mt-1 text-xs text-amber-700">
+                                    Kotta invoice add cheste, ippatike count chesina numbers tappu avutayi.
+                                    Anduke modata closing stock revert cheyyali.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={onRevertClosingStock}
+                                    className="mt-3 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 transition"
+                                >
+                                    Revert closing stock
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
