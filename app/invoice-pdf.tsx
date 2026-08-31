@@ -21,6 +21,177 @@ interface PDFToExcelConverterRef {
 
 type TableData = string[][];
 
+interface TextItem {
+    text: string;
+    x: number;
+    y: number;
+    w: number;
+    page: number;
+}
+
+const INVOICE_HEADERS = ['Sl.No.', 'Brand Number', 'Brand Name', 'Product Type', 'Pack Type', 'Pack Qty/Size', 'Qty(Cases)', 'Qty(Bottles)', 'Rate/Case', 'Unit Rate/Btl', 'Total'];
+
+// The depot has shipped ICDCs headed both "Sl.No." and "S.No.", with different
+// column widths, so the table is located by geometry rather than by line text:
+// a wide layout keeps each line item on one line, a narrow one wraps the brand
+// name and pack size over three.
+const SNO_HEADER = /^S\.?\s*l?\.?\s*No\.?$/i;
+// first item of the totals block that follows the last line item
+const SUMMARY_START = /^TIN$|^Particulars$|^Breakage|^Amount in words|Invoice\s*Value/i;
+// page furniture that sits inside the table's y-range but is not table data
+const NOISE = /^https?:\/\/|www\.|^\d{1,2}\/\d{1,2}\/\d{2},|^ICDC$/i;
+// The page number ("3/5") shares its line with the footer URL. It has to be
+// matched by position rather than by shape: a 90 ml pack size renders as
+// "96 / 90", which no pattern can tell apart from a page number.
+const PAGE_FOOTER = /^https?:\/\/|printicdcs/i;
+
+// Column anchors, matched against the header text items, left to right.
+const COLUMN_ANCHORS: Array<{ col: number; re: RegExp }> = [
+    { col: 0, re: SNO_HEADER },
+    { col: 1, re: /^Number$/i },
+    { col: 2, re: /^Brand\s+Name$/i },
+    { col: 3, re: /^Product$/i },
+    { col: 4, re: /^Pack$/i },
+    { col: 5, re: /^(Pack\s*)?Qty\s*\/$/i },
+    { col: 6, re: /^Qty\(Cases/i },
+    { col: 7, re: /^Qty\(Bottles/i },
+    { col: 8, re: /^Unit\s*Rate/i },
+    { col: 10, re: /^Total$/i },
+];
+
+const norm = (s: string): string => s.replace(/\s+/g, ' ').trim();
+
+const parseInvoiceItems = (items: TextItem[]): TableData | null => {
+    // 1. locate the header and derive the column anchor x positions
+    const headerItem = items.find(i => SNO_HEADER.test(i.text.trim()));
+    if (!headerItem) return null;
+
+    const headerBand = items.filter(
+        i => i.page === headerItem.page && i.y >= headerItem.y - 30 && i.y <= headerItem.y + 40
+    );
+    const headerBottom = Math.min(...headerBand.map(i => i.y));
+
+    const anchors: Array<{ col: number; x: number }> = [];
+    for (const { col, re } of COLUMN_ANCHORS) {
+        // "Pack" labels both Pack Type and Pack Qty - col 4 is the leftmost one
+        const hits = headerBand.filter(i => re.test(i.text.trim())).sort((a, b) => a.x - b.x);
+        if (hits.length) anchors.push({ col, x: hits[0].x });
+    }
+    anchors.sort((a, b) => a.x - b.x);
+    const snoAnchor = anchors.find(a => a.col === 0);
+    if (!snoAnchor || !anchors.some(a => a.col === 10)) return null;
+
+    // 2. find where the table ends (the totals block)
+    const summary = items.find(
+        i => SUMMARY_START.test(i.text.trim()) &&
+            (i.page > headerItem.page || (i.page === headerItem.page && i.y < headerBottom))
+    );
+    const beforeSummary = (i: TextItem): boolean => {
+        if (!summary) return true;
+        if (i.page !== summary.page) return i.page < summary.page;
+        return i.y > summary.y;
+    };
+
+    // 3. keep only the items inside the table body
+    const footerY = new Map<number, number>();
+    for (const i of items) {
+        if (PAGE_FOOTER.test(i.text.trim())) footerY.set(i.page, i.y);
+    }
+
+    const body = items.filter(i => {
+        if (NOISE.test(i.text.trim())) return false;
+        if (!beforeSummary(i)) return false;
+        if (i.page === headerItem.page && i.y >= headerBottom - 3) return false;
+        const fy = footerY.get(i.page);
+        if (fy !== undefined && Math.abs(i.y - fy) <= 5) return false;
+        return true;
+    });
+
+    // a line item starts at a bare integer sitting in the Sl.No. column
+    const records = body
+        .filter(i => /^\d{1,3}$/.test(i.text.trim()) && Math.abs(i.x - snoAnchor.x) <= 20)
+        .sort((a, b) => (a.page !== b.page ? a.page - b.page : b.y - a.y));
+    if (!records.length) return null;
+
+    // 4. group the items into one band per line item
+    const bands = records.map((anchor, idx) => {
+        const prev = records[idx - 1];
+        const next = records[idx + 1];
+        return {
+            anchor,
+            top: prev && prev.page === anchor.page ? (prev.y + anchor.y) / 2 : Infinity,
+            bottom: next && next.page === anchor.page ? (anchor.y + next.y) / 2 : -Infinity,
+            items: [] as TextItem[],
+        };
+    });
+    for (const item of body) {
+        const band = bands.find(b => b.anchor.page === item.page && item.y < b.top && item.y > b.bottom);
+        if (band) band.items.push(item);
+    }
+
+    // 5. discover the columns by clustering the data items' x-spans
+    const spans = bands.flatMap(b => b.items).map(i => [i.x, i.x + (i.w || 0)]).sort((a, b) => a[0] - b[0]);
+    const clusters: number[][] = [];
+    for (const [lo, hi] of spans) {
+        const last = clusters[clusters.length - 1];
+        if (last && lo <= last[1] + 2) last[1] = Math.max(last[1], hi);
+        else clusters.push([lo, hi]);
+    }
+
+    const bounds: number[] = [];
+    for (let i = 0; i < clusters.length - 1; i++) bounds.push((clusters[i][1] + clusters[i + 1][0]) / 2);
+    const clusterOf = (x: number): number => {
+        let k = 0;
+        while (k < bounds.length && x >= bounds[k]) k++;
+        return k;
+    };
+
+    // Clusters and header anchors are both left-to-right, so zip them when their
+    // counts agree - more reliable than nearest-x, since a header label can sit
+    // closer to the neighbouring column's data than to its own.
+    const clusterCol = new Map<number, number>();
+    if (clusters.length === anchors.length) {
+        anchors.forEach((a, k) => clusterCol.set(k, a.col));
+    } else {
+        clusters.forEach((c, k) => {
+            let best = anchors[0];
+            let bestD = Infinity;
+            for (const a of anchors) {
+                const d = a.x >= c[0] && a.x <= c[1] ? 0 : Math.min(Math.abs(a.x - c[0]), Math.abs(a.x - c[1]));
+                if (d < bestD) { bestD = d; best = a; }
+            }
+            clusterCol.set(k, best.col);
+        });
+    }
+
+    // 6. emit one row per line item
+    const rows: TableData = [INVOICE_HEADERS];
+    for (const band of bands) {
+        const cells: string[][] = Array.from({ length: 11 }, () => []);
+        const sorted = [...band.items].sort((a, b) => (Math.abs(a.y - b.y) > 3 ? b.y - a.y : a.x - b.x));
+        for (const item of sorted) {
+            const col = clusterCol.get(clusterOf(item.x));
+            if (col !== undefined) cells[col].push(item.text.trim());
+        }
+        const row = cells.map(parts => norm(parts.join(' ')));
+
+        // the Rate/Case cell holds "<per case> / <per bottle>"
+        if (row[8].includes('/')) {
+            const [perCase, perBottle] = row[8].split('/');
+            row[8] = norm(perCase);
+            row[9] = norm(perBottle);
+        }
+        row[1] = row[1] ? row[1].padStart(4, '0') : '';
+        // a line item can straddle a page break, leaving a stray "ml" in the next
+        // record's cell - rebuild the pack size from the first "<qty> / <size>" pair
+        const pack = row[5].match(/(\d+)\s*\/\s*(\d+)/);
+        row[5] = pack ? `${pack[1]} / ${pack[2]} ml` : row[5];
+
+        rows.push(row);
+    }
+    return rows;
+};
+
 // Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyBf-dvyFjMttuLD43V4MBBRbuvfbwBRKsI",
@@ -108,61 +279,6 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
         }
     };
 
-    const parseInvoiceText = useCallback((rows: string[]): TableData => {
-        const headers = ['Sl.No.', 'Brand Number', 'Brand Name', 'Product Type', 'Pack Type', 'Pack Qty/Size', 'Qty(Cases)', 'Qty(Bottles)', 'Rate/Case', 'Unit Rate/Btl', 'Total'];
-        const tableData: TableData = [headers];
-        let currentItem: string[] | null = null;
-        let foundTableStart = false;
-
-        for (let i = 0; i < rows.length; i++) {
-            const line = rows[i].trim();
-            if (!foundTableStart) {
-                if (line.includes('Sl.No') && line.includes('Brand')) { foundTableStart = true; }
-                continue;
-            }
-            if (line.includes('Invoice Qty') || line.includes('Particulars')) break;
-
-            const match = line.match(/^(\d{1,2})\s+(\d{3,5})\s+(.+)/);
-            if (match) {
-                if (currentItem) tableData.push(currentItem);
-                const [, slNo, brandNo, restOfLine] = match;
-                const productTypeMatch = restOfLine.match(/(IML|Beer|Duty Paid)/);
-                let brandName = '', remaining = '';
-                if (productTypeMatch) {
-                    brandName = restOfLine.substring(0, productTypeMatch.index).trim();
-                    remaining = restOfLine.substring(productTypeMatch.index!).trim();
-                } else { brandName = restOfLine; }
-                const parts = remaining.split(/\s+/);
-                const packQtyMatch = remaining.match(/(\d+\s*\/\s*\d+\s*ml)/);
-                const packQty = packQtyMatch ? packQtyMatch[1] : '';
-                const afterPackQty = packQtyMatch ? remaining.substring(remaining.indexOf(packQtyMatch[1]) + packQtyMatch[1].length).trim() : remaining;
-                const numbers = afterPackQty.match(/[\d,]+\.?\d*/g) || [];
-                currentItem = [slNo, brandNo.padStart(4, '0'), brandName, parts[0] || '', parts[1] || '', packQty, numbers[0] || '', numbers[1] || '', numbers[2] || '', numbers[3] || '', numbers[4] || ''];
-            } else if (currentItem) {
-                const hasProductType = /IML|Beer|Duty Paid/.test(line);
-                const startsWithNumber = /^\d/.test(line);
-                const isURL = /https?:\/\/|www\./.test(line);
-                if (!hasProductType && !startsWithNumber && !isURL && line.length < 100) {
-                    currentItem[2] += ' ' + line;
-                } else if (hasProductType && !currentItem[3]) {
-                    const parts = line.split(/\s+/);
-                    if (!currentItem[3]) currentItem[3] = parts[0] || '';
-                    if (!currentItem[4]) currentItem[4] = parts[1] || '';
-                    const packMatch = line.match(/(\d+\s*\/\s*\d+\s*ml)/);
-                    if (packMatch && !currentItem[5]) currentItem[5] = packMatch[1];
-                    const nums = line.match(/[\d,]+\.?\d*/g) || [];
-                    let numIndex = 0;
-                    for (let j = 6; j < 11; j++) {
-                        if (!currentItem[j] && nums[numIndex]) { currentItem[j] = nums[numIndex]; numIndex++; }
-                    }
-                }
-            }
-        }
-        if (currentItem) tableData.push(currentItem);
-        if (tableData.length === 1) tableData.push(['', '', 'No invoice data found in PDF', '', '', '', '', '', '', '', '']);
-        return tableData;
-    }, []);
-
     const extractWithPdfJs = useCallback(async (file: File): Promise<{ idocNumber: string; invoiceDate: string; tableData: TableData }> => {
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -177,14 +293,14 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
 
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        const allTextItems: { text: string; x: number; y: number; page: number }[] = [];
+        const allTextItems: TextItem[] = [];
 
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             textContent.items.forEach((item: any) => {
                 if (item.str && item.str.trim()) {
-                    allTextItems.push({ text: item.str, x: item.transform[4], y: item.transform[5], page: i });
+                    allTextItems.push({ text: item.str, x: item.transform[4], y: item.transform[5], w: item.width, page: i });
                 }
             });
         }
@@ -195,27 +311,16 @@ const PDFToExcelConverter = forwardRef<PDFToExcelConverterRef, PDFToExcelConvert
             return a.x - b.x;
         });
 
-        const rows: string[] = [];
-        let currentRow: typeof allTextItems = [];
-        let lastY = allTextItems[0]?.y;
-        allTextItems.forEach(item => {
-            if (Math.abs(item.y - lastY) > 5) {
-                if (currentRow.length > 0) { rows.push(currentRow.map(r => r.text).join(' ')); currentRow = []; }
-                lastY = item.y;
-            }
-            currentRow.push(item);
-        });
-        if (currentRow.length > 0) rows.push(currentRow.map(r => r.text).join(' '));
-
         const fullText = allTextItems.map(item => item.text).join(' ');
         const idocMatch = fullText.match(/\bICDC\d{15,20}\b/i);
         const idocNumber = idocMatch ? idocMatch[0] : '';
         const dateMatch = fullText.match(/Invoice Date:\s*(\d{1,2}[-\/]\w{3}[-\/]\d{4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
         const invoiceDate = dateMatch ? dateMatch[1] : '';
-        const tableData = parseInvoiceText(rows);
+        const tableData = parseInvoiceItems(allTextItems)
+            ?? [INVOICE_HEADERS, ['', '', 'No invoice data found in PDF', '', '', '', '', '', '', '', '']];
 
         return { idocNumber, invoiceDate, tableData };
-    }, [parseInvoiceText]);
+    }, []);
 
     const extractFromPDF = useCallback(async (file: File): Promise<void> => {
         setLoading(true);
