@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Save, CheckCircle, AlertCircle, Download, FileSpreadsheet, FileText, RefreshCw, LogOut, Pencil, Settings, Trash2, BookOpen } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { sampleWinesData } from "@/app/sample-data";
 import PDFToExcelConverter, { PDFToExcelConverterRef } from "@/app/invoice-pdf";
 import LoginForm from "@/app/login";
 import FeedbackButton from "@/app/components/FeedbackButton";
@@ -484,14 +483,20 @@ export default function Home() {
             }
         }
 
-        const activeWinesData = winesData.length > 0 ? winesData.map((w: any) => ({
+        if (winesData.length === 0) {
+            alert('No price list found. An admin needs to upload the price list PDF first (Manage → Price List).');
+            handlePdfReset();
+            return;
+        }
+
+        const activeWinesData = winesData.map((w: any) => ({
             'Brand Number': w.brandNumber,
             'Product Name': w.productName,
             'Issue Price': w.issuePrice,
             'MRP': w.mrp,
-        })) : sampleWinesData;
+        }));
 
-        console.log('Using wines data source:', winesData.length > 0 ? `Firebase (${winesData.length} entries)` : `sampleWinesData (${sampleWinesData.length} entries)`);
+        console.log(`Using price list from Firebase (${winesData.length} entries)`);
 
         const filtered: FilteredItem[] = [];
         const missed: MissedItem[] = [];
@@ -1922,6 +1927,9 @@ export default function Home() {
                 setUserRole(userRole);
                 setUsername(username);
                 if (selectedShop) setSelectedShop(selectedShop);
+                // a restored session skips handleLogin, so the price list has to
+                // be fetched here too or matching silently runs with no data
+                loadWinesFromFirebase();
             } else {
                 localStorage.removeItem('wineAppLogin');
             }
