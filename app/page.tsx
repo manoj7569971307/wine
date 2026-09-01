@@ -1989,6 +1989,8 @@ export default function Home() {
         return <AdminPanel onBack={() => {
             setShowAdminPanel(false);
             loadAvailableShops();
+            // the admin may have just uploaded a new price list
+            loadWinesFromFirebase();
         }} />;
     }
 
